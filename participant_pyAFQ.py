@@ -17,21 +17,28 @@ import AFQ.viz.altair as ava
 
 # afd.organize_stanford_data(clear_previous_afq="track")
 
-tracking_params = dict(n_seeds=25000,
-                       random_seeds=True,
-                       rng_seed=2022,
-                       trx=True,
-                       num_chunks=False)
+# tracking_params = dict(n_seeds=25000,
+#                        random_seeds=True,
+#                        rng_seed=2022,
+#                        trx=True,
+#                        num_chunks=False)
 
-directory = "/Users/ldaumail3/Documents/AMPB_MT_tractometry_analysis/AMPB"#anat"
+bids_path = "/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb"#anat"
+preprocDir = op.join(bids_path, 'derivatives/qsiprep')
+participant = 'sub-EBxGxEYx1965'
+dwi_path = op.join(preprocDir, participant, 'ses-03', 'dwi', participant+'_ses-03_acq-HCPdir99_space-T1w_desc-preproc_dwi.nii.gz')
+bval_path = op.join(preprocDir, participant, 'ses-03', 'dwi', participant+'_ses-03_acq-HCPdir99_space-T1w_desc-preproc_dwi.bval')
+bvec_path = op.join(preprocDir, participant, 'ses-03', 'dwi', participant+'_ses-03_acq-HCPdir99_space-T1w_desc-preproc_dwi.bvec')
+out_dir = op.join(bids_path, 'derivatives/afq/', participant)
+os.makedirs(out_dir, exist_ok=True)
 
 myafq = ParticipantAFQ(
-    bids_path=directory, 
-    preproc_pipeline='qsiprep',
-    tracking_params=tracking_params,
-    viz_backend_spec='plotly_no_gif')
+    dwi_data_file=dwi_path,
+    bval_file=bval_path,
+    bvec_file=bvec_path,
+    output_dir=out_dir,
+    csd_sh_order=4)
 
-preprocDir = op.join(directory, 'derivatives/qsiprep')
 
 #First get subjects names that we are going to loop through in the directory
 # subjNames = [f for f in os.listdir(preprocDir) if f not in {".DS_Store", "dataset_description.json", "dwiqc.json","logs"} and not f.endswith((".html"))]
@@ -44,8 +51,8 @@ preprocDir = op.join(directory, 'derivatives/qsiprep')
 # afq_dir = op.join(directory, "derivatives/afq", folder, ses)
 #If the FA was not calculated yet, need to run this step
 # if not any("FA_dwi.nii.gz" in file for file in os.listdir(afq_dir)):
-print("No file contains 'FA_dwi.nii.gz' in its name. Calculating FA and other parameters...")        
-FA_fname = myafq.export("dti_fa")#[folder]['04']
+# print("No file contains 'FA_dwi.nii.gz' in its name. Calculating FA and other parameters...")        
+# FA_fname = myafq.export("dti_fa")#[folder]['04']
 
 #Extract profiles
 myafq.export_all()
@@ -60,7 +67,7 @@ fig, ax = plt.subplots(1)
 ax.matshow(FA[:, :, FA.shape[-1] // 2], cmap='viridis')
 ax.axis("off")
 # Save the figure
-subject_dir = op.join(directory, "derivatives/afq", folder)
+subject_dir = op.join(bids_path, "derivatives/afq", folder)
 output_filename = folder + "_medial_fig"
 output_path = op.join(subject_dir, output_filename)
 fig.savefig(output_path, dpi=300, bbox_inches="tight")
