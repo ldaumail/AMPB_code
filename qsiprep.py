@@ -10,9 +10,10 @@ output_dir = op.join(op.expanduser('~'), 'Documents/research/ampb_mt_tractometry
 work_dir = op.join(op.expanduser('~'), 'Documents/research/ampb_mt_tractometry_analysis/ampb/work')
 
 
-participants = [f for f in os.listdir(bids_dir) if f not in {".DS_Store", "dataset_description.json", "code","derivatives"}]
+participants = [f for f in os.listdir(bids_dir) if f not in {".DS_Store", "dataset_description.json", "code","derivatives", "work"}]
 participants_cleaned = [f.replace("sub-", "") for f in participants]
 print(participants_cleaned)
+
 
 for participant in participants_cleaned:
     cmd = f"docker run --rm " \
@@ -23,7 +24,6 @@ for participant in participants_cleaned:
         f"pennlinc/qsiprep:{version} " \
         f"--skip-bids-validation " \
         f"/bids /out participant " \
-        f"--skip-bids-validation " \
         f"--participant-label {participant} " \
         f"-w /work " \
         f"--ignore fieldmaps " \
