@@ -8,7 +8,7 @@
 #SBATCH -N1 --ntasks-per-node=8               # Number of nodes and cores per node
 #SBATCH --mem-per-cpu=10G                      # Memory per core
 #SBATCH -t480                                 # Duration of the job (8*60 = 480 mins)
-#SBATCH -qembers                              # QOS name
+#SBATCH -qembers                              # QOS name #embers = free leftover cpus, risk for job to be killed by other jobs; inferno = paid for cpus, faster, no risk.
 #SBATCH -oReport-%j.out                       # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL            # Mail preferences
 #SBATCH --mail-user=ldaumail3@gatech.edu      # E-mail address for notifications
@@ -41,7 +41,6 @@ $HOME/p-wpark78-0/images/qsiprep-latest.sif \
     --low-mem --stop-on-first-crash \
     --fs-license-file /license.txt
 
-#    -B /mnt:mnt \
 # getting end time to calculate time elapsed
 end=`date +%s`
 elapsed=`expr $end - $begin`
