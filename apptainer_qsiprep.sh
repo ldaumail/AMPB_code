@@ -36,7 +36,7 @@ $HOME/p-wpark78-0/images/qsiprep-latest.sif \
     -w /work \
     --ignore fieldmaps \
     --output-resolution 1.5 \
-    --mem-mb 50000 \
+    --mem-mb 80000 \
     --nprocs 8 \
     --low-mem --stop-on-first-crash \
     --fs-license-file /license.txt
