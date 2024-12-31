@@ -23,7 +23,7 @@ echo $HOSTNAME
 # Loading modules
 #module load apptainer
 
-apptainer run --containall --writable-tmpfs \
+apptainer run \
     --bind $HOME/scratch/ampb:/bids \
     --bind $HOME/scratch/ampb/derivatives/qsiprep:/out \
     --bind $HOME/scratch/ampb/work:/work \
@@ -36,7 +36,7 @@ $HOME/p-wpark78-0/images/qsiprep-latest.sif \
     -w /work \
     --ignore fieldmaps \
     --output-resolution 1.5 \
-    --mem-mb 80000 \
+    --mem-mb 75000 \
     --nprocs 8 \
     --low-mem --stop-on-first-crash \
     --fs-license-file /license.txt
