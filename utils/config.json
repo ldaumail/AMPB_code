@@ -1,0 +1,85 @@
+{
+  "descriptions": [
+    {
+      "datatype": "anat",
+      "suffix": "T1w",
+      "custom_entities": "acq-MEMPRvNav_rec-RMS",
+      "criteria": {
+        "SeriesDescription": "anat-T1w_acq-MEMPRvNav RMS"
+      }
+    },
+    {
+      "datatype": "anat",
+      "suffix": "T2w",
+      "custom_entities": "acq-SPCvNav",
+      "criteria": {
+        "SeriesDescription": "anat-T2w_acq-SPCvNav"
+      }
+    }, 
+    {
+      "id": "id_mtlocal",
+      "datatype": "func",
+      "suffix": "bold",
+      "custom_entities": "task-mtlocal",
+      "criteria": {
+        "SeriesDescription": "func-bold_task-mtlocal_*"
+      }
+    }, 
+    {
+      "id": "id_ptlocal",
+      "datatype": "func",
+      "suffix": "bold",
+      "custom_entities": "task-ptlocal",
+      "criteria": {
+        "SeriesDescription": "func-bold_task-ptlocal_*"
+      }
+    }, 
+    {
+      "id": "id_ampb",
+      "datatype": "func",
+      "suffix": "bold",
+      "custom_entities": "task-ampb",
+      "criteria": {
+        "SeriesDescription": "func-bold_task-ampb_*"
+      }
+    }, 
+    {
+      "datatype": "fmap",
+      "suffix": "epi",
+      "custom_entities": "acq-opphase_dir-AP",
+      "criteria": {
+        "SeriesDescription": "fmap-epi_acq-opphase_dir-AP"
+      },
+      "sidecar_changes": {
+        "IntendedFor": [ "id_mtlocal", "id_ptlocal", "id_ampb" ]
+      }
+    }, 
+    {
+      "datatype": "fmap",
+      "suffix": "epi",
+      "custom_entities": "acq-opphase_dir-PA",
+      "criteria": {
+        "SeriesDescription": "fmap-epi_acq-opphase_dir-PA"
+      },
+      "sidecar_changes": {
+        "IntendedFor": [ "id_mtlocal", "id_ptlocal", "id_ampb" ]
+      }
+    },
+    {
+      "datatype": "dwi",
+      "suffix": "dwi",
+      "custom_entities": "acq-HCPdir99_dir-AP",
+      "criteria": {
+        "SeriesDescription": "dwi_acq-HCPdir99_dir-AP"
+      }
+    }, 
+    {
+      "datatype": "dwi",
+      "suffix": "dwi",
+      "custom_entities": "acq-HCPdir99_dir-PA",
+      "criteria": {
+        "SeriesDescription": "dwi_acq-HCPdir99_dir-PA"
+      }
+    }
+  ]
+}

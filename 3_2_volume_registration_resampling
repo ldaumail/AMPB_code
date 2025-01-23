@@ -1,0 +1,31 @@
+#!/bin/bash
+#This script intends to transform volumes in standard anatomical space like atlases into individual anatomical space
+#Loic Daumail -01/20/2024
+
+#PARAMS
+export PROJ=ampb
+export SUBJID=sub-NSxGxHNx1952
+export SUBJSESS=ses-01
+export WORK_DIR=/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/${PROJ}
+export SESS_DIR=${SUBJSESS}
+export MIDFRAME='75'
+
+### Attempt: 1 use mri_robust_register to generate registration file
+mkdir /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/work/sub-NSxGxHNx1952
+
+#First: create a reference frame that is centered midway through acquisition  
+mri_convert ${WORK_DIR}/derivatives/qsiprep/${SUBJID}/ses-04/dwi/${SUBJID}_ses-04_acq-HCPdir99_space-ACPC_desc-preproc_dwi.nii.gz -f $MIDFRAME ${WORK_DIR}/work/${SUBJID}/${SUBJID}_ses-04_acq-HCPdir99_space-ACPC_desc-preproc_dwi${MIDFRAME}.nii.gz
+
+#Second: Coregister Atlas parcellation/segmentation on reference frame
+mri_robust_register --mov ${WORK_DIR}/derivatives/freesurfer/${SUBJID}/mri/aparc.a2009s+aseg.mgz --dst ${WORK_DIR}/work/${SUBJID}/${SUBJID}_ses-04_acq-HCPdir99_space-ACPC_desc-preproc_dwi75.nii.gz --lta ${WORK_DIR}/work/${SUBJID}/aparc2009saseg2dwi.lta --satit
+#--isca
+
+#Resample atlas segmentation/parcellation from Atlas space to diffusion space
+
+mri_vol2vol --mov ${WORK_DIR}/derivatives/freesurfer/${SUBJID}/mri/aparc.a2009s+aseg.mgz --targ ${WORK_DIR}/work/${SUBJID}/${SUBJID}_ses-04_acq-HCPdir99_space-ACPC_desc-preproc_dwi75.nii.gz --o ${WORK_DIR}/work/${SUBJID}/aparc.a2009s+aseg_space-dwi.mgz --lta ${WORK_DIR}/work/${SUBJID}/aparc2009saseg2dwi.lta --interp trilinear
+
+
+### Attempt 2: use mni space
+
+mri_vol2vol --mov ${WORK_DIR}/derivatives/freesurfer/${SUBJID}/mri/aparc.a2009s+aseg.mgz --targ ${WORK_DIR}/derivatives/qsiprep/${SUBJID}/ses-04/dwi/${SUBJID}_ses-04_acq-HCPdir99_space-ACPC_desc-preproc_dwi.nii.gz --o ${WORK_DIR}/work/${SUBJID}/aparc.a2009s+aseg_space-ACPCdwi.mgz --xfm ${WORK_DIR}/derivatives/qsiprep/${SUBJID}/anat/${SUBJID}_from-ACPC_to-anat_mode-image_xfm.mat --interp trilinear
+

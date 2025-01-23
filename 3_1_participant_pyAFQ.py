@@ -1,4 +1,4 @@
-#This script calculates FA and runs tractography on diffusion maps previously processed with pyAFQ
+#This script calculates FA and runs tractography on diffusion maps using pyAFQ previously processed with qsiprep
 #Last edited 11/21/2024 - Loic Daumail 
 #Code needs an update for participant level analysis
 import os
@@ -26,15 +26,15 @@ import AFQ.viz.altair as ava
 
 bids_path = "/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb"#anat"
 preprocDir = op.join(bids_path, 'derivatives/qsiprep')
-subjNames = [f for f in os.listdir(preprocDir) if f not in {".DS_Store", "dataset_description.json", "dwiqc.json","logs"} and not f.endswith((".html"))]
+subjNames = [f for f in os.listdir(preprocDir) if f not in {".DS_Store", "dataset_description.json", "dwiqc.json","logs",".bidsignore"} and not f.endswith((".html"))]
 # Loop through each subject folder in the directory
 for participant in subjNames:
     #First we have to look for the files of interest for this subject (dwi, bval, bvec)
     diff_path = op.join(preprocDir, participant, 'ses-04', 'dwi')
     patterns = [
-    "T1w_desc-preproc_dwi.nii.gz",
-    "T1w_desc-preproc_dwi.bval",
-    "T1w_desc-preproc_dwi.bvec"]
+    "_desc-preproc_dwi.nii.gz",
+    "_desc-preproc_dwi.bval",
+    "_desc-preproc_dwi.bvec"]
 
     # Find files
     matched_files = {pattern: [] for pattern in patterns}
