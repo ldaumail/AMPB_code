@@ -88,3 +88,40 @@ ants.image_write(fsparc_warped, os.path.join(WORK_DIR, "sub-NSxGxHNx1952/transfo
 #     --winsorize-image-intensities [ 0.002, 0.998 ] \
 #     --write-composite-transform 0
 
+############################# Resample Glasser Atlas to QSIPREPT1 space (ACPC) #############
+import ants
+FIXED_QSIPREPT1 = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/qsiprep/sub-NSxGxHNx1952/anat/sub-NSxGxHNx1952_space-ACPC_desc-preproc_T1w.nii.gz'
+qsiprep_t1 = ants.image_read(FIXED_QSIPREPT1)
+MOV_GLASSER_NII = os.path.join("/Users/ldaumail3/Documents/research/brain_atlases/MNI2009a_GM/HCP-MMP1_on_MNI152_ICBM2009a_nlin_hd.nii.gz")
+mov_glasser_nii = ants.image_read(MOV_GLASSER_NII)
+
+mytx = "/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/qsiprep/sub-NSxGxHNx1952/anat/sub-NSxGxHNx1952_from-MNI152NLin2009cAsym_to-ACPC_mode-image_xfm.h5"
+
+fsparc_warped = ants.apply_transforms( fixed = qsiprep_t1, 
+                                       moving = mov_glasser_nii , 
+                                       transformlist = mytx,                                       
+                                       interpolator  = 'genericLabel', 
+                                       ) #whichtoinvert = [True, False]
+
+
+ants.plot( qsiprep_t1, fsparc_warped, overlay_alpha = 0.5 )
+
+
+
+############################# Resample QSIPREPT1 to Glasser Atlas MNI space #############
+# import ants
+# MOV_QSIPREPT1 = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/qsiprep/sub-NSxGxHNx1952/anat/sub-NSxGxHNx1952_space-ACPC_desc-preproc_T1w.nii.gz'
+# qsiprep_t1 = ants.image_read(MOV_QSIPREPT1)
+# FIXED_GLASSER_NII = os.path.join("/Users/ldaumail3/Documents/research/brain_atlases/MNI2009a_GM/HCP-MMP1_on_MNI152_ICBM2009a_nlin_hd.nii.gz")
+# fixed_glasser_nii = ants.image_read(FIXED_GLASSER_NII)
+
+# mytx = "/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/qsiprep/sub-NSxGxHNx1952/anat/sub-NSxGxHNx1952_from-ACPC_to-MNI152NLin2009cAsym_mode-image_xfm.h5"
+
+# qsiprepT1_warped = ants.apply_transforms( fixed = fixed_glasser_nii, 
+#                                        moving = qsiprep_t1, 
+#                                        transformlist = mytx,                                       
+#                                        interpolator  = 'bSpline', 
+#                                        ) #whichtoinvert = [True, False]
+
+
+# ants.plot( qsiprepT1_warped,fixed_glasser_nii, overlay_alpha = 0.5 )
