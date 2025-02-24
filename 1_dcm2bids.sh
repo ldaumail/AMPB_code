@@ -2,8 +2,8 @@
 
 participant="sub-NSxLxATx1954"
 
-paths_main="/Volumes/Leviathan/AMPB"
-paths_data="${paths_main}/${participant}"
+paths_main="/Volumes/cos-lab-wpark78/Loic_backup/ampb"
+paths_data="${paths_main}/VisDep-AMPB/SUBJECTS/${participant}/SESSIONS"
 paths_out="${paths_main}/data"
 config_file="${paths_main}/config.json"
 
