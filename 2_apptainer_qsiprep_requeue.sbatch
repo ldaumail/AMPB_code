@@ -16,10 +16,8 @@
 #SBATCH --array=1-4%2                             # Job IDs to run simultaneously from SUBJ list (limited to 4 simultaneously with %4)
 #SBATCH --requeue				#Resume job if previously crashed
 
-#SUBJ=(NSxGxBAx1970 EBxGxCCx1986 EBxLxHHx1949 EBxGxZAx1990 NSxLxATx1954 EBxGxEYx1965 NSxGxHNx1952 NSxLxYKx1964 EBxLxQPx1957 EBxGxYZx1949 EBxLxTZx1956 NSxGxIFx1991 EBxGxPEx1959 NSxGxHKx1965 NSxLxQUx1953 NSxLxPQx1973)
-#damaged NSxLxATx1954 EBxGxYZx1949 EBxLxTZx1956 #still need to run them maybe with new data
-SUBJ=(EBxGxYZx1949 NSxGxHNx1952 EBxLxTZx1956 NSxLxATx1954) # #NSxGxHNx1952
-#SUBJ=(NSxGxBAx1970 EBxGxCCx1986 EBxLxHHx1949 EBxGxZAx1990 NSxLxYKx1964 NSxLxPQx1973 EBxGxEYx1965 EBxLxQPx1957 NSxGxIFx1991 EBxGxPEx1959 NSxGxHKx1965 NSxLxQUx1953) 
+SUBJ=(NSxGxBAx1970 EBxGxCCx1986 EBxLxHHx1949 EBxGxZAx1990 NSxLxATx1954 EBxGxEYx1965 NSxGxHNx1952 NSxLxYKx1964 EBxLxQPx1957 EBxGxYZx1949 EBxLxTZx1956 NSxGxIFx1991 EBxGxPEx1959 NSxGxHKx1965 NSxLxQUx1953 NSxLxPQx1973)
+
 # for calculating the amount of time the job takes
 begin=`date +%s`
 echo $HOSTNAME
