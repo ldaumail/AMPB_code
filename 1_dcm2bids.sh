@@ -22,7 +22,7 @@ while IFS= read -r participant; do
     for session in "ses-01" "ses-01b" "ses-02" "ses-03" "ses-04"; do
         echo "  Processing session: $session"
         # Run dcm2bids
-        /Users/ldaumail3/Documents/applications/dcm2bids_macOS_3.2.0/dcm2bids \
+        dcm2bids \
             --dicom_dir "${dicom_source}/${session}" \
             --participant "${participant}" \
             --session "${session}" \

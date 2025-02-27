@@ -21,7 +21,7 @@ for participant in subjNames:
         input_label = op.join(surf_ROI_path, participant,participant+"_hemi-L_space-fsnative_label-MT_mask.label" )
         t1_template = op.join("/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/freesurfer", participant, "mri/T1.mgz")
         hemi = "lh"
-        freesurferCommand = f'mri_surf2vol --o {output_volume} --i {input_label} --subject {participant} --hemi {hemi} --template {t1_template}'
+        freesurferCommand = f'mri_surf2vol --o {output_volume} --subject {participant} --so {input_label} --hemi {hemi} --template {t1_template}'
         os.system(f'bash {utils}/callFreesurferFunction.sh -s "{freesurferCommand}"')
 
 
