@@ -9,4 +9,4 @@ This script is ran with the list of participants you want to convert the data in
 
 3: 3_1_ROI_pyAFQ_glasser.py: this script aims to use Glasser-based binary masks to run tractography using pyAFQ.
 First part of the script creates a set of MT and PT binary masks from the Glasser atlas in MNI2009a space for the entire dataset.
-The second part of the script runs GroupAFQ using the binary masks on each participant data.
+The second part of the script runs GroupAFQ using the binary masks on each participant data. In this case, the ROI paths are provided to the bundle dictionnary, there is not directionality in the tractography parameters.
