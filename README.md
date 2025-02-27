@@ -8,5 +8,5 @@ This script is ran with the list of participants you want to convert the data in
 2: 2_apptainer_qsiprep_requeue.sbatch : this script launches batch jobs in parallel on the PACE clusters. The BIDS data from each individual is preprocessed using qsiprep. when logged in on PACE, just use the command line : "sbatch 2_apptainer_qsiprep_requeue.sbatch"
 
 3: 3_1_ROI_pyAFQ_glasser.py: this script aims to use Glasser-based binary masks to run tractography using pyAFQ.
-First part of the script creates a set of binary masks from the Glasser atlas in MNI2009a space for the entire dataset.
-The second part of the script runs GroupAFQ.
+First part of the script creates a set of MT and PT binary masks from the Glasser atlas in MNI2009a space for the entire dataset.
+The second part of the script runs GroupAFQ using the binary masks on each participant data.
