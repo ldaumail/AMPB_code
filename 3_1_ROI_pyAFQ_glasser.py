@@ -29,7 +29,7 @@ import AFQ.api.bundle_dict as abd
 # dealing with subject space ROIs. If it's already in binary format,
 # there is no need to do this step.
 
-#Creat only one set of MNI ROIs for the whole dataset
+#Create only one set of MNI ROIs for the whole dataset
 
 roi_path = os.path.expanduser("~/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/glasser/mni_rois")
 os.makedirs(roi_path, exist_ok=True)
