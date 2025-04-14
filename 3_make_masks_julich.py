@@ -1,8 +1,10 @@
+#This script was developped to resample Julich ROIs from MNI space to individual subject diffusion space (ACPC)
+# For each participant
+#Loic Daumail - 12/04/2025
 import os
 import os.path as op
 import ants
 import argparse
-# from nilearn.image import resample_to_img
 
 
 def main(participant_file):
