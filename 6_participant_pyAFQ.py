@@ -9,13 +9,16 @@ from AFQ.definitions.image import ImageFile, RoiImage
 import argparse
 
 
-def main(participant_file):
-
+def main(participant_file, paths_local):
+    '''
+    To run this function, you need to provide 2 variables:
+    1. The path to a text file containing the list of participant IDs
+    2. Provide the path to the Bids directory
+    '''
     for participant in participant_file:
         # participant = 'sub-NSxLxYKx1964'
         # directories
-        # paths_server = op.join('/Volumes', 'cos-lab-wpark78', 'Loic_backup', 'tests', 'afq-functionalROI2', 'derivatives')
-        paths_local = op.join('/Users','ldaumail3','Documents','research','ampb_mt_tractometry_analysis', 'ampb')
+        # paths_local = op.join('/Users','ldaumail3','Documents','research','ampb_mt_tractometry_analysis', 'ampb')
         output_dir = op.join(paths_local, 'derivatives/afq', participant)
         os.makedirs(output_dir, exist_ok=True)
 
@@ -133,7 +136,8 @@ def main(participant_file):
                 **bundle_kwargs
             }
             },
-            resample_subject_to=my_dwi_path)
+            resample_subject_to=None) #,
+            #resample_subject_to=my_dwi_path
 
         brain_mask_definition = ImageFile(
             path = op.join(paths_dwi, participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-brain_mask.nii.gz')
@@ -171,6 +175,12 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="Path to a text file containing participant IDs (one per line)."
+    )
+    parser.add_argument(
+        "--paths_local",
+        type=str,
+        required=True,
+        help="Base path to the local project directory."
     )
     args = parser.parse_args()
 
