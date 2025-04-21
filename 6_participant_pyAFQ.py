@@ -9,14 +9,14 @@ from AFQ.definitions.image import ImageFile, RoiImage
 import argparse
 
 
-def main(participant_file, paths_local):
+def main(participant_list, paths_local):
     '''
     To run this function, you need to provide 2 variables:
     1. The path to a text file containing the list of participant IDs
     2. Provide the path to the Bids directory
     '''
-    for participant in participant_file:
-        # participant = 'sub-NSxLxYKx1964'
+    for participant in participant_list:
+        # participant = 'sub-NSxLxQUx1953' #'sub-NSxLxYKx1964'
         # directories
         # paths_local = op.join('/Users','ldaumail3','Documents','research','ampb_mt_tractometry_analysis', 'ampb')
         output_dir = op.join(paths_local, 'derivatives/afq', participant)
@@ -150,7 +150,7 @@ def main(participant_file, paths_local):
 
         tracking_params = {
             "seed_mask": RoiImage(use_endpoints = True), 
-            "n_seeds": 10, 
+            "n_seeds": 4, #10, 
         }
 
         myafq = ParticipantAFQ(
@@ -171,10 +171,10 @@ def main(participant_file, paths_local):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Runs pyAFQ for a list of participants.")
     parser.add_argument(
-        "--participants_file",
+        "--participants_list",
         type=str,
         required=True,
-        help="Path to a text file containing participant IDs (one per line)."
+        help="Comma-separated list of participant IDs, e.g. sub-001,sub-002,sub-003"
     )
     parser.add_argument(
         "--paths_local",
@@ -183,9 +183,9 @@ if __name__ == "__main__":
         help="Base path to the local project directory."
     )
     args = parser.parse_args()
+    participants = args.participants_list.split(",")
+    # # Read participants from file
+    # with open(args.participants_file, "r") as f:
+    #     participants = [line.strip() for line in f if line.strip()]
 
-    # Read participants from file
-    with open(args.participants_file, "r") as f:
-        participants = [line.strip() for line in f if line.strip()]
-
-    main(participants)
+    main(participants, args.paths_local)
