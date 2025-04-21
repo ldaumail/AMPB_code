@@ -22,7 +22,7 @@ def main(participant_list, paths_local):
         output_dir = op.join(paths_local, 'derivatives/afq', participant)
         os.makedirs(output_dir, exist_ok=True)
 
-        paths_MT_roi = op.join(paths_local, 'analysis', 'func_space-ACPC_rois', participant, 'ses-04', 'func') # roi
+        paths_MT_roi = op.join(paths_local, 'analysis', 'func_space-ACPC_rois', participant) # roi
         paths_roi = op.join(paths_local, 'analysis', 'julich_space-ACPC_rois', participant,  'ses-04', 'anat')
         paths_dwi = op.join(paths_local, 'derivatives', 'qsiprep', participant, 'ses-04', 'dwi') # dwi
 

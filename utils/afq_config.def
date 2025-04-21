@@ -1,0 +1,7 @@
+Bootstrap: localimage
+From: /storage/home/hcoda1/0/ldaumail3/p-wpark78-0/images/pyafq_2.sif
+
+%post
+	#!/bin/bash
+	
+	pip install git+https://github.com/tractometry/pyAFQ.git
