@@ -8,7 +8,7 @@ esac
 done
 
 export FREESURFER_HOME=/Applications/freesurfer/8.0.0-beta
-export SUBJECTS_DIR=$FREESURFER_HOME/subjects
+export SUBJECTS_DIR=/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/freesurfer #$FREESURFER_HOME/subjects
 source $FREESURFER_HOME/SetUpFreeSurfer.sh
 
 $STRING

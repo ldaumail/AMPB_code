@@ -7,11 +7,11 @@ import os.path as op
 import argparse
 
 def main(participant_file):
-
+    #Provide participants list text file as input
     for participant in participant_file:
         # directories
         paths_local = op.join('/Users','ldaumail3','Documents','research','ampb_mt_tractometry_analysis','ampb')
-        paths_roi = op.join(paths_local, 'analysis', 'func_space-ACPC_rois', participant) # roi
+        paths_roi = op.join(paths_local, 'analysis', 'functional_vol_roi', participant) # roi
 
         mask_list = [participant+'_hemi-L_space-ACPC_label-MT_mask.nii.gz', participant+'_hemi-R_space-ACPC_label-MT_mask.nii.gz']
         dilated_list = [participant+'_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz', participant+'_hemi-R_space-ACPC_label-MT_mask_dilated.nii.gz']

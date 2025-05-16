@@ -15,10 +15,11 @@ def main(participant_file):
         utils = op.join(paths_local, 'code', 'utils')
         sys.path.append(op.expanduser(f'{utils}'))
 
-        paths_func = op.join(paths_local, 'analysis', 'functional_vol_roi', participant)
         paths_qsiprep = op.join(paths_local, 'derivatives', 'qsiprep', participant, 'anat')
-        paths_ACPC = op.join(paths_local, 'analysis', 'func_space-ACPC_rois', participant)
-        os.makedirs(paths_ACPC, exist_ok=True)
+        # paths_ACPC = op.join(paths_local, 'analysis', 'func_space-ACPC_rois', participant)
+        # os.makedirs(paths_ACPC, exist_ok=True)
+        paths_func = op.join(paths_local, 'analysis', 'functional_vol_roi', participant)
+
         ## Create freesurfer to ACPC space registration
         # load acpc t1 (fixed)
         acpc_t1 = op.join(paths_qsiprep, participant+'_space-ACPC_desc-preproc_T1w.nii.gz')
@@ -27,22 +28,6 @@ def main(participant_file):
         # load acpc brain mask
         acpc_brain_mask = op.join(paths_qsiprep, participant+'_space-ACPC_desc-brain_mask.nii.gz')
         acpc_brain_mask_img = ants.image_read(acpc_brain_mask)
-
-        # # Try ses-01b then ses-01
-        # session_found = False
-        # for ses in ["ses-01b", "ses-01"]:
-        #     fs_t1 = op.join(paths_local, participant, ses, 'anat', f'{participant}_{ses}_acq-MEMPRvNav_rec-RMS_T1w.nii.gz')
-        #     if os.path.exists(fs_t1):
-        #         print(f"✅ Found Freesurfer T1 for {ses}")
-        #         fs_t1_img = ants.image_read(fs_t1)
-        #         session_found = True
-        #         break
-        #     else:
-        #         print(f"❌ No file at {fs_t1}")
-        
-        # if not session_found:
-        #     print(f"⚠️ Skipping {participant} — no Freesurfer T1 found.")
-        #     continue
 
         # fs t1 (moving)
         fs_t1 = op.join(paths_local, 'derivatives', 'freesurfer', participant, 'mri', 'T1.mgz') #participant+'_ses-01b_acq-MEMPRvNav_rec-RMS_T1w.nii.gz')
@@ -72,7 +57,7 @@ def main(participant_file):
 
 
         for roi, transmask in zip(roi_list, transformed_list):
-            transformed_mask_path = op.join(paths_ACPC, transmask)
+            transformed_mask_path = op.join(paths_func, transmask)
             if os.path.exists(transformed_mask_path):
                 print("File exists!")
             else:
