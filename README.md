@@ -7,6 +7,6 @@ This script is ran with the list of participants you want to convert the data in
 
 2: 2_apptainer_qsiprep_requeue.sbatch: this script launches batch jobs in parallel on the PACE clusters. The BIDS data from each individual is preprocessed using qsiprep. when logged in on PACE, just use the command line : "sbatch 2_apptainer_qsiprep_requeue.sbatch"
 
-3: 3_make_masks_julich.py: here, we imported probabilistic ROIs from the Julich brain atlas ( https://search.kg.ebrains.eu/instances/f1fe19e8-99bd-44bc-9616-a52850680777 ) and convert them into binary masks. The script also registers them into individual diffusion space using antspyx.
+3: 3_make_masks_julich.py: here, we imported probabilistic ROIs from the Julich brain atlas ( https://search.kg.ebrains.eu/instances/f1fe19e8-99bd-44bc-9616-a52850680777 ) and convert them into binary masks. The script also registers and resamples them into individual diffusion space using antspyx.
 
-4:
+4: 4_* scripts: convert the label functional MT ROI files obtained from our own experiments into binary masks resampled into individual diffusion space.
