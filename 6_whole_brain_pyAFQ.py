@@ -19,64 +19,12 @@ def main(participant_list, paths_local):
         # participant = 'sub-NSxLxYKx1964'
         # directories
         # paths_local = op.join('/Users','ldaumail3','Documents','research','ampb_mt_tractometry_analysis', 'ampb')
-        output_dir = op.join(paths_local, 'derivatives/cpu-afq', participant)
+        output_dir = op.join(paths_local, 'derivatives/wb-pyafq', participant)
         os.makedirs(output_dir, exist_ok=True)
 
-        paths_MT_roi = op.join(paths_local, 'analysis', 'functional_vol_roi', participant) # roi
-        paths_roi = op.join(paths_local, 'analysis', 'julich_space-ACPC_rois', participant,  'ses-04', 'anat')
         paths_wm = op.join(paths_local, 'analysis', 'acpc_wm', participant)
         paths_dwi = op.join(paths_local, 'derivatives', 'qsiprep', participant, 'ses-04', 'dwi') # dwi
 
-
-        # define ROIs 
-        mt_left = op.join(paths_MT_roi, participant+'_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz')
-        mt_right = op.join(paths_MT_roi, participant+'_hemi-R_space-ACPC_label-MT_mask_dilated.nii.gz')
-        
-        pt_left = op.join(paths_roi, participant+'_ses-04_desc-lhPT03SyN_mask.nii.gz')
-        pt_right = op.join(paths_roi, participant+'_ses-04_desc-rhPT03SyN_mask.nii.gz')
-
-        # sts_left = op.join(paths_roi, participant+'_ses-04_desc-lhSTS103SyN_mask.nii.gz')
-        # sts_right = op.join(paths_roi, participant+'_ses-04_desc-rhSTS103SyN_mask.nii.gz')
-
-        # v1_left = op.join(paths_roi, participant+'_ses-04_desc-lhV103SyN_mask.nii.gz')
-        # v1_right = op.join(paths_roi, participant+'_ses-04_desc-rhV103SyN_mask.nii.gz')
-
-        # lgn_left = op.join(paths_roi, participant+'_ses-04_desc-lhLGN03SyN_mask.nii.gz')
-        # lgn_right = op.join(paths_roi, participant+'_ses-04_desc-rhLGN03SyN_mask.nii.gz')
-
-        # pu_left = op.join(paths_roi, participant+'_ses-04_desc-lhPU03SyN_mask.nii.gz')
-        # pu_right = op.join(paths_roi, participant+'_ses-04_desc-rhPU03SyN_mask.nii.gz')
-
-        # fef_left = op.join(paths_roi, participant+'_ses-04_desc-lhFEF03SyN_mask.nii.gz')
-        # fef_right = op.join(paths_roi, participant+'_ses-04_desc-rhFEF03SyN_mask.nii.gz')
-
-        # po_left = op.join(paths_roi, participant+'_ses-04_desc-lhPO03SyN_mask.nii.gz')
-        # po_right = op.join(paths_roi, participant+'_ses-04_desc-rhPO03SyN_mask.nii.gz')
-
-
-        # setup
-        bundle_dict = abd.BundleDict({})
-        bundle_kwargs = {
-            "cross_midline": False,
-            "space": "subject"
-        } #    
-        #    
-
-        bundle_dict = abd.BundleDict({
-            "PTxMT_L": {
-                "start": pt_left,
-                "end": mt_left,
-                **bundle_kwargs
-            },
-            "PTxMT_R": {
-                "start": pt_right,
-                "end": mt_right,
-                **bundle_kwargs 
-            }
-	    },
-	    resample_subject_to=None) #,
-            #resample_subject_to=my_dwi_path
-	#resample_subject_to=None
 
         brain_mask_definition = ImageFile(
             path = op.join(paths_dwi, participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-brain_mask.nii.gz')
@@ -91,13 +39,10 @@ def main(participant_list, paths_local):
         ]
 
         tracking_params = {
-            "seed_mask": RoiImage(use_endpoints = True), 
-            "n_seeds": 20, 
-            "stop_mask": wm_mask_definition,
-        }
-        segmentation_params = {
-	    "dist_to_atlas": 0,
-        "cleaning_params": {"distance_threshold": 2}
+            "seed_mask": wm_mask_definition, 
+            "n_seeds":25000000,
+            "random_seeds":True,
+            "rng_seed":2022,
         }
 
         myafq = ParticipantAFQ(
@@ -105,11 +50,9 @@ def main(participant_list, paths_local):
             bval_file             = op.join(paths_dwi, participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-preproc_dwi.bval'), 
             bvec_file             = op.join(paths_dwi, participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-preproc_dwi.bvec'), 
             output_dir            = output_dir, 
-            bundle_info           = bundle_dict, 
             brain_mask_definition = brain_mask_definition, 
             scalars               = scalars, 
             tracking_params       = tracking_params,
-            segmentation_params = segmentation_params
         ) #   reg_template_spec     = op.join(paths_local, 'analysis','MNI152NLin2009cAsym','anat','MNI152NLin2009cAsym_res-08_rec-wsinc_T1w.nii.gz'),
 
         # myafq.cmd_outputs(cmd = "rm")

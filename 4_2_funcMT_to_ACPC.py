@@ -1,4 +1,5 @@
 #This script performs resampling of area MT from fs space to ACPC
+#Loic Daumail Spring 2025
 import os
 import os.path as op
 import ants
@@ -51,7 +52,7 @@ def main(participant_file):
             verbose = True
         )
 
-        ## Create binary masks resampled from MNI to ACPC space
+        ## Create binary masks resampled from freesurfer to ACPC space
         roi_list = [participant+'_hemi-L_space-fsnative_label-MT_desc-vol_mask.nii.gz', participant+'_hemi-R_space-fsnative_label-MT_desc-vol_mask.nii.gz']
         transformed_list = [participant+'_hemi-L_space-ACPC_label-MT_mask.nii.gz', participant+'_hemi-R_space-ACPC_label-MT_mask.nii.gz']
 
@@ -62,7 +63,7 @@ def main(participant_file):
                 print("File exists!")
             else:
                 print("File does not exist. Creating it now")
-                # load julich mask
+                # load functionnal mask
                 func_mask = op.join(paths_func, roi)
                 func_mask_img = ants.image_read(func_mask)
 

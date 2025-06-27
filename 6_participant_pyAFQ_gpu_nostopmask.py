@@ -79,7 +79,7 @@ def main(participant_list, paths_local):
         brain_mask_definition = ImageFile(
             path = op.join(paths_dwi, participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-brain_mask.nii.gz')
         )
-        wm_mask_definition = ImageFile(path = op.join(paths_wm, participant+"_space-ACPC_label-WM_mask.nii.gz"))
+        #wm_mask_definition = ImageFile(path = op.join(paths_wm, participant+"_space-ACPC_label-WM_mask.nii.gz"))
 
         scalars = [
             "dki_fa", "dki_md", "dki_mk", "dki_awf", 
@@ -89,14 +89,12 @@ def main(participant_list, paths_local):
         tracking_params = {
             "seed_mask": RoiImage(use_endpoints = True),
             "n_seeds": 20,
-	    "stop_mask": wm_mask_definition,
-	    "stop_threshold": 0.5,
 	        "trx": True
         } #"trx": True = to use more efficient trx files. "stop_threshold" needs  to be a float value. Default is 0, needs to be float(0) or 0.0. If the value is 0.5, it will set the boundaries right where the stop boundary should be, as the tracking is interpolating between 1s and 0s in a binary mask.
         
         segmentation_params = {
 	    "dist_to_atlas": 0,
-        "cleaning_params": {"distance_threshold": 2}
+        "cleaning_params": {"distance_threshold": 3}
         } #"dist_to_atlas" specifies the distance from the target ROIs that tracts need to reach. if = 0, tracts need to reach the surface of ROI, or enter it. If 4 mm = needs to be within 4mm of ROI surface. 
 #"distance_threshold" in cleaning params is the Mahalanobis distance in number of STDEVs. We adjust it to exclude outlier streamlines.
         
