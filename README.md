@@ -5,10 +5,8 @@ Tip: in order to run this script, you need to make sure that you activated the v
 This script is ran with the list of participants you want to convert the data into bids as an input "bash 1_dcm2bids.sh participants.txt"
 
 
-2: 2_apptainer_qsiprep_requeue.sbatch : this script launches batch jobs in parallel on the PACE clusters. The BIDS data from each individual is preprocessed using qsiprep. when logged in on PACE, just use the command line : "sbatch 2_apptainer_qsiprep_requeue.sbatch"
+2: 2_apptainer_qsiprep_requeue.sbatch: this script launches batch jobs in parallel on the PACE clusters. The BIDS data from each individual is preprocessed using qsiprep. when logged in on PACE, just use the command line : "sbatch 2_apptainer_qsiprep_requeue.sbatch"
 
-3: 3_1_ROI_pyAFQ_glasser.py: this script aims to use Glasser-based binary masks to run tractography using pyAFQ.
-First part of the script creates a set of MT and PT binary masks from the Glasser atlas in MNI2009a space for the entire dataset.
-The second part of the script runs GroupAFQ using the binary masks on each participant data. In this case, the ROI paths are provided to the bundle dictionnary, there is no directionality specified in the tractography parameters.
+3: 3_make_masks_julich.py: here, we imported probabilistic ROIs from the Julich brain atlas ( https://search.kg.ebrains.eu/instances/f1fe19e8-99bd-44bc-9616-a52850680777 ) and convert them into binary masks. The script also registers and resamples them into individual diffusion space using antspyx.
 
-4: 4_functional_ROI_pyAFQ.py: This script attempts to perform tractography with GroupAFQ, just like in 3. However, here we will run pyAFQ using specific ROIs in individual space of each participant data. The bundle dictionnary is provided a set of Bids filters to select the ROIs for each participant data. No directory path is provided here.
+4: 4_* scripts: convert the label functional MT ROI files obtained from our own experiments into volumetric binary masks resampled into individual diffusion space.
