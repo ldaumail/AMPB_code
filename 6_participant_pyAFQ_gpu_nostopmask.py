@@ -18,7 +18,7 @@ def main(participant_list, paths_local):
         # participant = 'sub-NSxLxYKx1964'
         # directories
         # paths_local = op.join('/Users','ldaumail3','Documents','research','ampb_mt_tractometry_analysis', 'ampb')
-        output_dir = op.join(paths_local, 'derivatives/afq', participant)
+        output_dir = op.join(paths_local, 'derivatives/afq/lgn-mt', participant)
         os.makedirs(output_dir, exist_ok=True)
 
         paths_MT_roi = op.join(paths_local, 'analysis', 'functional_vol_roi', participant) # roi
@@ -31,8 +31,8 @@ def main(participant_list, paths_local):
         mt_left = op.join(paths_MT_roi, participant+'_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz')
         mt_right = op.join(paths_MT_roi, participant+'_hemi-R_space-ACPC_label-MT_mask_dilated.nii.gz')
         
-        pt_left = op.join(paths_roi, participant+'_ses-04_desc-lhPT03SyN_mask.nii.gz')
-        pt_right = op.join(paths_roi, participant+'_ses-04_desc-rhPT03SyN_mask.nii.gz')
+        # pt_left = op.join(paths_roi, participant+'_ses-04_desc-lhPT03SyN_mask.nii.gz')
+        # pt_right = op.join(paths_roi, participant+'_ses-04_desc-rhPT03SyN_mask.nii.gz')
 
         # sts_left = op.join(paths_roi, participant+'_ses-04_desc-lhSTS103SyN_mask.nii.gz')
         # sts_right = op.join(paths_roi, participant+'_ses-04_desc-rhSTS103SyN_mask.nii.gz')
@@ -40,8 +40,8 @@ def main(participant_list, paths_local):
         # v1_left = op.join(paths_roi, participant+'_ses-04_desc-lhV103SyN_mask.nii.gz')
         # v1_right = op.join(paths_roi, participant+'_ses-04_desc-rhV103SyN_mask.nii.gz')
 
-        # lgn_left = op.join(paths_roi, participant+'_ses-04_desc-lhLGN03SyN_mask.nii.gz')
-        # lgn_right = op.join(paths_roi, participant+'_ses-04_desc-rhLGN03SyN_mask.nii.gz')
+        lgn_left = op.join(paths_roi, participant+'_ses-04_desc-lhLGN03SyN_mask.nii.gz')
+        lgn_right = op.join(paths_roi, participant+'_ses-04_desc-rhLGN03SyN_mask.nii.gz')
 
         # pu_left = op.join(paths_roi, participant+'_ses-04_desc-lhPU03SyN_mask.nii.gz')
         # pu_right = op.join(paths_roi, participant+'_ses-04_desc-rhPU03SyN_mask.nii.gz')
@@ -61,13 +61,13 @@ def main(participant_list, paths_local):
         } #    
         #    
         bundle_dict = abd.BundleDict({
-            "PTxMT_L": {
-                "start": pt_left,
+            "LGNxMT_L": {
+                "start": lgn_left,
                 "end": mt_left,
                 **bundle_kwargs
             },
-            "PTxMT_R": {
-                "start": pt_right,
+            "LGNxMT_R": {
+                "start": lgn_right,
                 "end": mt_right,
                 **bundle_kwargs 
             }
@@ -108,7 +108,7 @@ def main(participant_list, paths_local):
             scalars               = scalars, 
             tracking_params       = tracking_params,
 	        tractography_ngpus    = 1,
-	        chunk_size = 50000,
+	        chunk_size = 25000,
 		segmentation_params = segmentation_params
             )
 	    #segmentation_params   = segmentation_params) #chunk_size=10000 

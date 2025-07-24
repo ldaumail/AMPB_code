@@ -133,6 +133,60 @@ def main(participant_file):
                 # # save transformed mask
                 ants.image_write(transformed_mask, transformed_mask_path)
 
+                #Create LIP-VIP mask
+        for hemi in ['lh', 'rh']:
+                
+            prob_hIP1_roi = 'Area-hIP1_'+hemi+'_MNI152.nii.gz'
+            prob_hIP2_roi = 'Area-hIP2_'+hemi+'_MNI152.nii.gz'
+            prob_hIP3_roi = 'Area-hIP3_'+hemi+'_MNI152.nii.gz'
+            hIP_mask_name = hemi+'hIP'
+            transformed_mask_path = op.join(paths_ACPC, 'ses-04', 'anat', participant+'_ses-04_desc-'+hIP_mask_name+'03SyN_mask.nii.gz')
+            if os.path.exists(transformed_mask_path):
+                print("File exists!")
+            else:
+                print("File does not exist. Creating it now")
+                # load julich masks
+                hIP1_julich_mask = op.join(paths_julich, prob_hIP1_roi)
+                hIP1_julich_mask_img = ants.image_read(hIP1_julich_mask)
+
+                hIP2_julich_mask = op.join(paths_julich, prob_hIP2_roi)
+                hIP2_julich_mask_img = ants.image_read(hIP2_julich_mask)
+
+                hIP3_julich_mask = op.join(paths_julich, prob_hIP3_roi)
+                hIP3_julich_mask_img = ants.image_read(hIP3_julich_mask)
+
+                # binarize
+                hIP1_julich_mask_img[hIP1_julich_mask_img >= 0.3] = 1
+                hIP1_julich_mask_img[hIP1_julich_mask_img < 0.3] = 0
+
+                hIP2_julich_mask_img[hIP2_julich_mask_img >= 0.3] = 1
+                hIP2_julich_mask_img[hIP2_julich_mask_img < 0.3] = 0
+
+                hIP3_julich_mask_img[hIP3_julich_mask_img >= 0.3] = 1
+                hIP3_julich_mask_img[hIP3_julich_mask_img < 0.3] = 0
+
+                img1_data = hIP1_julich_mask_img.numpy()
+                img2_data = hIP2_julich_mask_img.numpy()
+                img3_data = hIP3_julich_mask_img.numpy()
+
+                union_img = (img1_data > 0) | (img2_data > 0) | (img3_data > 0)
+                union_img = union_img.astype(hIP1_julich_mask_img.dtype)  # Keep same data type
+                
+                # Convert back to ANTs image
+                julich_mask_img = ants.from_numpy(union_img, origin=hIP1_julich_mask_img.origin, spacing=hIP1_julich_mask_img.spacing, direction=hIP1_julich_mask_img.direction)
+
+                #Resample binary mask into ACPC
+                    # apply inverse transformation: MNI Julich mask → ACPC space
+                mytx = reg['fwdtransforms']
+                transformed_mask = ants.apply_transforms(
+                    moving = julich_mask_img, 
+                    fixed = acpc_t1_img, 
+                    transformlist = mytx, 
+                    interpolator = "genericLabel" ## keep it as a binary mask without smoothing it out, great for parcellations ("nearestNeighbor" is also discrete but can introduce aliasing)
+                )
+                # # save transformed mask
+                ants.image_write(transformed_mask, transformed_mask_path)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate ACPC masks for a list of participants.")
     parser.add_argument(
