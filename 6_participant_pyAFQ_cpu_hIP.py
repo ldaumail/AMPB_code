@@ -1,5 +1,6 @@
 #Run pyAFQ in subject ACPC space
 #04/14/2025
+
 import os
 import os.path as op
 import AFQ.api.bundle_dict as abd
@@ -18,12 +19,12 @@ def main(participant_list, paths_local):
         # participant = 'sub-NSxLxYKx1964'
         # directories
         # paths_local = op.join('/Users','ldaumail3','Documents','research','ampb_mt_tractometry_analysis', 'ampb')
-        output_dir = op.join(paths_local, 'derivatives/afq/hip-mt', participant)
+        output_dir = op.join(paths_local, 'derivatives/cpu-afq', participant)
         os.makedirs(output_dir, exist_ok=True)
 
         paths_MT_roi = op.join(paths_local, 'analysis', 'functional_vol_roi', participant) # roi
         paths_roi = op.join(paths_local, 'analysis', 'julich_space-ACPC_rois', participant,  'ses-04', 'anat')
-        paths_wm = op.join(paths_local, 'analysis', 'acpc_wm', participant)
+        # paths_wm = op.join(paths_local, 'analysis', 'acpc_wm', participant)
         paths_dwi = op.join(paths_local, 'derivatives', 'qsiprep', participant, 'ses-04', 'dwi') # dwi
 
 
@@ -31,14 +32,13 @@ def main(participant_list, paths_local):
         mt_left = op.join(paths_MT_roi, participant+'_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz')
         mt_right = op.join(paths_MT_roi, participant+'_hemi-R_space-ACPC_label-MT_mask_dilated.nii.gz')
         
+        hip_left = op.join(paths_roi, participant+'_ses-04_desc-lhhIP03SyN_mask.nii.gz')
+        hip_right = op.join(paths_roi, participant+'_ses-04_desc-rhhIP03SyN_mask.nii.gz')
         # pt_left = op.join(paths_roi, participant+'_ses-04_desc-lhPT03SyN_mask.nii.gz')
         # pt_right = op.join(paths_roi, participant+'_ses-04_desc-rhPT03SyN_mask.nii.gz')
 
-        hip_left = op.join(paths_roi, participant+'_ses-04_desc-lhhIP03SyN_mask.nii.gz')
-        hip_right = op.join(paths_roi, participant+'_ses-04_desc-rhhIP03SyN_mask.nii.gz')
-
-        # sts1_left = op.join(paths_roi, participant+'_ses-04_desc-lhSTS103SyN_mask.nii.gz')
-        # sts1_right = op.join(paths_roi, participant+'_ses-04_desc-rhSTS103SyN_mask.nii.gz')
+        # sts_left = op.join(paths_roi, participant+'_ses-04_desc-lhSTS103SyN_mask.nii.gz')
+        # sts_right = op.join(paths_roi, participant+'_ses-04_desc-rhSTS103SyN_mask.nii.gz')
 
         # v1_left = op.join(paths_roi, participant+'_ses-04_desc-lhV103SyN_mask.nii.gz')
         # v1_right = op.join(paths_roi, participant+'_ses-04_desc-rhV103SyN_mask.nii.gz')
@@ -60,16 +60,17 @@ def main(participant_list, paths_local):
         bundle_dict = abd.BundleDict({})
         bundle_kwargs = {
             "cross_midline": False,
-            "space": "subject",
+            "space": "subject"
         } #    
         #    
+
         bundle_dict = abd.BundleDict({
-            "HIPxMT_L": {
+            "hIPxMT_L": {
                 "start": hip_left,
                 "end": mt_left,
                 **bundle_kwargs
             },
-            "HIPxMT_R": {
+            "hIPxMT_R": {
                 "start": hip_right,
                 "end": mt_right,
                 **bundle_kwargs 
@@ -82,7 +83,9 @@ def main(participant_list, paths_local):
         brain_mask_definition = ImageFile(
             path = op.join(paths_dwi, participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-brain_mask.nii.gz')
         )
-        #wm_mask_definition = ImageFile(path = op.join(paths_wm, participant+"_space-ACPC_label-WM_mask.nii.gz"))
+
+        # wm_mask_definition = ImageFile(path = op.join(paths_wm, participant+"_space-ACPC_label-WM_mask.nii.gz"))
+
 
         scalars = [
             "dki_fa", "dki_md", "dki_mk", "dki_awf", 
@@ -90,17 +93,14 @@ def main(participant_list, paths_local):
         ]
 
         tracking_params = {
-            "seed_mask": RoiImage(use_endpoints = True),
-            "n_seeds": 20,
-	        "trx": True
-        } #"trx": True = to use more efficient trx files. "stop_threshold" needs  to be a float value. Default is 0, needs to be float(0) or 0.0. If the value is 0.5, it will set the boundaries right where the stop boundary should be, as the tracking is interpolating between 1s and 0s in a binary mask.
-        
+            "seed_mask": RoiImage(use_endpoints = True), 
+            "n_seeds": 20, 
+        } # "stop_mask": wm_mask_definition,
         segmentation_params = {
 	    "dist_to_atlas": 0,
         "cleaning_params": {"distance_threshold": 3}
-        } #"dist_to_atlas" specifies the distance from the target ROIs that tracts need to reach. if = 0, tracts need to reach the surface of ROI, or enter it. If 4 mm = needs to be within 4mm of ROI surface. 
-#"distance_threshold" in cleaning params is the Mahalanobis distance in number of STDEVs. We adjust it to exclude outlier streamlines.
-        
+        }
+
         myafq = ParticipantAFQ(
             dwi_data_file         = op.join(paths_dwi, participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-preproc_dwi.nii.gz'), 
             bval_file             = op.join(paths_dwi, participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-preproc_dwi.bval'), 
@@ -110,11 +110,8 @@ def main(participant_list, paths_local):
             brain_mask_definition = brain_mask_definition, 
             scalars               = scalars, 
             tracking_params       = tracking_params,
-	        tractography_ngpus    = 1,
-	        chunk_size = 25000,
-		segmentation_params = segmentation_params
-            )
-	    #segmentation_params   = segmentation_params) #chunk_size=10000 
+            segmentation_params = segmentation_params
+        ) #   reg_template_spec     = op.join(paths_local, 'analysis','MNI152NLin2009cAsym','anat','MNI152NLin2009cAsym_res-08_rec-wsinc_T1w.nii.gz'),
 
         # myafq.cmd_outputs(cmd = "rm")
         bundle = myafq.export_all()

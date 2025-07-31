@@ -7,9 +7,10 @@ import argparse
 import sys
 
 
-def main(participant_file):
+def main(participant_file, roi_name):
 
     for participant in participant_file:
+        # roi_name = 'PT'
         # participant = 'sub-NSxLxYKx1964'
         # directories
         paths_local = op.join('/Users','ldaumail3','Documents','research','ampb_mt_tractometry_analysis','ampb')
@@ -53,8 +54,10 @@ def main(participant_file):
         )
 
         ## Create binary masks resampled from freesurfer to ACPC space
-        roi_list = [participant+'_hemi-L_space-fsnative_label-MT_desc-vol_mask.nii.gz', participant+'_hemi-R_space-fsnative_label-MT_desc-vol_mask.nii.gz']
-        transformed_list = [participant+'_hemi-L_space-ACPC_label-MT_mask.nii.gz', participant+'_hemi-R_space-ACPC_label-MT_mask.nii.gz']
+        roi_list1 = [f for f in os.listdir(paths_func) if roi_name in f and 'hemi-L' in f]  #[participant+'_hemi-L_space-fsnative_label-MT_desc-vol_mask.nii.gz', participant+'_hemi-R_space-fsnative_label-MT_desc-vol_mask.nii.gz']
+        roi_list2 = [f for f in os.listdir(paths_func) if roi_name in f and 'hemi-R' in f]
+        roi_list = roi_list1+roi_list2
+        transformed_list = [participant+'_hemi-L_space-ACPC_label-'+roi_name+'_mask.nii.gz', participant+'_hemi-R_space-ACPC_label-'+roi_name+'_mask.nii.gz']
 
 
         for roi, transmask in zip(roi_list, transformed_list):
@@ -90,10 +93,16 @@ if __name__ == "__main__":
         required=True,
         help="Path to a text file containing participant IDs (one per line)."
     )
+    parser.add_argument(
+        "--roi_name",
+        type=str,
+        required=True,
+        help="Name of the ROI as written in label file name"
+    )
     args = parser.parse_args()
 
     # Read participants from file
     with open(args.participants_file, "r") as f:
         participants = [line.strip() for line in f if line.strip()]
 
-    main(participants)
+    main(participants, args.roi_name)

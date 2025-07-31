@@ -97,7 +97,7 @@ def main(participant_list, paths_local):
         }
         segmentation_params = {
 	    "dist_to_atlas": 0,
-        "cleaning_params": {"distance_threshold": 2}
+        "cleaning_params": {"distance_threshold": 3}
         }
 
         myafq = ParticipantAFQ(

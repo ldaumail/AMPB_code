@@ -8,7 +8,7 @@ import os.path as op
 import argparse
 import sys
 
-def main(participant_file):
+def main(participant_file, roi_name):
         paths_local = op.join('/Users','ldaumail3','Documents','research','ampb_mt_tractometry_analysis', 'ampb')
 
         utils = op.join(paths_local, 'code','utils')
@@ -27,8 +27,10 @@ def main(participant_file):
 
                 # define participant
                 # participant='sub-NSxLxYKx1964'
-                label_list = [participant+'_hemi-L_space-fsnative_label-MT_mask.label', participant+'_hemi-R_space-fsnative_label-MT_mask.label'] # 
-                vol_list = [participant+'_hemi-L_space-fsnative_label-MT_desc-vol_mask.nii.gz', participant+'_hemi-R_space-fsnative_label-MT_desc-vol_mask.nii.gz'] #
+                label_list = [participant+'_hemi-L_space-fsnative_label-'+roi_name+'_mask.label', participant+'_hemi-R_space-fsnative_label-'+roi_name+'_mask.label'] # 
+                vol_list = [participant+'_hemi-L_space-fsnative_label-'+roi_name+'_desc-vol_mask.nii.gz', participant+'_hemi-R_space-fsnative_label-'+roi_name+'_desc-vol_mask.nii.gz'] #
+                #vol_list = [participant+'_hemi-L_space-fsnative_label-'+roi_name+'_mask.nii.gz', participant+'_hemi-R_space-fsnative_label-'+roi_name+'_mask.nii.gz']
+
                 hemi = ['lh','rh'] #
                 temp_path = op.join(fs_path, participant, 'mri', 'brain.mgz')
 
@@ -58,10 +60,16 @@ if __name__ == "__main__":
         required=True,
         help="Path to a text file containing participant IDs (one per line)."
     )
+    parser.add_argument(
+        "--roi_name",
+        type=str,
+        required=True,
+        help="Name of the ROI as written in label file name"
+    )
     args = parser.parse_args()
 
     # Read participants from file
     with open(args.participants_file, "r") as f:
         participants = [line.strip() for line in f if line.strip()]
 
-    main(participants)
+    main(participants, args.roi_name)
