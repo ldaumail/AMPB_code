@@ -16,11 +16,9 @@ base_path = op.join('/Volumes','cos-lab-wpark78','LoicDaumail','ampb','derivativ
 bundle_path = op.join(base_path,'bundles')
 qsiprep_path = op.join('/Volumes','cos-lab-wpark78','LoicDaumail','ampb','derivatives', 'qsiprep', participant, 'anat')
 roi_path = op.join('/Users','ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'functional_vol_roi', participant)
-# fa_path = op.join(base_path,'models')
 
 #Upload tracts in
-# fa_img = nib.load(op.join(fa_path, participant+'_ses-04_acq-HCPdir99_model-dki_param-fa_dwimap.nii.gz'))
-# fa = fa_img.get_fdata()
+
 t1w_img = nib.load(op.join(qsiprep_path,
                            participant+'_space-ACPC_desc-preproc_T1w.nii.gz'))
 t1w = t1w_img.get_fdata()
@@ -165,18 +163,25 @@ plt.show()
 # print("Affine 2:\n", mtR_roi.affine)
 # print(mtR_roi.header)
 
+
+# ------- Check coordinates and space for each file ----
 def center_world(img):
     center_voxel = np.array(img.shape) // 2
     center_world = img.affine @ np.append(center_voxel, 1)
     return center_world[:3]
-mtR_roi =  nib.load(op.join(base_path, 'ROIs', participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-STS1xMTREnd_mask.nii.gz'))
-print("Center world coords image 1:", center_world(mtR_roi))
 mtR_roi = nib.load(op.join(roi_path, participant+'_hemi-R_space-ACPC_label-MT_mask_dilated.nii.gz'))
+mtR_roi.affine
 print("Center world coords image 2:", center_world(mtR_roi))
-
+mtR_roi =  nib.load(op.join(base_path, 'ROIs', participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-STS1xMTREnd_mask.nii.gz'))
+mtR_roi.affine
+print("Center world coords image 1:", center_world(mtR_roi))
+fa_path = op.join(base_path,'models')
+fa_img = nib.load(op.join(fa_path, participant+'_ses-04_acq-HCPdir99_model-dki_param-fa_dwimap.nii.gz'))
+fa = fa_img.get_fdata()
 print("Center world coords image 3:", center_world(fa_img))
 print(fa_img.header)
-
+t1w_img.affine
+print(t1w_img.header)
 print(sts1_mtR.space)
 # #Plot 
 # import matplotlib.pyplot as plt
@@ -276,15 +281,15 @@ slicers = slice_volume(t1w, x=t1w.shape[0] // 2, z=t1w.shape[-1] // 3)
 #Add actors to 3D window scen object
 scene = window.Scene()
 
-#scene.add(sts1_mtL_actor)
-scene.add(sts1_mtR_actor)
+scene.add(sts1_mtL_actor)
+#scene.add(sts1_mtR_actor)
 
-#mtL_actor = actor.contour_from_roi(mtL_dat, color=(1, 0, 0), opacity=0.5)
-mtR_actor = actor.contour_from_roi(mtR_dat, color=(1, 0, 0), opacity=0.5)
+mtL_actor = actor.contour_from_roi(mtL_dat, color=(1, 0, 0), opacity=0.5)
+#mtR_actor = actor.contour_from_roi(mtR_dat, color=(1, 0, 0), opacity=0.5)
 
 # Show in interactive window
-#scene.add(mtL_actor)
-scene.add(mtR_actor)
+scene.add(mtL_actor)
+#scene.add(mtR_actor)
 
 
 for slicer in slicers:
