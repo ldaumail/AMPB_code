@@ -14,12 +14,15 @@ from dipy.tracking.streamline import transform_streamlines
 participant = 'sub-EBxGxEYx1965'
 base_path = op.join('/Volumes','cos-lab-wpark78','LoicDaumail','ampb','derivatives','pyafq', 'gpu-afq_MT-STS1_nseeds20_0mm_nowm_dist3',participant)
 bundle_path = op.join(base_path,'bundles')
-qsiprep_path = op.join('/Volumes','cos-lab-wpark78','LoicDaumail','ampb','derivatives', 'qsiprep', participant, 'anat')
+qsiprep_path = op.join('/Volumes','cos-lab-wpark78','LoicDaumail','ampb','derivatives', 'qsiprep', participant)
 roi_path = op.join('/Users','ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'functional_vol_roi', participant)
+
+# dwi_file = nib.load(op.join(qsiprep_path, 'ses-04','dwi', participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-preproc_dwi.nii.gz'))
+# print(dwi_file.header)
 
 #Upload tracts in
 
-t1w_img = nib.load(op.join(qsiprep_path,
+t1w_img = nib.load(op.join(qsiprep_path, 'anat',
                            participant+'_space-ACPC_desc-preproc_T1w.nii.gz'))
 t1w = t1w_img.get_fdata()
 
@@ -39,10 +42,10 @@ streamlinesL = sts1_mtL_t1w
 streamlinesR = sts1_mtR_t1w
 
 #### Load MT ROI ###
-mtL_roi =  nib.load(op.join(base_path, 'ROIs', participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-STS1xMTLEnd_mask.nii.gz'))
-mtR_roi =  nib.load(op.join(base_path, 'ROIs', participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-STS1xMTREnd_mask.nii.gz'))
-mtL_dat = mtL_roi.get_fdata()
-mtR_dat = mtR_roi.get_fdata()
+# mtL_roi =  nib.load(op.join(base_path, 'ROIs', participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-STS1xMTLEnd_mask.nii.gz'))
+# mtR_roi =  nib.load(op.join(base_path, 'ROIs', participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-STS1xMTREnd_mask.nii.gz'))
+# mtL_dat = mtL_roi.get_fdata()
+# mtR_dat = mtR_roi.get_fdata()
 # mtL_roi.affine
 
 # print("Affine 1:\n", mtR_roi.affine)
@@ -52,10 +55,10 @@ mtR_dat = mtR_roi.get_fdata()
 # mtR_dat[mtR_dat > 0] = 1
 
 
-# mtL_roi = nib.load(op.join(roi_path, participant+'_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz'))
-# mtR_roi = nib.load(op.join(roi_path, participant+'_hemi-R_space-ACPC_label-MT_mask_dilated.nii.gz'))
-# mtL_dat = mtL_roi.get_fdata()
-# mtR_dat = mtR_roi.get_fdata()
+mtL_roi = nib.load(op.join(roi_path, participant+'_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz'))
+mtR_roi = nib.load(op.join(roi_path, participant+'_hemi-R_space-ACPC_label-MT_mask_dilated.nii.gz'))
+mtL_dat = mtL_roi.get_fdata()
+mtR_dat = mtR_roi.get_fdata()
 
 
 #### Calculate endpoint densities at MT ROI boundary
@@ -172,10 +175,10 @@ def center_world(img):
     return center_world[:3]
 mtR_roi = nib.load(op.join(roi_path, participant+'_hemi-R_space-ACPC_label-MT_mask_dilated.nii.gz'))
 mtR_roi.affine
-print("Center world coords image 2:", center_world(mtR_roi))
+print("Center world coords image 1:", center_world(mtR_roi))
 mtR_roi =  nib.load(op.join(base_path, 'ROIs', participant+'_ses-04_acq-HCPdir99_space-ACPC_desc-STS1xMTREnd_mask.nii.gz'))
 mtR_roi.affine
-print("Center world coords image 1:", center_world(mtR_roi))
+print("Center world coords image 2:", center_world(mtR_roi))
 julich_path = op.join('/Users','ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'julich_space-ACPC_rois')
 sts1_roi = nib.load(op.join(julich_path, participant, 'ses-04', 'anat', participant+'_ses-04_desc-lhSTS103SyN_mask.nii.gz'))
 sts1_roi.affine
