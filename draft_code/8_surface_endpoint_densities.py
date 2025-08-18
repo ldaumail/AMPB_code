@@ -19,13 +19,13 @@ base_path = op.join('/Volumes','cos-lab-wpark78','LoicDaumail','ampb','derivativ
 bundle_path = op.join(base_path,'bundles')
 qsiprep_path = op.join('/Volumes','cos-lab-wpark78','LoicDaumail','ampb','derivatives', 'qsiprep', participant)
 surf_roi_path = op.join('/Users','ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'functional_surf_roi', participant)
-
+freesurfer_path = op.join('/Users','ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'derivatives', 'freesurfer')
 
 #Upload tracts in
 
 t1w_img = nib.load(op.join(qsiprep_path, 'anat',
                            participant+'_space-ACPC_desc-preproc_T1w.nii.gz'))
-t1w = t1w_img.get_fdata()
+# t1w = t1w_img.get_fdata()
 
 sts1_mtL = load_tractogram(op.join(bundle_path,
                           participant+'_ses-04_acq-HCPdir99_desc-STS1xMTL_tractography.trx'), t1w_img)
@@ -183,11 +183,36 @@ fig.colorbar(scR, ax=ax, shrink=0.5, pad=0.05, label='Right STS1-MT Hit Count')
 plt.show()
 
 ## -- Project Streamline densities to surface MT ROI vertices -----
-## Load Surface ROI data 
-vertex_indices_mt_lh = fsio.read_label(op.join(surf_roi_path, participant+'_hemi-L_space-fsnative_label-MT_mask.label'), read_scalars=False)
-vertex_indices_mt_rh = fsio.read_label(op.join(surf_roi_path, participant+'_hemi-R_space-fsnative_label-MT_mask.label'), read_scalars=False)
+## 1) Load ROI label indices
+vtx_indices_mt_lh = fsio.read_label(op.join(surf_roi_path, participant+'_hemi-L_space-fsnative_label-MT_mask.label'), read_scalars=False)
+vtx_indices_mt_rh = fsio.read_label(op.join(surf_roi_path, participant+'_hemi-R_space-fsnative_label-MT_mask.label'), read_scalars=False)
 
-print(vertex_indices_mt_rh)
+print(vtx_indices_mt_rh)
+
+## 2) Load surface mesh for coordinates
+lh_coords_tkRAS, faces = fsio.read_geometry(
+    op.join(freesurfer_path, participant, "surf", "lh.white")
+)
+rh_coords_tkRAS, faces = fsio.read_geometry(
+    op.join(freesurfer_path, participant, "surf", "rh.white")
+)
+
+# 3) Get the ROI vertex coordinates on that surface (still tkRAS)
+lh_mt_coords_tkRAS = lh_coords_tkRAS[vtx_indices_mt_lh]   # shape (N, 3)
+rh_mt_coords_tkRAS = rh_coords_tkRAS[vtx_indices_mt_rh]   
+
+# 4) Convert tkRAS → scanner RAS to match your T1 NIfTI
+#    Read orig.mgz to get the two affines FreeSurfer uses
+orig = nib.load(op.join(subj_dir, subj, "mri", "orig.mgz"))
+M_vox2ras      = orig.header.get_affine()                # scanner RAS
+M_vox2ras_tkr  = orig.header.get_sform()                 # tkRAS (a.k.a. vox2ras_tkr)
+M_tkRAS_to_scanRAS = M_vox2ras @ np.linalg.inv(M_vox2ras_tkr)
+
+# apply to homogeneous coords
+ones = np.ones((roi_coords_tkRAS.shape[0], 1))
+roi_coords_h = np.hstack([roi_coords_tkRAS, ones])
+roi_coords_scanRAS = (roi_coords_h @ M_tkRAS_to_scanRAS.T)[:, :3]  # now aligned with T1 world
+
 
 
 
