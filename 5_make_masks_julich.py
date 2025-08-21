@@ -48,7 +48,7 @@ def main(participant_file):
                     'rhV1', 'rhPT', 'rhSTS1', 'rhLGN', 'rhPO', 'rhFEF']
 
         for mask, prob_roi in zip(mask_name,prob_roi_list):
-            transformed_mask_path = op.join(paths_ACPC, 'ses-concat', 'anat', participant+'_ses-concat_desc-'+mask+'03SyN_mask.nii.gz')
+            transformed_mask_path = op.join(paths_ACPC, 'ses-concat', 'anat', participant+'_ses-concat_space-ACPC_desc-'+mask+'03SyN_mask.nii.gz')
             if os.path.exists(transformed_mask_path):
                 print("File exists!")
             else:
@@ -84,7 +84,7 @@ def main(participant_file):
             prob_PUm_roi = 'Thalamus-PUm_'+hemi+'_MNI152.nii.gz'
             prob_PUl_roi = 'Thalamus-PUl_'+hemi+'_MNI152.nii.gz'
             PU_mask_name = hemi+'PU'
-            transformed_mask_path = op.join(paths_ACPC, 'ses-concat', 'anat', participant+'_ses-concat_desc-'+PU_mask_name+'03SyN_mask.nii.gz')
+            transformed_mask_path = op.join(paths_ACPC, 'ses-concat', 'anat', participant+'_ses-concat_space-ACPC_desc-'+PU_mask_name+'03SyN_mask.nii.gz')
             if os.path.exists(transformed_mask_path):
                 print("File exists!")
             else:
@@ -140,7 +140,7 @@ def main(participant_file):
             prob_hIP2_roi = 'Area-hIP2_'+hemi+'_MNI152.nii.gz'
             prob_hIP3_roi = 'Area-hIP3_'+hemi+'_MNI152.nii.gz'
             hIP_mask_name = hemi+'hIP'
-            transformed_mask_path = op.join(paths_ACPC, 'ses-concat', 'anat', participant+'_ses-concat_desc-'+hIP_mask_name+'03SyN_mask.nii.gz')
+            transformed_mask_path = op.join(paths_ACPC, 'ses-concat', 'anat', participant+'_ses-concat_space-ACPC_desc-'+hIP_mask_name+'03SyN_mask.nii.gz')
             if os.path.exists(transformed_mask_path):
                 print("File exists!")
             else:

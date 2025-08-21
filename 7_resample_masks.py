@@ -8,7 +8,7 @@ import argparse
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = current_dir  # main_script.py is inside project/
 sys.path.append(project_dir)
-from utils.resample_roi import resample_roi
+from utils.resample_file import resample_file
 
 
 def main(participants_file, bids_path):
@@ -22,14 +22,14 @@ def main(participants_file, bids_path):
         for mask in mask_name:
             input_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_ses-concat_desc-'+mask+'03SyN_mask.nii.gz')
             output_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_ses-concat_space-T1w_desc-'+mask+'03SyN_mask.nii.gz')
-            resample_roi(input_file, target_file, output_file, interpolator = "linear")
+            resample_file(input_file, target_file, output_file, interpolator = "linear")
         
-        func_mask_name = ['lhMT', 'lhPT', 
-                          'rhMT', 'rhPT']
+        func_mask_name = ['MT', 'PT']
         for mask in func_mask_name:
             for hemi in ['L', 'R']:
                 input_file = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, participant+'_hemi-'+hemi+'_space-ACPC_label-'+mask+'_mask_dilated.nii.gz')
                 output_file = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, participant+'_hemi-'+hemi+'_space-T1w_label-'+mask+'_mask_dilated.nii.gz')
+                resample_file(input_file, target_file, output_file, interpolator = "linear")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Resample mask to target resolution for a list of participants.")

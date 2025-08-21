@@ -13,11 +13,12 @@ def main(participants_file, bids_path):
         target_brain = op.join(bids_path, 'derivatives', 'qsiprep', participant, 'anat', participant+'_space-ACPC_desc-preproc_T1w.nii.gz')
         target_sample = op.join(bids_path, 'derivatives', 'qsiprep', participant, 'ses-concat', 'dwi', participant+'_ses-concat_acq-HCPdir99_space-ACPC_desc-brain_mask.nii.gz')
         output_fname = op.join(bids_path, 'analysis', 'fs_wm', participant, participant+'_space-T1w_rec-fs_label-WM_mask.nii.gz')
+        
         os.makedirs(op.join(bids_path, 'analysis', 'fs_wm', participant), exist_ok=True)
         create_fs_wmmask(fs_dir, target_brain, target_sample, output_fname)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Create streamline density maps")
+    parser = argparse.ArgumentParser(description="Create white matter masks")
     parser.add_argument(
         "--participants_file",
         type=str,

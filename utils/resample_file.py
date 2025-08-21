@@ -2,7 +2,7 @@ import ants
 import argparse
 
 
-def resample_roi(input_file, target_file, output_file, interpolator = "linear"):
+def resample_file(input_file, target_file, output_file, interpolator = "linear"):
   # read input and target file
   input_image  = ants.image_read(input_file)
   target_image = ants.image_read(target_file)
@@ -17,7 +17,7 @@ def resample_roi(input_file, target_file, output_file, interpolator = "linear"):
   print(f"Saved: {output_file}")
 
 
-if __name__ == "__resample_roi__": 
+if __name__ == "__resample_file__": 
   parser = argparse.ArgumentParser()
   parser.add_argument("--input_file", type = str)
   parser.add_argument("--target_file", type = str)

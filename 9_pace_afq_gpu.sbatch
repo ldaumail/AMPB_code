@@ -1,0 +1,92 @@
+#!/bin/bash
+# Perform tractography on each subject with pyAFQ
+# First need to build pyafq image for apptainer: apptainer build pyafq_latest.sif docker://ghcr.io/nrdg/pyafq:latest
+#
+#  Created by ldaumail3 on 12/17/24.
+#
+#SBATCH --account=gts-wpark78                 # Charge account
+#SBATCH -N1 			               # Number of nodes and cores per node
+#SBATCH --gres=gpu:V100:1
+#SBATCH --mem=128G                      #--mem-per-gpu=10G you can also adjust the cpu memory, however both parameters are mutually exclusive: --mem=64G
+#SBATCH -t1500                                 # Duration of the job (8*60 = 480 mins; 900 = 15 hours)
+#SBATCH -qinferno                              # QOS name embers = free, leftover  cpus / inferno = paid, credits usage
+#SBATCH -o/storage/home/hcoda1/0/ldaumail3/scratch/afq_ampb/derivatives/afq/outReports/Report-%j.out                       # Combined output and error messages file
+#SBATCH --mail-type=BEGIN,END,FAIL            # Mail preferences
+#SBATCH --mail-user=ldaumail3@gatech.edu      # E-mail address for notifications
+#SBATCH --array=1 #-13%13                             # Job IDs to run simultaneously from SUBJ list (limited to 4 simultaneously with %4)
+#SBATCH --requeue				#Resume job if previously crashed
+
+# for calculating the amount of time the job takes
+begin=`date +%s`
+echo $HOSTNAME
+
+# Modules -------------------------------------------------------------
+#module load apptainer
+module load cuda/12.1
+
+# Directories ------------------------------------------------------------------
+
+WORK_HOME="/storage/home/hcoda1/0/ldaumail3"
+APPTAINER_DIR="${WORK_HOME}/images"
+DATA_HOME="/storage/home/hcoda1/0/ldaumail3/scratch/afq_ampb"
+DERIVATIVES_DIR="${DATA_HOME}/derivatives"
+DATA_DIR="${DERIVATIVES_DIR}/qsiprep/${participant}/ses-concat/dwi"
+ANALYSIS_DIR="${DATA_HOME}/analysis"
+JULICH_ROIS_DIR="${ANALYSIS_DIR}/julich_space-ACPC_rois/${participant}"
+FUNC_ROIS_DIR="${ANALYSIS_DIR}/functional_vol_roi/${participant}"
+OUT_DIR="${DERIVATIVES_DIR}/${output_dir}"
+if [[ ! -d "${OUT_DIR}" ]]; then mkdir -p "${OUT_DIR}"; fi
+FILES_DIR="${HOME}/AMPB/python"
+
+AFQ_DIR="${HOME}/AFQ_data" 
+TEMPLATEFLOW_DIR="${HOME}/.cache/templateflow"
+
+# Run pyAFQ --------------------------------------------------------------------
+
+# define variables
+hemistr="${hemisphere:0:1}"
+start_roi="${roi%x*}"; end_roi="${roi#*x}"
+
+# define start file
+start_file="${participant}_hemi-${hemistr}_space-T1w_label-${start_roi}_mask.nii.gz"
+if [[ "${start_roi}" == "MT" ]]; then start_file="${start_file/MT/MTxWM}"; fi
+
+# define stop file
+stop_file="${participant}_hemi-${hemistr}_space-T1w_label-${end_roi}_mask.nii.gz"
+if [[ "${end_roi}" == "MT" ]]; then stop_file="${stop_file/MT/MTxWM}"; fi
+
+# prepare output directory
+curr_afq="afq-${hemisphere}${roi}"
+curr_out="${OUT_DIR}/${curr_afq}/${participant}"
+if [[ ! -d "${curr_out}" ]]; then mkdir -p "${curr_out}"; fi
+
+fname="${participant}_ses-concat_desc-bundles_tractography.trx"
+if [[ ! -f "${curr_out}/${fname}" ]]; then 
+  echo "Running AFQ for ${curr_afq}..." 
+
+  apptainer exec \
+    --bind "${DATA_DIR}:/data" \
+    --bind "${ANALYSIS_DIR}:/analysis" \
+    --bind "${JULICH_ROIS_DIR}:/jrois" \
+    --bind "${FUNC_ROIS_DIR}:/frois" \
+    --bind "${curr_out}/..:/out" \
+    --bind "${FILES_DIR}:/files" \
+    --bind "${AFQ_DIR}:/home/AFQ_data" \
+    --bind "${TEMPLATEFLOW_DIR}:/home/.cache/templateflow" \
+    --nv \
+    "${APPTAINER_DIR}/jk_pyafq_gpu_container.sif" \
+    python3 "${DATA_HOME}/code/9_participant_pyAFQ_gpu.py" \
+    --dwi_data_file "/data/${participant}_ses-concat_space-T1w_desc-preproc_dwi.nii.gz" \
+    --bval_file "/data/${participant}_ses-concat_space-T1w_desc-preproc_dwi.bval" \
+    --bvec_file "/data/${participant}_ses-concat_space-T1w_desc-preproc_dwi.bvec" \
+    --mask_file "/data/${participant}_ses-concat_space-T1w_desc-brain_mask.nii.gz" \
+    --stop_mask_file "/analysis/fs_wm/${participant}/${participant}_space-T1w_rec-fs_label-WM_mask.nii.gz" \
+    --roi_files "/jrois/${start_file}" "/frois/${stop_file}" \
+    --output_dir "/out/${participant}"
+fi
+
+
+# getting end time to calculate time elapsed
+end=`date +%s`
+elapsed=`expr $end - $begin`
+echo Time taken: $elapsed
