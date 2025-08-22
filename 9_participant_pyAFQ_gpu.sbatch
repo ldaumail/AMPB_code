@@ -10,7 +10,7 @@
 #SBATCH --mem=128G                      #--mem-per-gpu=10G you can also adjust the cpu memory, however both parameters are mutually exclusive: --mem=64G
 #SBATCH -t1500                                 # Duration of the job (8*60 = 480 mins; 900 = 15 hours)
 #SBATCH -qinferno                              # QOS name embers = free, leftover  cpus / inferno = paid, credits usage
-#SBATCH -o/storage/home/hcoda1/0/ldaumail3/scratch/afq_ampb/derivatives/afq/outReports/Report-%j.out                       # Combined output and error messages file
+#SBATCH -o/storage/home/hcoda1/0/ldaumail3/scratch/afq_ampb/derivatives/pyAFQ/outReports/Report-%j.out                       # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL            # Mail preferences
 #SBATCH --mail-user=ldaumail3@gatech.edu      # E-mail address for notifications
 #SBATCH --array=1 #-13%13                             # Job IDs to run simultaneously from SUBJ list (limited to 4 simultaneously with %4)
@@ -26,20 +26,19 @@ module load cuda/12.1
 
 # Directories ------------------------------------------------------------------
 
-WORK_HOME="/storage/home/hcoda1/0/ldaumail3"
-APPTAINER_DIR="${WORK_HOME}/images"
-DATA_HOME="/storage/home/hcoda1/0/ldaumail3/scratch/afq_ampb"
+APPTAINER_DIR="${HOME}/p-wpark78-0/images"
+DATA_HOME="${HOME}/scratch/afq_ampb"
 DERIVATIVES_DIR="${DATA_HOME}/derivatives"
 DATA_DIR="${DERIVATIVES_DIR}/qsiprep/${participant}/ses-concat/dwi"
 ANALYSIS_DIR="${DATA_HOME}/analysis"
-JULICH_ROIS_DIR="${ANALYSIS_DIR}/julich_space-ACPC_rois/${participant}"
+JULICH_ROIS_DIR="${ANALYSIS_DIR}/julich_space-ACPC_rois/${participant}/ses-concat/anat"
 FUNC_ROIS_DIR="${ANALYSIS_DIR}/functional_vol_roi/${participant}"
 OUT_DIR="${DERIVATIVES_DIR}/${output_dir}"
 if [[ ! -d "${OUT_DIR}" ]]; then mkdir -p "${OUT_DIR}"; fi
-FILES_DIR="${HOME}/AMPB/python"
 
-AFQ_DIR="${HOME}/AFQ_data" 
-TEMPLATEFLOW_DIR="${HOME}/.cache/templateflow"
+#Need to make sure these directories exist before adding:
+# AFQ_DIR="${HOME}/AFQ_data" #we want the image to look for the pyAFQ data in this folder, so that there is no need to download again
+# TEMPLATEFLOW_DIR="${HOME}/.cache/templateflow" #same here, points to template directories, so we don't download again
 
 # Run pyAFQ --------------------------------------------------------------------
 
@@ -63,25 +62,24 @@ if [[ ! -d "${curr_out}" ]]; then mkdir -p "${curr_out}"; fi
 fname="${participant}_ses-concat_desc-bundles_tractography.trx"
 if [[ ! -f "${curr_out}/${fname}" ]]; then 
   echo "Running AFQ for ${curr_afq}..." 
-
+    # Can also add these, just need to make sure the directories exist
+    # --bind "${AFQ_DIR}:/home/AFQ_data" \
+    # --bind "${TEMPLATEFLOW_DIR}:/home/.cache/templateflow" \
   apptainer exec \
     --bind "${DATA_DIR}:/data" \
     --bind "${ANALYSIS_DIR}:/analysis" \
     --bind "${JULICH_ROIS_DIR}:/jrois" \
     --bind "${FUNC_ROIS_DIR}:/frois" \
     --bind "${curr_out}/..:/out" \
-    --bind "${FILES_DIR}:/files" \
-    --bind "${AFQ_DIR}:/home/AFQ_data" \
-    --bind "${TEMPLATEFLOW_DIR}:/home/.cache/templateflow" \
     --nv \
     "${APPTAINER_DIR}/jk_pyafq_gpu_container.sif" \
     python3 "${DATA_HOME}/code/9_participant_pyAFQ_gpu.py" \
-    --dwi_data_file "/data/${participant}_ses-concat_space-T1w_desc-preproc_dwi.nii.gz" \
-    --bval_file "/data/${participant}_ses-concat_space-T1w_desc-preproc_dwi.bval" \
-    --bvec_file "/data/${participant}_ses-concat_space-T1w_desc-preproc_dwi.bvec" \
-    --mask_file "/data/${participant}_ses-concat_space-T1w_desc-brain_mask.nii.gz" \
+    --dwi_data_file "/data/${participant}_ses-concat_acq-HCPdir99_space-ACPC_desc-preproc_dwi.nii.gz" \
+    --bval_file "/data/${participant}_ses-concat_acq-HCPdir99_space-ACPC_desc-preproc_dwi.bval" \
+    --bvec_file "/data/${participant}_ses-concat_acq-HCPdir99_space-ACPC_desc-preproc_dwi.bvec" \
+    --mask_file "/data/${participant}_ses-concat_acq-HCPdir99_space-ACPC_desc-brain_mask.nii.gz" \
     --stop_mask_file "/analysis/fs_wm/${participant}/${participant}_space-T1w_rec-fs_label-WM_mask.nii.gz" \
-    --roi_files "/jrois/${start_file}" "/frois/${stop_file}" \
+    --roi_files "/frois/${start_file}" "/jrois/${stop_file}" \
     --output_dir "/out/${participant}"
 fi
 
