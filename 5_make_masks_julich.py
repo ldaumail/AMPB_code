@@ -5,11 +5,13 @@ import os
 import os.path as op
 import ants
 import argparse
+import re
 
 
 def main(participant_file):
 
     for participant in participant_file:
+        #participant = 'sub-NSxGxBAx1970'
         # directories
         paths_local = op.join('/Users','ldaumail3','Documents','research','ampb_mt_tractometry_analysis','ampb')
         paths_mni = op.join(paths_local, 'analysis', 'MNI152NLin2009cAsym', 'anat')
@@ -48,7 +50,11 @@ def main(participant_file):
                     'rhV1', 'rhPT', 'rhSTS1', 'rhLGN', 'rhPO', 'rhFEF']
 
         for mask, prob_roi in zip(mask_name,prob_roi_list):
-            transformed_mask_path = op.join(paths_ACPC, 'ses-concat', 'anat', participant+'_ses-concat_space-ACPC_desc-'+mask+'03SyN_mask.nii.gz')
+            hemi  = re.sub(".*(lh|rh).*", "\\1", mask)
+            hemi  = "L" if hemi == "lh" else "R"
+            roi = re.sub(".*(?:lh|rh)(.*)", "\\1", mask)
+            transformed_mask_path = op.join(paths_ACPC, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_desc-'+roi+'_mask.nii.gz')
+            #participant+'_hemi-L_space-ACPC_label-'+roi_name+'_mask.nii.gz'
             if os.path.exists(transformed_mask_path):
                 print("File exists!")
             else:
@@ -83,8 +89,10 @@ def main(participant_file):
             prob_PUi_roi = 'Thalamus-PUi_'+hemi+'_MNI152.nii.gz'
             prob_PUm_roi = 'Thalamus-PUm_'+hemi+'_MNI152.nii.gz'
             prob_PUl_roi = 'Thalamus-PUl_'+hemi+'_MNI152.nii.gz'
-            PU_mask_name = hemi+'PU'
-            transformed_mask_path = op.join(paths_ACPC, 'ses-concat', 'anat', participant+'_ses-concat_space-ACPC_desc-'+PU_mask_name+'03SyN_mask.nii.gz')
+            PU_mask_name = 'PU'
+
+            hemi  = "L" if hemi == "lh" else "R"
+            transformed_mask_path = op.join(paths_ACPC, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_desc-'+PU_mask_name+'_mask.nii.gz')
             if os.path.exists(transformed_mask_path):
                 print("File exists!")
             else:
@@ -139,8 +147,9 @@ def main(participant_file):
             prob_hIP1_roi = 'Area-hIP1_'+hemi+'_MNI152.nii.gz'
             prob_hIP2_roi = 'Area-hIP2_'+hemi+'_MNI152.nii.gz'
             prob_hIP3_roi = 'Area-hIP3_'+hemi+'_MNI152.nii.gz'
-            hIP_mask_name = hemi+'hIP'
-            transformed_mask_path = op.join(paths_ACPC, 'ses-concat', 'anat', participant+'_ses-concat_space-ACPC_desc-'+hIP_mask_name+'03SyN_mask.nii.gz')
+            hIP_mask_name = 'hIP'
+            hemi  = "L" if hemi == "lh" else "R"
+            transformed_mask_path = op.join(paths_ACPC, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_desc-'+hIP_mask_name+'_mask.nii.gz')
             if os.path.exists(transformed_mask_path):
                 print("File exists!")
             else:

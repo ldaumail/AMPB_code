@@ -6,10 +6,9 @@ import numpy as np
 import subprocess
 
 
-participant = 'sub-EBxGxCCx1986'
+participant = 'sub-NSxGxBAx1970'
 bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
 analysis_path = op.join(bids_path, 'analysis')
-label_file = op.join(analysis_path, 'functional_surf_roi', participant, participant+"_hemi-L_space-fsnative_label-MT_mask.label")  # FreeSurfer label file for MT
 fs_path = op.join(bids_path, 'derivatives','freesurfer')
 out_dir = op.join(analysis_path, 'tdi_maps', 'dipy_proj_surf', participant)
 # Ensure output dir exists
@@ -85,11 +84,6 @@ coords, faces = read_geometry(wm_surf)
 
 # Load projected surface data
 surf_map = nib.load(out_file).get_fdata().squeeze()
-# Load label vertices
-label_vertices = read_label(label_file)
-
-# Extract values inside ROI
-mt_values = surf_map[label_vertices]
 
 # Normalize values for colormap
 values = surf_map.copy()
@@ -125,7 +119,11 @@ coords, faces = read_geometry(wm_surf)
 surf_map = nib.load(out_file).get_fdata().squeeze()
 
 # Load label vertices (ROI indices)
+label_file = op.join(analysis_path, 'functional_surf_roi', participant, participant+"_hemi-L_space-fsnative_label-MT_mask.label")  # FreeSurfer label file for MT
 label_vertices = read_label(label_file)
+
+# Extract values inside ROI
+mt_values = surf_map[label_vertices]
 
 # ----------------------------
 # Base surface (gray, inflated)

@@ -8,7 +8,7 @@
 #SBATCH -N1 			               # Number of nodes and cores per node
 #SBATCH --gres=gpu:V100:1
 #SBATCH --mem=128G                      #--mem-per-gpu=10G you can also adjust the cpu memory, however both parameters are mutually exclusive: --mem=64G
-#SBATCH -t1500                                 # Duration of the job (8*60 = 480 mins; 900 = 15 hours)
+#SBATCH -t150                                 # Duration of the job (8*60 = 480 mins; 900 = 15 hours)
 #SBATCH -qinferno                              # QOS name embers = free, leftover  cpus / inferno = paid, credits usage
 #SBATCH -o/storage/home/hcoda1/0/ldaumail3/scratch/afq_ampb/derivatives/pyAFQ/outReports/Report-%j.out                       # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL            # Mail preferences
@@ -36,9 +36,6 @@ FUNC_ROIS_DIR="${ANALYSIS_DIR}/functional_vol_roi/${participant}"
 OUT_DIR="${DERIVATIVES_DIR}/${output_dir}"
 if [[ ! -d "${OUT_DIR}" ]]; then mkdir -p "${OUT_DIR}"; fi
 
-#Need to make sure these directories exist before adding:
-# AFQ_DIR="${HOME}/AFQ_data" #we want the image to look for the pyAFQ data in this folder, so that there is no need to download again
-# TEMPLATEFLOW_DIR="${HOME}/.cache/templateflow" #same here, points to template directories, so we don't download again
 
 # Run pyAFQ --------------------------------------------------------------------
 
@@ -47,11 +44,11 @@ hemistr="${hemisphere:0:1}"
 start_roi="${roi%x*}"; end_roi="${roi#*x}"
 
 # define start file
-start_file="${participant}_hemi-${hemistr}_space-T1w_label-${start_roi}_mask.nii.gz"
+start_file="${participant}_hemi-${hemistr}_space-ACPC_label-${start_roi}_mask.nii.gz"
 if [[ "${start_roi}" == "MT" ]]; then start_file="${start_file/MT/MTxWM}"; fi
 
 # define stop file
-stop_file="${participant}_hemi-${hemistr}_space-T1w_label-${end_roi}_mask.nii.gz"
+stop_file="${participant}_hemi-${hemistr}_space-ACPC_label-${end_roi}_mask.nii.gz"
 if [[ "${end_roi}" == "MT" ]]; then stop_file="${stop_file/MT/MTxWM}"; fi
 
 # prepare output directory
@@ -62,9 +59,7 @@ if [[ ! -d "${curr_out}" ]]; then mkdir -p "${curr_out}"; fi
 fname="${participant}_ses-concat_desc-bundles_tractography.trx"
 if [[ ! -f "${curr_out}/${fname}" ]]; then 
   echo "Running AFQ for ${curr_afq}..." 
-    # Can also add these, just need to make sure the directories exist
-    # --bind "${AFQ_DIR}:/home/AFQ_data" \
-    # --bind "${TEMPLATEFLOW_DIR}:/home/.cache/templateflow" \
+
   apptainer exec \
     --bind "${DATA_DIR}:/data" \
     --bind "${ANALYSIS_DIR}:/analysis" \
@@ -72,7 +67,7 @@ if [[ ! -f "${curr_out}/${fname}" ]]; then
     --bind "${FUNC_ROIS_DIR}:/frois" \
     --bind "${curr_out}/..:/out" \
     --nv \
-    "${APPTAINER_DIR}/jk_pyafq_gpu_container.sif" \
+    "${APPTAINER_DIR}/pyafq_gpu_cuda_12.sif" \
     python3 "${DATA_HOME}/code/9_participant_pyAFQ_gpu.py" \
     --dwi_data_file "/data/${participant}_ses-concat_acq-HCPdir99_space-ACPC_desc-preproc_dwi.nii.gz" \
     --bval_file "/data/${participant}_ses-concat_acq-HCPdir99_space-ACPC_desc-preproc_dwi.bval" \

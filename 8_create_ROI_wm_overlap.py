@@ -12,9 +12,9 @@ def main(participants_file, bids_path):
         input_file1 = op.join(bids_path, 'analysis', 'fs_wm', participant, participant+'_space-T1w_rec-fs_label-WM_mask.nii.gz')
         for mask in ['MT', 'PT']:
             for hemi in ['L', 'R']:
-                input_file2 = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, participant+'_hemi-'+hemi+'_space-T1w_label-'+mask+'_mask_dilated.nii.gz')
+                input_file2 = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, participant+'_hemi-'+hemi+'_space-ACPC_label-'+mask+'_mask_dilated.nii.gz')
                 input_files = [input_file1, input_file2]
-                output_file = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, participant+'_hemi-'+hemi+'_space-T1w_label-'+mask+'xWM_mask.nii.gz')
+                output_file = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, participant+'_hemi-'+hemi+'_space-ACPC_label-'+mask+'xWM_mask.nii.gz')
                 overlap_masks(input_files, output_file)
 
 if __name__ == "__main__":

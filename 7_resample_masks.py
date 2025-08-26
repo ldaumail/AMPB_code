@@ -5,6 +5,7 @@ import ants
 import argparse
 import sys
 import argparse
+import re
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = current_dir  # main_script.py is inside project/
 sys.path.append(project_dir)
@@ -20,15 +21,18 @@ def main(participants_file, bids_path):
                     'rhV1', 'rhPT', 'rhSTS1', 'rhLGN', 'rhPO', 'rhFEF', 'rhPU', 'rhhIP']
         
         for mask in mask_name:
-            input_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_ses-concat_desc-'+mask+'03SyN_mask.nii.gz')
-            output_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_ses-concat_space-T1w_desc-'+mask+'03SyN_mask.nii.gz')
+            hemi  = re.sub(".*(lh|rh).*", "\\1", mask)
+            hemi  = "L" if hemi == "lh" else "R"
+            roi = re.sub(".*(?:lh|rh)(.*)", "\\1", mask)
+            input_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_desc-'+roi+'_mask.nii.gz')
+            output_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_desc-'+roi+'_mask.nii.gz')
             resample_file(input_file, target_file, output_file, interpolator = "linear")
         
         func_mask_name = ['MT', 'PT']
         for mask in func_mask_name:
             for hemi in ['L', 'R']:
                 input_file = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, participant+'_hemi-'+hemi+'_space-ACPC_label-'+mask+'_mask_dilated.nii.gz')
-                output_file = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, participant+'_hemi-'+hemi+'_space-T1w_label-'+mask+'_mask_dilated.nii.gz')
+                output_file = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, participant+'_hemi-'+hemi+'_space-ACPC_label-'+mask+'_mask_dilated.nii.gz')
                 resample_file(input_file, target_file, output_file, interpolator = "linear")
 
 if __name__ == "__main__":
