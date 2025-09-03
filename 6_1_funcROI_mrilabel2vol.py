@@ -8,7 +8,7 @@ import os.path as op
 import argparse
 import sys
 
-def main(participant_file, roi_name):
+def main(participants_file, roi_name):
         paths_local = op.join('/Users','ldaumail3','Documents','research','ampb_mt_tractometry_analysis', 'ampb')
 
         utils = op.join(paths_local, 'code','utils')
@@ -23,7 +23,7 @@ def main(participant_file, roi_name):
         fs_path =  op.join(paths_local,'derivatives', 'freesurfer')
 
         # Loop through each subject folder in the directory
-        for participant in participant_file:
+        for participant in participants_file:
 
                 # define participant
                 # participant='sub-NSxLxYKx1964'

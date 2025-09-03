@@ -6,7 +6,7 @@ import numpy as np
 import subprocess
 
 
-participant = 'sub-NSxGxBAx1970'
+participant = 'sub-EBxGxCCx1986'
 bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
 analysis_path = op.join(bids_path, 'analysis')
 fs_path = op.join(bids_path, 'derivatives','freesurfer')
@@ -48,10 +48,7 @@ for h, hemi in enumerate(hemisphere):
     # Output file name
     out_file = os.path.join(out_dir, f"{participant}_hemi-{hemi}_space-fsnative_label-{mask}_tdi_on_surf.mgh")
 
-    if hemi == 'L':
-        hm = 'lh'
-    else:
-        hm = 'rh'
+    hm  = "lh" if hemi == "L" else "rh"
     # Build mri_vol2surf command
     cmd = [
         "mri_vol2surf",
@@ -60,7 +57,7 @@ for h, hemi in enumerate(hemisphere):
         "--hemi", hm,
         "--reg", registration_file,
         "--surf", "white",
-        "--projfrac", "0",
+        "--projfrac", "-1",
         "--sd", fs_path,
         "--out", out_file
     ]
@@ -77,7 +74,8 @@ from fury import window, actor, colormap
 import numpy as np
 
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
-wm_surf = op.join(fs_path, participant, 'surf', "lh.inflated")   # FreeSurfer surface (white or pial)
+hm  = "lh" if hemi == "L" else "rh"
+wm_surf = op.join(fs_path, participant, 'surf', f"{hm}.inflated")   # FreeSurfer surface (white or pial)
 
 # Load surface (coords = vertices, faces = triangles)
 coords, faces = read_geometry(wm_surf)
@@ -112,7 +110,7 @@ import numpy as np
 import os.path as op
 
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
-wm_surf = op.join(fs_path, participant, 'surf', "lh.inflated")   # FreeSurfer surface (inflated)
+wm_surf = op.join(fs_path, participant, 'surf', f"{hm}.inflated")    # FreeSurfer surface (inflated)
 coords, faces = read_geometry(wm_surf)
 
 # Load projected surface data

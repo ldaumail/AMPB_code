@@ -7,9 +7,9 @@ import argparse
 import sys
 
 
-def main(participant_file, roi_name):
+def main(participants_file, roi_name):
 
-    for participant in participant_file:
+    for participant in participants_file:
         # roi_name = 'PT'
         # participant = 'sub-NSxLxYKx1964'
         # directories
