@@ -52,6 +52,9 @@ for h, hemi in enumerate(hemisphere):
     # ----------------------------
     mt_mask_img = ants.image_read(op.join(roi_path, participant+'_hemi-'+hemi+'_space-ACPC_label-MT_mask_dilated.nii.gz'))
     mt_mask = mt_mask_img.numpy()
+
+    # mt_mask_nib = nib.load(op.join(roi_path, participant+'_hemi-'+hemi+'_space-ACPC_label-MTxWM_mask.nii.gz'))
+    # print(mt_mask_nib.header)
 # mt_mask.shape
 # non_zero_count = np.count_nonzero(mt_mask)
 # (2000000/353)**(1/3)
@@ -205,7 +208,7 @@ import numpy as np
 import os.path as op
 
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
-wm_surf = op.join(fs_path, participant, 'surf', f"{hemi_fs}.inflated")    # FreeSurfer surface (inflated)
+wm_surf = op.join(fs_path, participant, 'surf', f"{hemi_fs}.white")    # FreeSurfer surface (inflated)
 coords, faces = read_geometry(wm_surf)
 
 # Load projected surface data
@@ -240,11 +243,12 @@ roi_colors = np.zeros((coords.shape[0], 4))   # RGBA
 roi_colors[:, -1] = 0.0  # fully transparent background
 roi_colors[label_vertices, :] = roi_colormap_rgba
 
-#Define Volumetric MT ROI actor
-vol_actor = actor.point(ras_tkr, colors=(1, 0, 0), point_radius=1.0)  # red dots
-
 #Define surface actors
 roi_actor = actor.surface(coords, faces, roi_colors)
+
+#Define Volumetric MT ROI actor in fs RAS-tkr space
+vol_actor = actor.point(ras_tkr, colors=(1, 0, 0), point_radius=0.3)  # red dots
+
 
 # ----------------------------
 # Scene
@@ -252,6 +256,7 @@ roi_actor = actor.surface(coords, faces, roi_colors)
 scene = window.Scene()
 scene.add(base_actor)
 scene.add(roi_actor)
+scene.add(vol_actor)
 
 window.show(scene)
 

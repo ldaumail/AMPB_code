@@ -25,7 +25,7 @@ if __name__ == "__resample_file__":
   parser.add_argument("--interpolator", type = str, default = "linear")
   args = parser.parse_args()
 
-  resample_roi(
+  resample_file(
     input_file   = args.input_file,
     target_file  = args.target_file,
     output_file  = args.output_file, 
