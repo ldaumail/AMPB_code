@@ -42,21 +42,20 @@ def main(dwi_data_file, bval_file, bvec_file, mask_file, stop_mask_file,
 
   # define tracking parameters
   tracking_params = {
-    "n_seeds": 2000000,
-    "random_seeds": True, 
+    "n_seeds": 20,
     "seed_mask": RoiImage(use_endpoints = True), 
     "stop_mask": ImageFile(path = stop_mask_file),
     "trx": True
   }
-    # define segmentation parameters
+  # define segmentation parameters
+  #"dist_to_atlas": 0, "cleaning_params": {"distance_threshold": 3}
+  #"dist_to_atlas" specifies the distance from the target ROIs that tracts need to reach. if = 0, tracts need to reach the surface of ROI, or enter it. If 4 mm = needs to be within 4mm of ROI surface. 
+  #"distance_threshold" in cleaning params is the Mahalanobis distance in number of STDEVs. We adjust it to exclude outlier streamlines.
   segmentation_params = {
-    "cleaning_params": {
-      "clean_rounds": 2, #TODO: adjust as needed
-    }
-  } #"dist_to_atlas": 0, "cleaning_params": {"distance_threshold": 3}
- #"dist_to_atlas" specifies the distance from the target ROIs that tracts need to reach. if = 0, tracts need to reach the surface of ROI, or enter it. If 4 mm = needs to be within 4mm of ROI surface. 
-#"distance_threshold" in cleaning params is the Mahalanobis distance in number of STDEVs. We adjust it to exclude outlier streamlines.
-        
+	    "dist_to_atlas": 0,
+        "cleaning_params": {"distance_threshold": 3, "clean_rounds": 2}
+        }  
+       
   # define ParticipantAFQ object
   myafq = ParticipantAFQ(
     dwi_data_file         = dwi_data_file, 
