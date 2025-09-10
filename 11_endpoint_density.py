@@ -44,8 +44,8 @@ reg = ants.registration(
     verbose = True
 )
 
-hemisphere = ['L', 'R']
-roi_names = ['LeftMTxWMxLGN', 'RightMTxWMxLGN']
+hemisphere = ['L'] # 'R'
+roi_names = ['LeftMTxWMxLGN'] #, 'RightMTxWMxLGN'
 for h, hemi in enumerate(hemisphere):
     # ----------------------------
     # STEP 1: Load volumetric ROI
@@ -201,62 +201,80 @@ for h, hemi in enumerate(hemisphere):
 # Visualize projection 
 # -------------------
 
-###### !!!!! Need to add tract, and complete density overlay + Origin MT ROI outline
+#Still need to add tract to the figure
+
 import nibabel as nib
 from nibabel.freesurfer import read_geometry, read_label
 from fury import window, actor, colormap
 import numpy as np
 import os.path as op
 
+# ----------------------------
+# Load data
+# ----------------------------
+hemi_fs = 'lh'
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
-wm_surf = op.join(fs_path, participant, 'surf', f"{hemi_fs}.white")    # FreeSurfer surface (inflated)
+wm_surf = op.join(fs_path, participant, 'surf', f"{hemi_fs}.white")    # FreeSurfer surface
 coords, faces = read_geometry(wm_surf)
 
-# Load projected surface data
+# Load projected density map (per vertex values)
+output_file = op.join(out_path, f"{participant}_hemi-{hemi_fs}_label-MT_desc-projdensity.mgh")
 surf_map = nib.load(output_file).get_fdata().squeeze()
-# print(surf_map.size)
 
-# Load label vertices (ROI indices)
-label_file = op.join(analysis_path, 'functional_surf_roi', participant, f"{participant}_hemi-{hemi}_space-fsnative_label-MT_mask.label")  # FreeSurfer label file for MT
+# Load MT label vertices
+label_file = op.join(
+    analysis_path,
+    'functional_surf_roi',
+    participant,
+    f"{participant}_hemi-{hemi}_space-fsnative_label-MT_mask.label"
+)
 label_vertices = read_label(label_file)
-# label_vertices.size
 
 # ----------------------------
-# Base surface (gray, inflated)
+# Base density map overlay (all vertices)
 # ----------------------------
-base_colors = np.ones((coords.shape[0], 4)) * 0.8  # light gray RGBA
-base_colors[:, -1] = 0.3   # alpha (transparency)
-base_actor = actor.surface(coords, faces, base_colors)
+# normalize surface map
+norm_vals = (surf_map - np.nanmin(surf_map)) / (np.nanmax(surf_map) - np.nanmin(surf_map) + 1e-8)
+
+# colormap for full surface
+surf_colors = colormap.create_colormap(norm_vals, name='plasma')  # Nx3 RGB
+surf_colors = np.c_[surf_colors, np.ones(surf_colors.shape[0])]   # add alpha
+
+density_actor = actor.surface(coords, faces, surf_colors)
 
 # ----------------------------
-# MT ROI overlay (colored by values of density map)
+# MT boundary as line overlay
 # ----------------------------
-# normalize ROI values
-roi_values = surf_map[label_vertices]
-norm_vals = (roi_values - np.nanmin(roi_values)) / (np.nanmax(roi_values) - np.nanmin(roi_values) + 1e-8)
+# Extract MT boundary edges (faces that include MT + non-MT vertices)
+mask = np.zeros(coords.shape[0], dtype=bool)
+mask[label_vertices] = True
 
-# color map
-roi_colormap = colormap.create_colormap(norm_vals, name='plasma') # plasma colormap (returns Nx3 RGB)
-roi_colormap_rgba = np.c_[roi_colormap, np.ones(roi_colormap.shape[0])] # add alpha channel (opaque ROI)
+# find edges between MT and non-MT vertices
+edges = []
+for f in faces: #Faces contains triangles of 3 corner IDs each.
+    in_mask = mask[f]
+    if np.any(in_mask) and not np.all(in_mask):
+        # collect boundary edges
+        for i in range(3):
+            v1, v2 = f[i], f[(i+1) % 3] #use modulo 3 to take care of last corner i =2 with corner 0
+            if mask[v1] != mask[v2]:
+                edges.append((v1, v2))
 
-# assign colors only to ROI vertices
-roi_colors = np.zeros((coords.shape[0], 4))   # RGBA
-roi_colors[:, -1] = 0.0  # fully transparent background
-roi_colors[label_vertices, :] = roi_colormap_rgba
+edges = np.unique(np.array(edges), axis=0) #This to avoid edges counted twice over all triangles
+line_coords = coords[edges]
 
-#Define surface actors
-roi_actor = actor.surface(coords, faces, roi_colors)
+# draw boundary as polyline actor (red)
+boundary_actor = actor.line(line_coords, colors=(0, 1, 0), linewidth=3)
 
 #Define Volumetric MT ROI actor in fs RAS-tkr space
 vol_actor = actor.point(ras_tkr, colors=(1, 0, 0), point_radius=0.3)  # red dots
-
 
 # ----------------------------
 # Scene
 # ----------------------------
 scene = window.Scene()
-scene.add(base_actor)
-scene.add(roi_actor)
+scene.add(density_actor)
+scene.add(boundary_actor)
 scene.add(vol_actor)
 
 window.show(scene)

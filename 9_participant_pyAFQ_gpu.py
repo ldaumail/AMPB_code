@@ -52,9 +52,8 @@ def main(dwi_data_file, bval_file, bvec_file, mask_file, stop_mask_file,
   #"dist_to_atlas" specifies the distance from the target ROIs that tracts need to reach. if = 0, tracts need to reach the surface of ROI, or enter it. If 4 mm = needs to be within 4mm of ROI surface. 
   #"distance_threshold" in cleaning params is the Mahalanobis distance in number of STDEVs. We adjust it to exclude outlier streamlines.
   segmentation_params = {
-	    "dist_to_atlas": 0,
         "cleaning_params": {"distance_threshold": 3, "clean_rounds": 2}
-        }  
+        }  #	    "dist_to_atlas": 0,
        
   # define ParticipantAFQ object
   myafq = ParticipantAFQ(
