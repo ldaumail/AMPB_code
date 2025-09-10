@@ -1,5 +1,6 @@
 import ants
 import argparse
+import numpy as np
 
 
 def resample_file(input_file, target_file, output_file, interpolator = "linear"):
@@ -13,7 +14,15 @@ def resample_file(input_file, target_file, output_file, interpolator = "linear")
     target = target_image,
     interp_type = interpolator
   )
-  ants.image_write(resampled_image, output_file) 
+
+  binary_data = (resampled_image.numpy() > 0).astype(np.uint8)
+  binary_img = ants.from_numpy(
+      binary_data,
+      origin=resampled_image.origin,
+      spacing=resampled_image.spacing,
+      direction=resampled_image.direction
+  )
+  ants.image_write(binary_img, output_file) 
   print(f"Saved: {output_file}")
 
 

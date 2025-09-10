@@ -50,7 +50,7 @@ for h, hemi in enumerate(hemisphere):
     # ----------------------------
     # STEP 1: Load volumetric ROI
     # ----------------------------
-    mt_mask_img = ants.image_read(op.join(roi_path, participant+'_hemi-'+hemi+'_space-ACPC_label-MT_mask_dilated.nii.gz'))
+    mt_mask_img = ants.image_read(op.join(roi_path, participant+'_hemi-'+hemi+'_space-ACPC_label-MTxWM_mask.nii.gz'))
     mt_mask = mt_mask_img.numpy()
 
     # mt_mask_nib = nib.load(op.join(roi_path, participant+'_hemi-'+hemi+'_space-ACPC_label-MTxWM_mask.nii.gz'))
@@ -157,7 +157,7 @@ for h, hemi in enumerate(hemisphere):
     # STEP 6: Load FreeSurfer WM surface (coords already in RAS-tkr)
     # ----------------------------
     hemi_fs = "lh" if hemi == "L" else "rh"
-    surf_path = os.path.join(fs_path, "surf", f"{hemi_fs}.white")
+    surf_path = os.path.join(fs_path, participant, "surf", f"{hemi_fs}.white")
     fs_coords, fs_faces = fsio.read_geometry(surf_path)
 
     # ----------------------------
@@ -201,6 +201,7 @@ for h, hemi in enumerate(hemisphere):
 # Visualize projection 
 # -------------------
 
+###### !!!!! Need to add tract, and complete density overlay + Origin MT ROI outline
 import nibabel as nib
 from nibabel.freesurfer import read_geometry, read_label
 from fury import window, actor, colormap
