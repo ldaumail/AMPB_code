@@ -7,13 +7,13 @@ paths_logs="${HOME}/scratch/logs"
 
 output_dir="pyAFQ/cleaning_rounds2" 
 
-hemisphere_list=( "Left" "Right" )
-roi_list=("MTxLGN" "MTxPT")
-participant_list=("sub-EBxGxEYx1965" "sub-EBxGxPEx1959" "sub-EBxGxYZx1949"
+hemisphere_list=( "Left" "Right" ) 
+roi_list=("MTxLGN" "MTxPT" "MTxSTS1" "MTxhIP")
+participant_list=("sub-EBxGxCCx1986" "sub-EBxGxEYx1965" "sub-EBxGxPEx1959"
 "sub-EBxGxZAx1990" "sub-EBxLxHHx1949" "sub-EBxLxQPx1957" "sub-EBxLxTZx1956"
 "sub-NSxGxBAx1970" "sub-NSxGxHKx1965" "sub-NSxGxHNx1952" "sub-NSxGxIFx1991"
 "sub-NSxLxATx1954" "sub-NSxLxPQx1973" "sub-NSxLxQUx1953" "sub-NSxLxYKx1964")
-#   "sub-EBxGxCCx1986"
+# "sub-EBxGxYZx1949"
 # -----------------------------------------------------------------------------
 
 for participant in "${participant_list[@]}"; do # for each participant
