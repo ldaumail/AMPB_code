@@ -27,7 +27,7 @@ def main(participants_file, bids_path):
             output_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_label-'+roi+'_mask.nii.gz')
             resample_file(input_file, target_file, output_file, interpolator = "linear")
         
-        func_mask_name = ['MT', 'PT'] 
+        func_mask_name = ['MT', 'PT'] #
         for mask in func_mask_name:
             for hemi in ['L', 'R']:
                 input_file = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, participant+'_hemi-'+hemi+'_space-ACPC_label-'+mask+'_mask_dilated.nii.gz')

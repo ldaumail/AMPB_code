@@ -10,8 +10,8 @@ import sys
 def main(participants_file, roi_name):
 
     for participant in participants_file:
-        # roi_name = 'PT'
-        # participant = 'sub-NSxLxYKx1964'
+        # roi_name = 'MT'
+        # participant = 'sub-NSxGxBAx1970'
         # directories
         paths_local = op.join('/Users','ldaumail3','Documents','research','ampb_mt_tractometry_analysis','ampb')
         utils = op.join(paths_local, 'code', 'utils')
