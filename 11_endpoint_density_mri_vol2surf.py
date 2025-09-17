@@ -9,7 +9,7 @@ from nilearn import plotting
 import ants
 import subprocess
 
-participant = 'sub-EBxGxCCx1986'
+participant = 'sub-EBxGxCCx1986' #sub-NSxGxBAx1970
 bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
 analysis_path = op.join(bids_path, 'analysis')
 roi_path = op.join(analysis_path, 'functional_vol_roi', participant)
@@ -153,7 +153,7 @@ for h, hemi in enumerate(hemisphere):
 
     ## STEP 7: Perform volume to surface projection of MT ROI density values
     # Output file name
-    out_file = os.path.join(out_path, f"{participant}_hemi-{hemi}_space-fsnative_label-{mask_name}_desc-fsprojdensity.mgh")
+    out_file = os.path.join(out_path, f"{participant}_hemi-{hemi}_space-fsnative_label-{mask_name}_desc-fsprojdensity3mm.mgh")
 
     hemi_fs  = "lh" if hemi == "L" else "rh"
     # Build mri_vol2surf command
@@ -163,10 +163,10 @@ for h, hemi in enumerate(hemisphere):
         "--regheader", participant,
         "--hemi", hemi_fs,
         "--surf", "white",
-        "--projfrac", "-1",
+        "--projdist", "-3",
         "--sd", fs_path,
         "--out", out_file
-    ]
+    ] #"--projfrac", "-0.3",
 
     # Run the command
     print("Running:", " ".join(cmd))
