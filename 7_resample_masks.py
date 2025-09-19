@@ -61,6 +61,10 @@ if __name__ == "__main__":
 # brain_mask = nib.load('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/qsiprep/sub-EBxGxCCx1986/ses-concat/dwi/sub-EBxGxCCx1986_ses-concat_acq-HCPdir99_space-ACPC_desc-preproc_dwi.nii.gz')
 # print(brain_mask.header)
 # import nibabel as nib
-# mt_roi = nib.load('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/functional_vol_roi/sub-EBxGxCCx1986/sub-EBxGxCCx1986_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz')
+# mt_roi = nib.load('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/functional_vol_roi/sub-NSxLxPQx1973/sub-NSxLxPQx1973_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz')
 # print(mt_roi.header)
 # print((mt_roi.get_fdata() > 0).sum())
+# pt_roi = nib.load('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/julich_space-ACPC_rois/sub-NSxLxPQx1973/ses-concat/anat/sub-NSxLxPQx1973_hemi-L_space-ACPC_desc-PT_mask.nii.gz')
+# print((pt_roi.get_fdata() > 0).sum())
+# pt_roi = nib.load('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/julich_space-ACPC_rois/sub-EBxGxCCx1986/ses-concat/anat/sub-EBxGxCCx1986_hemi-L_space-ACPC_desc-PT_mask.nii.gz')
+# print((pt_roi.get_fdata() > 0).sum())
