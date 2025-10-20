@@ -12,10 +12,13 @@ from utils.resample_file import resample_file
 
 
 def main(participants_file, bids_path):
-
+    '''
+    Example:
+    python 7_resample_masks.py --participants_file ./utils/study2_subjects_updated.txt --bids_path '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb'
+    '''
     for participant in participants_file:
         target_file =  op.join(bids_path, 'derivatives', 'qsiprep', participant, 'ses-concat', 'dwi', participant+'_ses-concat_acq-HCPdir99_space-ACPC_desc-brain_mask.nii.gz')
-        
+         
         mask_name = ['lhV1', 'lhPT', 'lhSTS1', 'lhLGN', 'lhPO', 'lhFEF', 'lhPU', 'lhhIP',
                     'rhV1', 'rhPT', 'rhSTS1', 'rhLGN', 'rhPO', 'rhFEF', 'rhPU', 'rhhIP']
         
@@ -27,7 +30,7 @@ def main(participants_file, bids_path):
             output_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_label-'+roi+'_mask.nii.gz')
             resample_file(input_file, target_file, output_file, interpolator = "linear")
         
-        func_mask_name = ['MT', 'PT'] #
+        func_mask_name = ['MT'] #, 'PT'
         for mask in func_mask_name:
             for hemi in ['L', 'R']:
                 input_file = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, participant+'_hemi-'+hemi+'_space-ACPC_label-'+mask+'_mask_dilated.nii.gz')
@@ -58,9 +61,13 @@ if __name__ == "__main__":
 
 
 
+
+# import nibabel as nib
 # brain_mask = nib.load('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/qsiprep/sub-EBxGxCCx1986/ses-concat/dwi/sub-EBxGxCCx1986_ses-concat_acq-HCPdir99_space-ACPC_desc-preproc_dwi.nii.gz')
 # print(brain_mask.header)
 # import nibabel as nib
+# anat_brain_mask = nib.load('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/qsiprep/sub-EBxGxCCx1986/anat/sub-EBxGxCCx1986_space-ACPC_desc-brain_mask.nii.gz')
+# print(anat_brain_mask.header)
 # mt_roi = nib.load('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/functional_vol_roi/sub-NSxLxPQx1973/sub-NSxLxPQx1973_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz')
 # print(mt_roi.header)
 # print((mt_roi.get_fdata() > 0).sum())

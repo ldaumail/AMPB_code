@@ -11,8 +11,7 @@ BUNDLES_KWARGS = {
   "space": "subject",
 }
 
-def main(dwi_data_file, bval_file, bvec_file, mask_file, stop_mask_file, 
-         roi_files, output_dir):
+def main(dwi_data_file, bval_file, bvec_file, t1_file, roi_files, output_dir):
   # define custom bundles dictionary
   bundles = {} # intialize empty bundles dictionary
   for start_file, end_file in roi_files: # for each roi (start/stop) file  
@@ -30,24 +29,26 @@ def main(dwi_data_file, bval_file, bvec_file, mask_file, stop_mask_file,
       **BUNDLES_KWARGS
     }
   # define bundles as BundleDict
-  bundles = abd.BundleDict(bundles, resample_subject_to=None)
+  bundles = abd.BundleDict(bundles, resample_subject_to=True)
 
-  # define brain main image file
-  brain_mask_definition = ImageFile(path = mask_file)
 
-  scalars = [
-            "dki_fa", "dki_md", "dki_mk", "dki_awf", 
-            "fwdti_fa", "fwdti_md", "fwdti_fwf"
-        ]
+#   scalars = [
+#             "dki_fa", "dki_md", "dki_mk", "dki_awf", 
+#             "fwdti_fa", "fwdti_md", "fwdti_fwf"
+#         ]
 
   # define tracking parameters
   tracking_params = {
     "n_seeds": 2000000,
     "random_seeds": True, 
-    "seed_mask": RoiImage(use_endpoints = True), 
-    "stop_mask": ImageFile(path = stop_mask_file),
+    "seed_mask": RoiImage(
+            use_waypoints=False,
+            use_endpoints=True,
+            only_wmgmi=True), 
     "trx": True
   }
+
+
   # define segmentation parameters
   #"dist_to_atlas": 0, "cleaning_params": {"distance_threshold": 3}
   #"dist_to_atlas" specifies the distance from the target ROIs that tracts need to reach. if = 0, tracts need to reach the surface of ROI, or enter it. If 4 mm = needs to be within 4mm of ROI surface. 
@@ -61,9 +62,9 @@ def main(dwi_data_file, bval_file, bvec_file, mask_file, stop_mask_file,
     dwi_data_file         = dwi_data_file, 
     bval_file             = bval_file,
     bvec_file             = bvec_file,
+    t1_file               = t1_file,
     output_dir            = output_dir,
     bundle_info           = bundles,
-    brain_mask_definition = brain_mask_definition, 
     tracking_params       = tracking_params, 
     segmentation_params   = segmentation_params,
     tractography_ngpus    = 1
@@ -77,8 +78,7 @@ if __name__ == "__main__":
   parser.add_argument("--dwi_data_file", type = str)
   parser.add_argument("--bval_file", type = str)
   parser.add_argument("--bvec_file", type = str)
-  parser.add_argument("--mask_file", type = str)
-  parser.add_argument("--stop_mask_file", type = str)
+  parser.add_argument("--t1_file", type = str)
   parser.add_argument("--roi_files", type = str, nargs = 2, action = "append")
   parser.add_argument("--output_dir", type = str)
   args = parser.parse_args()
@@ -86,9 +86,8 @@ if __name__ == "__main__":
   main(
     dwi_data_file  = args.dwi_data_file,
     bval_file      = args.bval_file, 
-    bvec_file      = args.bvec_file, 
-    mask_file      = args.mask_file, 
-    stop_mask_file = args.stop_mask_file,
+    bvec_file      = args.bvec_file,
+    t1_file        = args.t1_file,  
     roi_files      = args.roi_files,
     output_dir     = args.output_dir
   )

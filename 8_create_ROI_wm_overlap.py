@@ -41,3 +41,10 @@ if __name__ == "__main__":
         participants = [line.strip() for line in f if line.strip()]
 
     main(participants, args.bids_path)
+
+
+# import nibabel as nib
+# output_file = nib.load('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/functional_vol_roi/sub-NSxLxPQx1973/sub-NSxLxPQx1973_hemi-L_space-ACPC_label-MTxWM_mask.nii.gz')
+# print(output_file.header)
+# mt_roi = nib.load('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/functional_vol_roi/sub-NSxLxPQx1973/sub-NSxLxPQx1973_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz')
+# print(mt_roi.header)

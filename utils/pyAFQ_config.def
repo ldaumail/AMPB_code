@@ -1,0 +1,43 @@
+Bootstrap: docker
+From: nvidia/cuda:12.1.0-devel-ubuntu22.04
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export PATH=/opt/anaconda/envs/afq/bin:/opt/anaconda/bin:${PATH}
+    export LD_LIBRARY_PATH=/opt/anaconda/lib:${LD_LIBRARY_PATH}
+    
+%post
+    # System update and basic tools installation
+    apt-get update && apt-get install --assume-yes apt-transport-https \
+        ca-certificates gnupg software-properties-common \
+        gcc git wget curl numactl cmake 
+
+
+    # Miniconda3
+    curl -L "https://repo.anaconda.com/miniconda/Miniconda3-py311_25.1.1-1-Linux-x86_64.sh" \
+        -o "/tmp/Miniconda3.sh"
+    bash /tmp/Miniconda3.sh -b -p /opt/anaconda
+    rm -rf /tmp/Miniconda3.sh
+    cd /opt && eval "$(/opt/anaconda/bin/conda shell.bash hook)"
+  
+    # Create writable conda env for AFQ + niimath
+    /opt/anaconda/bin/conda create -y -n afq python=3.11
+
+    # Use the env’s python for installs
+    /opt/anaconda/envs/afq/bin/pip install numpy>=2.0.0 scipy>=1.13.0 cython nibabel dipy tqdm fslpy pingouin>=0.3 seaborn>=0.11.0 ipython
+    /opt/anaconda/envs/afq/bin/pip install git+https://github.com/dipy/GPUStreamlines.git
+    /opt/anaconda/envs/afq/bin/pip install git+https://github.com/36000/pyAFQ.git@dam
+    
+    #Address read only to executable permissions
+    # --- Fix niimath ---
+    /opt/anaconda/envs/afq/bin/pip install -U git+https://github.com/spikedoanz/niimath.git@niimath-permissions 
+    
+    # Sanity check (Brainchop's niimath should now work in env)
+    /opt/anaconda/envs/afq/bin/niimath --help || true
+%runscript
+    exec /opt/anaconda/envs/afq/bin/python "$@"
+    # . /opt/anaconda/bin/conda/etc/profile.d/conda.sh
+    # conda activate afq
+    # exec /opt/pyAFQ/bin/pyAFQ "$@"
+
+
