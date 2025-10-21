@@ -2,10 +2,10 @@ import os
 import os.path as op
 import numpy as np
 from scipy.ndimage import binary_erosion
-# import matplotlib.pyplot as plt
-# from skimage import measure
-# from nibabel.processing import resample_from_to
-# from nilearn import plotting
+import matplotlib.pyplot as plt
+from skimage import measure
+from nibabel.processing import resample_from_to
+from nilearn import plotting
 import ants
 import subprocess
 
@@ -14,7 +14,7 @@ bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tracto
 analysis_path = op.join(bids_path, 'analysis')
 roi_path = op.join(analysis_path, 'functional_vol_roi', participant)
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
-out_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_gmwmi_tdi_maps', participant)
+out_path = op.join(bids_path, 'analysis', 'tdi_maps','dipy_proj_surf', participant)
 os.makedirs(out_path, exist_ok=True)
 
 
