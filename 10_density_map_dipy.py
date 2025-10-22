@@ -14,13 +14,13 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path):
     '''
     Ex usage: python 10_density_map_dipy.py --participants_file ./utils/study2_subjects_updated.txt --tract_name LeftMTmaskxLGN --bids_path /Use
 rs/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --pyAFQ_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/deriva
-tives/pyAFQ/gmwmi/LeftMTxLGN
+tives/pyAFQ/wmgmi/LeftMTxLGN
     '''
     for participant in participants_file:
         # participant = 'sub-EBxGxCCx1986'
-        # tract_name = 'LeftMTmaskxLGN'
-        # pyAFQ_path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/pyAFQ/gmwmi/LeftMTxLGN'
-        tdi_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_gmwmi_tdi_maps', participant)
+        # tract_name = 'RightMTmaskxLGN'
+        # pyAFQ_path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/pyAFQ/wmgmi/RightMTxLGN'
+        tdi_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant)
         os.makedirs(tdi_path, exist_ok=True)
 
         for tract in [tract_name]: 
