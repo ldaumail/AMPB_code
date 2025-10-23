@@ -12,9 +12,9 @@ from utils.streamlines_utils import streamline2dipy_density
 
 def main(participants_file, tract_name, bids_path, pyAFQ_path):
     '''
-    Ex usage: python 10_density_map_dipy.py --participants_file ./utils/study2_subjects_updated.txt --tract_name LeftMTmaskxLGN --bids_path /Use
+    Ex usage: python 10_density_map_dipy.py --participants_file ./utils/study2_subjects_updated.txt --tract_name LeftMTxLGN --bids_path /Use
 rs/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --pyAFQ_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/deriva
-tives/pyAFQ/wmgmi/LeftMTxLGN
+tives/pyAFQ/wmgmi
     '''
     for participant in participants_file:
         # participant = 'sub-EBxGxCCx1986'
@@ -22,11 +22,12 @@ tives/pyAFQ/wmgmi/LeftMTxLGN
         # pyAFQ_path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/pyAFQ/wmgmi/RightMTxLGN'
         tdi_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant)
         os.makedirs(tdi_path, exist_ok=True)
-
-        for tract in [tract_name]: 
-            tract_path = os.path.join(pyAFQ_path, participant, 'bundles', participant+'_ses-concat_acq-HCPdir99_desc-' + tract + '_tractography.trx')
+        
+        new_name = tract_name.replace("MT", "MTmask")
+        for tract in [new_name]: 
+            tract_path = os.path.join(pyAFQ_path, tract_name, participant, 'bundles', participant+'_ses-concat_acq-HCPdir99_desc-' + tract + '_tractography.trx')
             tract_tdi_map = os.path.join(tdi_path, participant+'_ses-concat_desc-' + tract + '_tdi_map.nii.gz')
-            template = op.join(pyAFQ_path,participant, participant+'_ses-concat_acq-HCPdir99_b0ref.nii.gz')
+            template = op.join(pyAFQ_path, tract_name, participant, participant+'_ses-concat_acq-HCPdir99_b0ref.nii.gz')
 
             streamline2dipy_density(tract_path, template, tract_tdi_map)
 

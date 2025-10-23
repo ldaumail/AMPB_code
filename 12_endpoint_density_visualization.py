@@ -18,16 +18,16 @@ import ants
 # ----------------------------
 # Load data
 # ----------------------------
-tract_name = 'LeftMTmaskxLGN'
-participant = 'sub-NSxGxHKx1965'
+tract_name = 'RightMTmaskxLGN'
+participant = 'sub-EBxGxCCx1986'
 bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
 proj_density_path = op.join(bids_path, 'analysis', 'tdi_maps','dipy_wmgmi_tdi_maps', participant)
 analysis_path = op.join(bids_path, 'analysis')
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 
-hemi = 'L' # 'R'
+hemi = 'L' if 'Left' in tract_name else "R"
 hemi_fs = "lh" if hemi == "L" else "rh"
-wm_surf = op.join(fs_path, participant, 'surf', f"{hemi_fs}.white")    # FreeSurfer surface
+wm_surf = op.join(fs_path, participant, 'surf', f"{hemi_fs}.inflated")    # FreeSurfer surface
 coords, faces = read_geometry(wm_surf)
 
 # Load projected density map (per vertex values)
