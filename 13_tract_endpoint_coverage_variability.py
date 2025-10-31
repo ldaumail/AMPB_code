@@ -24,7 +24,7 @@ with open(subjects_file, 'r') as f:
 print(f"Loaded {len(participants)} participants:")
 print(participants)
 
-tract_list = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU']
+tract_list = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU', 'MTxFEF', 'MTxhIP']
 hemispheres = ['L', 'R']
 
 # ==== RESULTS STORAGE ====
@@ -61,7 +61,7 @@ for participant in participants:
             all_rows.append({
                 "participant": participant,
                 "hemisphere": hemi,
-                "tract": tract_name,
+                "tract": tract,
                 "proportion": proportion,
                 "total_vertices": total_count,
                 "nonzero_vertices": nonzero_count
@@ -125,4 +125,95 @@ for i, hemi in enumerate(hemispheres):
     axes[i].legend()
 
 plt.tight_layout()
+plt.show()
+
+
+
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import matplotlib.patches as mpatches
+
+# Assume df_results has columns: participant, hemisphere, tract, proportion (0–1)
+# Add a group label based on participant name pattern
+df_results["group"] = df_results["participant"].apply(
+    lambda x: "EB" if "EB" in x else ("NS" if "NS" in x else "Other")
+)
+
+# Compute mean and std per group × hemisphere × tract
+summary = (
+    df_results.groupby(["group", "hemisphere", "tract"])["proportion"]
+    .agg(["mean", "std"])
+    .reset_index()
+)
+
+hemispheres = ["L", "R"]
+groups = ["EB", "NS"]
+tracts = df_results["tract"].unique()
+
+# Define consistent colors per group
+colors = {"EB": "#1f77b4", "NS": "#ff7f0e"}  # blue and orange
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+
+for i, hemi in enumerate(hemispheres):
+    ax = axes[i]
+    hemi_data = df_results[df_results["hemisphere"] == hemi]
+
+    for g, group in enumerate(groups):
+        group_data = hemi_data[hemi_data["group"] == group]
+
+        for j, tract in enumerate(tracts):
+            tract_data = group_data[group_data["tract"] == tract]
+            
+            # Jitter x positions to avoid overlap
+            x_jitter = np.random.normal(j + g * 0.25, 0.04, size=len(tract_data))
+            
+            # Scatter individual participant data
+            ax.scatter(
+                x_jitter,
+                tract_data["proportion"] * 100,
+                color=colors[group],
+                alpha=0.6,
+                s=40,
+                label=group if (j == 0 and i == 0) else ""  # legend only once
+            )
+
+            # Plot mean ± std
+            m = summary.query(
+                "group == @group and hemisphere == @hemi and tract == @tract"
+            )["mean"]
+            s = summary.query(
+                "group == @group and hemisphere == @hemi and tract == @tract"
+            )["std"]
+
+            if not m.empty:
+                ax.errorbar(
+                    j + g * 0.25,
+                    m.values[0] * 100,
+                    yerr=s.values[0] * 100,
+                    fmt="o",
+                    color="black",
+                    capsize=5,
+                    markersize=6,
+                    lw=1.2,
+                    zorder=5,
+                )
+
+    ax.set_title(f"{'Left' if hemi == 'L' else 'Right'} Hemisphere")
+    ax.set_xticks(np.arange(len(tracts)) + 0.125)
+    ax.set_xticklabels(tracts, rotation=30, ha="right")
+    ax.set_ylabel("Non-empty MT vertices (%)" if i == 0 else "")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+
+# After plotting everything, before plt.show():
+legend_handles = [
+    mpatches.Patch(color=colors["EB"], label="EB"),
+    mpatches.Patch(color=colors["NS"], label="NS")
+]
+fig.legend(handles=legend_handles, loc="upper center", ncol=2, frameon=False)
+plt.tight_layout(rect=[0, 0, 1, 0.95])
 plt.show()
