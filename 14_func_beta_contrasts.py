@@ -18,9 +18,11 @@ conditions = {"motion": 1, "silent": 2, "stationary": 3}
 
 # --- Define contrasts (positive - negative) ---
 contrasts = {
-    "motion_vs_stationary": ("motion", "stationary"),
-    "motion_vs_silent": ("motion", "silent")
+    "motionXstationary": ("motion", "stationary"),
+    "motionXsilent": ("motion", "silent")
 }
+
+design = "ptlocal"
 
 # --- Loop through participants ---
 for participant in sorted(os.listdir(func_dir)):
@@ -44,7 +46,7 @@ for participant in sorted(os.listdir(func_dir)):
         # --- Load beta maps for this hemisphere ---
         beta_files = sorted(
             f for f in os.listdir(glm_dir)
-            if f.endswith("_beta.mgz") and f"hemi-{hemi}" in f and "ptlocal" in f
+            if f.endswith("_beta.mgz") and f"hemi-{hemi}" in f and design in f
         )
 
         if not beta_files:
@@ -55,15 +57,13 @@ for participant in sorted(os.listdir(func_dir)):
         for bf in beta_files:
             img = nib.load(op.join(glm_dir, bf))
             betas.append(img.get_fdata())
-        betas = np.stack(betas, axis=-1)  # (X, Y, Z, n_betas)
-        print(f"      📊 Loaded {betas.shape[-1]} beta maps for hemi-{hemi}")
 
+        # Concatenate all trial volumes along last axis
+        betas = np.concatenate(betas, axis=-1)  # (1, 1, 229605, 120)
+        print(f"      📊 Loaded concatenated beta shape: {betas.shape}")
         # --- Load corresponding event files for this hemisphere ---
         subject_runs = []
-        for file in sorted(
-            f for f in os.listdir(event_dir)
-            if f"hemi-{hemi}" in f and "ptlocal" in f and f.endswith("_events.tsv")
-        ):
+        for file in sorted(f for f in os.listdir(event_dir) if design in f and f.endswith("_events.tsv")):
             df = pd.read_csv(op.join(event_dir, file), sep="\t")
             run_conditions = df["trial_type"].map(conditions).fillna(0).astype(int).values
             subject_runs.append(run_conditions)
@@ -99,16 +99,24 @@ for participant in sorted(os.listdir(func_dir)):
             # Mean beta per condition
             mean_pos = np.mean(betas[..., pos_idx], axis=-1)
             mean_neg = np.mean(betas[..., neg_idx], axis=-1)
-
+            # betas[..., pos_idx].shape
             contrast_map = mean_pos - mean_neg
 
             # -----------------
             # 3. Save contrast map
             # -----------------
-            contrast_img = nib.Nifti1Image(contrast_map, img.affine, img.header)
+            # Copy and adjust header
+            new_header = img.header.copy()
+            new_header.set_data_shape(contrast_map.shape)
+            contrast_img = nib.MGHImage(contrast_map.astype(np.float32), img.affine, new_header)
+            # contrast_img.get_fdata().shape
+            # img.get_fdata().shape
+            # print(new_header)
+            # print(img.header)
+            
             out_dir = op.join(glm_dir, "contrasts")
             os.makedirs(out_dir, exist_ok=True)
-            out_path = op.join(out_dir, f"{participant}_hemi-{hemi}_{contrast_name}.nii.gz")
+            out_path = op.join(out_dir, f"{participant}_task-{design}_hemi-{hemi}_space-fsnative_desc-{contrast_name}.mgz")
 
             nib.save(contrast_img, out_path)
             print(f"      💾 Saved: {out_path}")

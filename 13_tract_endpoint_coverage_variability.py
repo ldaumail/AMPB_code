@@ -1,7 +1,6 @@
 #In this script, the goal is to assess any difference in overlap of endpoints with MT 
 # ROI across the different tracts
 
-import os
 import os.path as op
 import numpy as np
 import nibabel as nib
@@ -24,7 +23,7 @@ with open(subjects_file, 'r') as f:
 print(f"Loaded {len(participants)} participants:")
 print(participants)
 
-tract_list = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU', 'MTxFEF', 'MTxhIP']
+tract_list = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU', 'MTxFEF', 'MTxhIP', 'MTxV1']
 hemispheres = ['L', 'R']
 
 # ==== RESULTS STORAGE ====
@@ -128,7 +127,7 @@ plt.tight_layout()
 plt.show()
 
 
-
+## Same plot with jitter scatter points 
 
 import matplotlib.pyplot as plt
 import pandas as pd
