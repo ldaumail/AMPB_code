@@ -34,7 +34,7 @@ density_dir = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps')
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
-tract_order = ['MTmaskxLGN', 'MTmaskxPT', 'MTmaskxSTS1', 'MTmaskxPU', 'MTmaskxFEF', 'MTmaskxhIP','MTmaskxV1']
+tract_order = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU', 'MTxFEF', 'MTxhIP','MTxV1']
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
 
@@ -51,14 +51,15 @@ for participant in participants:
     for hemi in hemis:
         # for tract in ['MTmaskxLGN', 'MTmaskxPT', 'MTmaskxSTS1', 'MTmaskxPU', 'MTmaskxFEF', 'MTmaskxhIP', 'MTmaskxV1']:
         print(f"   🧩 Hemisphere: {hemi}")
-
+        hemi_fs = "lh" if hemi == "L" else "rh"
         subj_dir = op.join(density_dir, participant)
         subj_densities = []
 
         # Loop through *tracts in fixed order*
         for tract in tract_order:
+            
             # Find file matching this tract and hemisphere
-            matches = [f for f in os.listdir(subj_dir) if tract in f and f"hemi-{hemi}" in f and f.endswith("fsprojdensity0mm.mgh")]
+            matches = [f for f in os.listdir(subj_dir) if tract in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith("fsprojdensity0mm.mgh")]
 
             if not matches:
                 print(f"   ⚠️ Missing: {tract} ({hemi}) for {participant}")

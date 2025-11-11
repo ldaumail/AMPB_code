@@ -14,9 +14,7 @@ from utils.overlap_masks import overlap_masks
 
 def main(participants_file, tract_name, bids_path, pyAFQ_path, ref_space):
     '''
-        Ex usage: python 11_endpoint_density_mri_vol2surf.py --participants_file ./utils/study2_subjects_updated.txt --tract_name MTxLGN --bids_path /Use
-    rs/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --pyAFQ_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/deriva
-    tives/pyAFQ/wmgmi --ref_space fsnative
+        Ex usage: python 11_endpoint_density_mri_vol2surf_space-fsaverage.py --participants_file ./utils/study2_subjects_updated.txt --tract_name MTxPT --bids_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --pyAFQ_path /Volumes/cos-lab-wpark78/LoicDaumail/ampb/derivatives/pyafq/wmgmi --ref_space fsaverage
     '''
     for participant in participants_file:
         # participant = 'sub-EBxGxCCx1986' #sub-NSxGxBAx1970
@@ -24,7 +22,8 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, ref_space):
         # bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
         analysis_path = op.join(bids_path, 'analysis')
         roi_path = op.join(analysis_path, 'functional_vol_roi', participant)
-        fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
+
+        fs_path = op.join('/Applications', 'freesurfer', '8.0.0-beta', 'subjects') #op.join(bids_path, 'derivatives', 'freesurfer')
         out_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant)
         os.makedirs(out_path, exist_ok=True)
 
@@ -34,16 +33,16 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, ref_space):
         qsiprep_path = op.join(bids_path, 'derivatives', 'qsiprep', participant)
         acpc_t1 = op.join(qsiprep_path, 'anat', participant+'_space-ACPC_desc-preproc_T1w.nii.gz')
         acpc_t1_img = ants.image_read(acpc_t1)
-        fs_brain_mask = op.join(fs_path, participant, 'mri', 'brain.mgz')
+        fs_brain_mask = op.join(fs_path, 'fsaverage', 'mri', 'brain.mgz')
         fs_brain_mask_img = ants.image_read(fs_brain_mask)
         # 1) Load the FreeSurfer conformed reference volume
-        fs_ref_path = op.join(fs_path, participant, 'mri', 'T1.mgz')  # or 'T1.mgz'
+        fs_ref_path = op.join(fs_path, 'fsaverage', 'mri', 'T1.mgz')  # or 'T1.mgz'
         fs_ref_img  = ants.image_read(fs_ref_path)
         # fs_ref_img.numpy().shape
         reg = ants.registration(
             fixed = fs_ref_img,
             moving = acpc_t1_img,
-            type_of_transform = 'Rigid',#'SyN', #SyN here, as qsiprep T1 and fsaverage are different brains. For same brains, use 'Rigid'
+            type_of_transform = 'SyN',#'SyN', #SyN here, as qsiprep T1 and fsaverage are different brains. For same brains, use 'Rigid'
             mask = fs_brain_mask_img,  
             reg_iterations = (1000, 500, 250, 100),  
             verbose = True
@@ -75,6 +74,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, ref_space):
             ### --- STEP 3: load streamline density map
             # -----------------------------
              #roi_names[h] 
+            
             density_path = op.join(out_path, f"{participant}_ses-concat_desc-{side}{tract_density_name}_tdi_map.nii.gz")
             density_map_img = ants.image_read(density_path)
 
@@ -167,7 +167,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, ref_space):
             cmd = [
                 "mri_vol2surf",
                 "--mov", mt_density_path,
-                "--regheader", participant,
+                "--regheader", 'fsaverage',
                 "--hemi", hemi_fs,
                 "--surf", "white",
                 "--projdist", "0",
@@ -197,19 +197,19 @@ if __name__ == "__main__":
         "--bids_path",
         type=str,
         required=True,
-        help="Path to BIDS compatible directory"
+        help="Name of the tract as written in bundle file name"
     )
     parser.add_argument(
         "--pyAFQ_path",
         type=str,
         required=True,
-        help="Path to pyAFQ output"
+        help="Name of the tract as written in bundle file name"
     )
     parser.add_argument(
         "--ref_space",
         type=str,
         required=True,
-        help="Space to be used as a reference in which the output is projected"
+        help="Name of the tract as written in bundle file name"
     )
     args = parser.parse_args()
 

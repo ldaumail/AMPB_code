@@ -11,90 +11,120 @@ from dipy.tracking.streamline import transform_streamlines
 # ------------------------------------------------------------
 # 1. Define paths
 # ------------------------------------------------------------
-participant = 'sub-NSxGxIFx1991'
-bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 
+participant = 'sub-EBxLxTZx1956'
+
+bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research',
                     'ampb_mt_tractometry_analysis', 'ampb')
-fs_path = op.join(bids_path, 'derivatives', 'freesurfer', participant, 'mri')
-afq_path = op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi', 'LeftMTxLGN', participant)
-qsiprep_path = op.join(bids_path,'derivatives', 'qsiprep', participant)
+afq_path = op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi')
+qsiprep_path = op.join(bids_path, 'derivatives', 'qsiprep', participant)
 
 # Files
-gmwmi_mask_file = op.join(afq_path, f"{participant}_ses-concat_acq-HCPdir99_desc-wmgmi_mask.nii.gz")
-t1w_acpc_file = op.join(qsiprep_path, 'anat', participant+'_space-ACPC_desc-preproc_T1w.nii.gz')
-tract_file = op.join(afq_path, 'bundles', f"{participant}_ses-concat_acq-HCPdir99_desc-LeftMTmaskxLGN_tractography.trx")
-mt_path = op.join(bids_path, 'analysis','functional_vol_roi', participant, f"{participant}_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz")
+gmwmi_mask_file = op.join(afq_path, 'LeftMTxLGN', participant,
+                          f"{participant}_ses-concat_acq-HCPdir99_desc-wmgmi_mask.nii.gz")
+t1w_acpc_file = op.join(qsiprep_path, 'anat',
+                        f"{participant}_space-ACPC_desc-preproc_T1w.nii.gz")
 
-# ------------------------------------------------------------
-# 2. Load images
-# ------------------------------------------------------------
-gmwmi_img = ants.image_read(gmwmi_mask_file)
+# -------------------------------------------------------------------------
+# 2. Load base images
+# -------------------------------------------------------------------------
 t1w_img = nib.load(t1w_acpc_file)
 t1w_ants_img = ants.image_read(t1w_acpc_file)
-mt_lgn_trct = load_tractogram(tract_file, t1w_img)
-mt_roi_img = ants.image_read(mt_path) # Load MT ROI file
+gmwmi_img = ants.image_read(gmwmi_mask_file)
 
-# 3. Prepare tract for plotting
-# streamlinesL = mt_lgn_trct.streamlines
-mt_lgn_trct.to_rasmm()
-
-lgn_mtL_t1w = transform_streamlines(mt_lgn_trct.streamlines,
-                                np.linalg.inv(t1w_img.affine))
-
-#Visualizing bundles with principal direction coloring
-
-def lines_as_tubes(sl, line_width, **kwargs):
-    line_actor = actor.line(sl, **kwargs)
+# -------------------------------------------------------------------------
+# 3. Helper to make Fury line actors
+# -------------------------------------------------------------------------
+def lines_as_tubes(streamlines, line_width, color):
+    line_actor = actor.line(streamlines, colors=color)
     line_actor.GetProperty().SetRenderLinesAsTubes(1)
     line_actor.GetProperty().SetLineWidth(line_width)
     return line_actor
 
+# -------------------------------------------------------------------------
+# 4. Define tracts and colors
+# -------------------------------------------------------------------------
+tracts = {
+    "LeftMTxLGN": (1, 0.2, 0.2),
+    "LeftMTxPT": (1, 0.5, 0),
+    "LeftMTxSTS1": (0.9, 0.8, 0),
+    "LeftMTxPU": (0, 0.8, 0.2),
+    "LeftMTxFEF": (0.2, 0.6, 1),
+    "LeftMTxV1": (0.8, 0.2, 1),
+    "LeftMTxhIP": (0.5, 0.5, 0.5),
+    "RightMTxLGN": (1, 0.2, 0.2),
+    "RightMTxPT": (1, 0.5, 0),
+    "RightMTxSTS1": (0.9, 0.8, 0),
+    "RightMTxPU": (0, 0.8, 0.2),
+    "RightMTxFEF": (0.2, 0.6, 1),
+    "RightMTxV1": (0.8, 0.2, 1),
+    "RightMTxHIP": (0.5, 0.5, 0.5)
+}
 
-lgn_mtL_actor = lines_as_tubes(lgn_mtL_t1w, 8)
+# -------------------------------------------------------------------------
+# 5. Load and transform tracts
+# -------------------------------------------------------------------------
+tract_actors = []
+for tract_name, color in tracts.items():
+    hemi = "Left" if tract_name.startswith("Left") else "Right"
+    mask_name = tract_name.replace("MT", "MTmask")
+    tract_file = op.join(afq_path, tract_name, participant, "bundles",
+                         f"{participant}_ses-concat_acq-HCPdir99_desc-{mask_name}_tractography.trx")
+    if not op.exists(tract_file):
+        print(f"⚠️ Missing: {tract_file}")
+        continue
 
-# Resample the GMWMI mask to the T1w space (reference)
-# This ensures it has the same dimensions, voxel size, and orientation
-# The `interp_type='nearest_neighbor'` is used for binary masks.
-gmwmi_resampled = ants.resample_image_to_target(
-    image=gmwmi_img, 
-    target=t1w_ants_img, # Use the T1w as the spatial target
-    interp_type='nearestNeighbor' # Crucial for binary masks
-)
+    trk = load_tractogram(tract_file, t1w_img)
+    trk.to_rasmm()
+    trk_xfm = transform_streamlines(trk.streamlines, np.linalg.inv(t1w_img.affine))
+    tract_actor = lines_as_tubes(trk_xfm, 5, color=color)
+    tract_actors.append(tract_actor)
 
-# # Resample the MT ROI mask to the T1w space
-mt_roi_resampled = ants.resample_image_to_target(
-    image=mt_roi_img,
-    target=t1w_ants_img, # Use the same T1w as the spatial target
-    interp_type='nearestNeighbor'
-)
-# ------------------------------------------------------------
-# 4. Create FURY actors
-# ------------------------------------------------------------
-# Background anatomical T1 in diffusion space
-## #Slice anatomical image using slicer actors
-t1w = t1w_img.get_fdata()
-t1_actor = actor.slicer(t1w)
+# -------------------------------------------------------------------------
+# 6. ROI loading helper
+# -------------------------------------------------------------------------
+def roi_actor(roi_path, color):
+    if not op.exists(roi_path):
+        print(f"⚠️ Missing ROI: {roi_path}")
+        return None
+    roi_img = ants.image_read(roi_path)
+    roi_resampled = ants.resample_image_to_target(roi_img, t1w_ants_img, interp_type='nearestNeighbor')
+    return actor.contour_from_roi(roi_resampled.numpy(), color=color, opacity=0.4)
 
-# Smooth contour for GMWMI (binary mask)
-gmwmi_actor = actor.contour_from_roi(
-    gmwmi_resampled.numpy(),
-    color=(1, 0, 0),   # red surface
-    opacity=0.5
-)
+# -------------------------------------------------------------------------
+# 7. ROI definitions
+# -------------------------------------------------------------------------
+roi_defs = {
+    "MT":    ("analysis/functional_vol_roi", "MT_mask_dilated", (0, 0, 1)),
+    "LGN":   ("analysis/julich_space-ACPC_rois", "LGN_mask", (1, 0, 0)),
+    "PT":    ("analysis/julich_space-ACPC_rois", "PT_mask", (1, 0.5, 0)),
+    "STS1":  ("analysis/julich_space-ACPC_rois", "STS1_mask", (0.9, 0.8, 0)),
+    "PU":    ("analysis/julich_space-ACPC_rois", "PU_mask", (0, 0.8, 0.2)),
+    "FEF":   ("analysis/julich_space-ACPC_rois", "FEF_mask", (0.2, 0.6, 1)),
+    "V1":    ("analysis/julich_space-ACPC_rois", "V1_mask", (0.8, 0.2, 1)),
+    "hIP":   ("analysis/julich_space-ACPC_rois", "hIP_mask", (0.5, 0.5, 0.5))
+}
 
-# Smooth contour for MT ROI (binary mask)
-mt_roi_actor = actor.contour_from_roi(
-    mt_roi_resampled.numpy(),
-    color=(0, 0, 1),   # blue surface (change color as desired)
-    opacity=0.5
-)
-# ------------------------------------------------------------
-# 5. Visualize
-# ------------------------------------------------------------
+roi_actors = []
+
+for hemi in ["L", "R"]:
+    for roi_name, (subdir, label, color) in roi_defs.items():
+        if roi_name == "MT":
+            roi_path = op.join(bids_path, subdir, participant,
+                               f"{participant}_hemi-{hemi}_space-ACPC_label-{roi_name}_mask_dilated.nii.gz")
+        else:
+            roi_path = op.join(bids_path, subdir, participant, 'ses-concat', 'anat',
+                               f"{participant}_hemi-{hemi}_space-ACPC_desc-{roi_name}_mask.nii.gz")
+        roi_act = roi_actor(roi_path, color)
+        if roi_act:
+            roi_actors.append(roi_act)
+
+# -------------------------------------------------------------------------
+# 8. Build and render scene
+# -------------------------------------------------------------------------
 scene = window.Scene()
-scene.add(t1_actor)
-scene.add(gmwmi_actor) 
-scene.add(lgn_mtL_actor)
-scene.add(mt_roi_actor)
+for act in tract_actors + roi_actors:
+    scene.add(act)
 
 scene.reset_camera_tight()
+scene.background((0, 0, 0))
 window.show(scene)
