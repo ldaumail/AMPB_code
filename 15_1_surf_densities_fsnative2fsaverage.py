@@ -8,7 +8,7 @@ from pathlib import Path
 
 bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
 participants = sorted([p for p in os.listdir(bids_path) if p.startswith("sub-")])
-fs_path = fs_path = op.join(bids_path, 'derivatives', 'freesurfer') #op.join('/Applications', 'freesurfer', '8.0.0-beta', 'subjects')
+fs_path = op.join(bids_path, 'derivatives', 'freesurfer') #op.join('/Applications', 'freesurfer', '8.0.0-beta', 'subjects')
 tract_names = ["MTxLGN", "MTxPT", "MTxSTS1", "MTxPU", "MTxhIP", "MTxFEF", "MTxV1"]
 for participant in participants: #participants_file:
     print(f"\n🔹 Processing {participant}")

@@ -30,7 +30,7 @@ bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tra
 density_dir = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps')
 
 # -----------------------
-#1 Generate densities array
+#1 Generate endpoint densities array
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
@@ -73,17 +73,36 @@ for participant in participants:
             subj_densities.append(data)
 
         # Stack into one array: shape (n_tracts, n_vertices)
-        subj_densities = np.stack(subj_densities, axis=0)  # (7, n_vertices)
+        subj_densities = np.stack(subj_densities, axis=3)  # (7, n_vertices)
         density_data[hemi].append(subj_densities)
 
-for i, arr in enumerate(density_data[hemi]):
-    print(f"{hemi} element {i}: shape = {arr.shape}")
+# for i, arr in enumerate(density_data[hemi]):
+#     print(f"{hemi} element {i}: shape = {arr.shape}")
     
 # Convert to numpy arrays
 
 for hemi in hemis:
-    density_data[hemi] = np.stack(density_data[hemi], axis=0)  # (n_subjects, n_tracts, n_vertices)
+    density_data[hemi] = np.stack(density_data[hemi], axis=4)  # (n_subjects, n_tracts, n_vertices)
     print(f"✅ {hemi}-hemisphere shape: {density_data[hemi].shape}")
+
+#-------------------------
+# Generate Beta contrast array
+#-------------------------
+func_dir = op.join(bids_path, 'analysis', 'fMRI_data')
+# Initialize storage dictionary
+contrast_data = {hemi: [] for hemi in hemis}
+
+for participant in participants:
+    if not participant.startswith("sub-"):
+        continue
+    print(f"\n🔹 Participant: {participant}")
+    # Loop by hemisphere
+    for hemi in hemis:
+        print(f"   🧩 Hemisphere: {hemi}")
+        hemi_fs = "lh" if hemi == "L" else "rh"
+        subj_dir = op.join(contrast_dir, participant)
+        subj_contrasts = []
+
 
 # ----------------------------
 # Parameters

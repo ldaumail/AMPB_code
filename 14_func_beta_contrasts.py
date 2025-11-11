@@ -5,6 +5,7 @@ import os.path as op
 import os
 import pandas as pd
 import numpy as np
+import subprocess
 
 # -----------------
 # 1. Load event files and compute contrasts per hemisphere
@@ -12,6 +13,7 @@ import numpy as np
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research',
                     'ampb_mt_tractometry_analysis', 'ampb')
 func_dir = op.join(bids_path, 'analysis', 'fMRI_data')
+fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 
 # --- Define condition codes ---
 conditions = {"motion": 1, "silent": 2, "stationary": 3}
@@ -42,6 +44,7 @@ for participant in sorted(os.listdir(func_dir)):
     # -----------------
     for hemi in ["L", "R"]:
         print(f"   🧩 Hemisphere: {hemi}")
+        hemi_fs = "lh" if hemi == "L" else "rh"
 
         # --- Load beta maps for this hemisphere ---
         beta_files = sorted(
@@ -120,6 +123,24 @@ for participant in sorted(os.listdir(func_dir)):
 
             nib.save(contrast_img, out_path)
             print(f"      💾 Saved: {out_path}")
+
+            # -------------------------
+            #Save it in fsaverage space
+            # -------------------------
+            source_fsnative_file = out_path
+            out_fsaverage_file = op.join(out_dir, f"{participant}_task-{design}_hemi-{hemi}_space-fsaverage_desc-{contrast_name}.mgz")
+            
+
+            cmd = ["mri_surf2surf",
+            "--srcsubject", participant, 
+            "--trgsubject", "fsaverage",
+            "--hemi", hemi_fs, 
+            "--sval", source_fsnative_file, 
+            "--tval", out_fsaverage_file ]
+
+            # Run the command
+            print("Running:", " ".join(cmd))
+            subprocess.run(cmd, check=True, env={**os.environ, "SUBJECTS_DIR": fs_path})
 
 print("\n✅ All contrasts computed and saved per hemisphere.")
 
