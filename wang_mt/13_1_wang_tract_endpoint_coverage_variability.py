@@ -23,7 +23,7 @@ with open(subjects_file, 'r') as f:
 print(f"Loaded {len(participants)} participants:")
 print(participants)
 
-tract_list = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU', 'MTxFEF', 'MTxhIP', 'MTxV1']
+tract_list = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU', 'MTxhIP', 'MTxV1'] #'MTxFEF', , 'MTxV1'
 hemispheres = ['L', 'R']
 
 # ==== RESULTS STORAGE ====
@@ -41,11 +41,9 @@ for participant in participants:
 
         # Loop over tracts
         for tract in tract_list:
-            new_name = tract.replace("MT", "MTmask")
-            tract_name = f"Left{new_name}" if hemi == 'L' else f"Right{new_name}"
 
             density_map_file = op.join(proj_density_path,participant,
-                f"{participant}_hemi-{hemi}_space-fsnative_label-{tract_name}_desc-fsprojdensity0mm.mgh")
+                f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract}_desc-fsprojdensity0mm.mgh")
 
             density_map = nib.load(density_map_file).get_fdata().squeeze()
 
@@ -66,7 +64,7 @@ for participant in participants:
                 "nonzero_vertices": nonzero_count
             })
 
-            print(f"{participant} {hemi_fs}-{tract_name}: {proportion:.2%} non-empty MT vertices")
+            print(f"{participant} {hemi_fs}-{tract}: {proportion:.2%} non-empty MT vertices")
 
 # ==== STORE ALL RESULTS ====
 df_results = pd.DataFrame(all_rows)
@@ -216,3 +214,6 @@ legend_handles = [
 fig.legend(handles=legend_handles, loc="upper center", ncol=2, frameon=False)
 plt.tight_layout(rect=[0, 0, 1, 0.95])
 plt.show()
+
+
+## Perform Stats

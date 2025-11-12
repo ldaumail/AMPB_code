@@ -6,7 +6,7 @@ import ants
 from fury import window, actor
 
 
-participant = 'sub-NSxGxHNx1952'
+participant ='sub-NSxGxBAx1970' #'sub-EBxGxCCx1986' #'sub-NSxGxHNx1952' #
 bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 mni_wang_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases','Wang_2015')
@@ -126,6 +126,6 @@ scene.add(wang_lh_mst_actor)    # left MST ROI
 scene.add(wang_rh_mst_actor)    # right MST ROI
 scene.add(L_mt_actor)    # left MT ROI
 scene.add(R_mt_actor)    # right MT ROI
-scene.add(wmgmi_actor)
+# scene.add(wmgmi_actor)
 window.show(scene)
 

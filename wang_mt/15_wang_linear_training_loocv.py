@@ -24,7 +24,7 @@ func_dir = op.join(bids_path, 'analysis', 'fMRI_data')
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
-tract_order = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU', 'MTxFEF', 'MTxhIP','MTxV1']
+tract_order = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU', 'MTxhIP','MTxV1'] #'MTxFEF',
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
 
@@ -49,7 +49,7 @@ for participant in participants:
         for tract in tract_order:
             
             # Find file matching this tract and hemisphere
-            matches = [f for f in os.listdir(subj_dir) if tract in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith("fsprojdensity0mm.mgh")]
+            matches = [f for f in os.listdir(subj_dir) if f"wang{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith("fsprojdensity0mm.mgh")]
 
             if not matches:
                 print(f"   ⚠️ Missing: {tract} ({hemi}) for {participant}")
@@ -79,7 +79,7 @@ for hemi in hemis:
 # Generate Beta contrast array
 #-------------------------
 
-contrasts = ["motionXstationary", "motionXsilent"]
+contrast_order = ["motionXstationary", "motionXsilent"]
 # Initialize storage dictionary
 contrast_data = {hemi: [] for hemi in hemis}
 
@@ -95,7 +95,7 @@ for participant in participants:
         subj_contrasts = []
 
                 # Loop through *tracts in fixed order*
-        for contrast in contrasts:
+        for contrast in contrast_order:
             # Find file matching this tract and hemisphere
             matches = [f for f in os.listdir(contrasts_dir) if f"hemi-{hemi}" in f and "fsaverage" in f and "ptlocal" in f and contrast in f]
             # Load the file
@@ -127,8 +127,11 @@ verbose = True
 # ----------------------------
 # Basic checks
 # ----------------------------
+densities = np.squeeze(density_data["L"])
+contrasts = np.squeeze(contrast_data["L"])
+
 assert densities.ndim == 3, "densities must be (n_subj, n_tracts, n_vertices)"
-assert contrasts.ndim == 2, "contrasts must be (n_subj, n_vertices)"
+assert contrast_data["L"].ndim == 2, "contrasts must be (n_subj, n_vertices)"
 n_subj, n_tracts, n_vertices = densities.shape
 assert contrasts.shape[0] == n_subj and contrasts.shape[1] == n_vertices
 

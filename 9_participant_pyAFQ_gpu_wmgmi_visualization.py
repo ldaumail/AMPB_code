@@ -11,7 +11,7 @@ from dipy.tracking.streamline import transform_streamlines
 # ------------------------------------------------------------
 # 1. Define paths
 # ------------------------------------------------------------
-participant = 'sub-EBxLxTZx1956'
+participant = 'sub-NSxGxHNx1952' #'sub-EBxLxTZx1956'
 
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research',
                     'ampb_mt_tractometry_analysis', 'ampb')
@@ -94,7 +94,6 @@ def roi_actor(roi_path, color):
 # 7. ROI definitions
 # -------------------------------------------------------------------------
 roi_defs = {
-    "MT":    ("analysis/functional_vol_roi", "MT_mask_dilated", (0, 0, 1)),
     "LGN":   ("analysis/julich_space-ACPC_rois", "LGN_mask", (1, 0, 0)),
     "PT":    ("analysis/julich_space-ACPC_rois", "PT_mask", (1, 0.5, 0)),
     "STS1":  ("analysis/julich_space-ACPC_rois", "STS1_mask", (0.9, 0.8, 0)),
@@ -102,7 +101,7 @@ roi_defs = {
     "FEF":   ("analysis/julich_space-ACPC_rois", "FEF_mask", (0.2, 0.6, 1)),
     "V1":    ("analysis/julich_space-ACPC_rois", "V1_mask", (0.8, 0.2, 1)),
     "hIP":   ("analysis/julich_space-ACPC_rois", "hIP_mask", (0.5, 0.5, 0.5))
-}
+} #    "MT":    ("analysis/functional_vol_roi", "MT_mask_dilated", (0, 0, 1)),
 
 roi_actors = []
 
@@ -118,13 +117,16 @@ for hemi in ["L", "R"]:
         if roi_act:
             roi_actors.append(roi_act)
 
+
+
+t1_actor = actor.slicer(t1w_ants_img.numpy())
 # -------------------------------------------------------------------------
 # 8. Build and render scene
 # -------------------------------------------------------------------------
 scene = window.Scene()
 for act in tract_actors + roi_actors:
     scene.add(act)
-
+#scene.add(t1_actor)
 scene.reset_camera_tight()
 scene.background((0, 0, 0))
 window.show(scene)
