@@ -23,7 +23,7 @@ with open(subjects_file, 'r') as f:
 print(f"Loaded {len(participants)} participants:")
 print(participants)
 
-tract_list = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU', 'MTxhIP', 'MTxV1'] #'MTxFEF', , 'MTxV1'
+tract_list = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU', 'MTxFEF', 'MTxhIP', 'MTxV1'] # , 'MTxV1'
 hemispheres = ['L', 'R']
 
 # ==== RESULTS STORAGE ====

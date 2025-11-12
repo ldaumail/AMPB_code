@@ -128,22 +128,33 @@ verbose = True
 # Basic checks
 # ----------------------------
 densities = np.squeeze(density_data["L"])
-contrasts = np.squeeze(contrast_data["L"])
+contrasts = np.squeeze(contrast_data["L"][:, 0, 0, 0,:])
 
 assert densities.ndim == 3, "densities must be (n_subj, n_tracts, n_vertices)"
-assert contrast_data["L"].ndim == 2, "contrasts must be (n_subj, n_vertices)"
-n_subj, n_tracts, n_vertices = densities.shape
-assert contrasts.shape[0] == n_subj and contrasts.shape[1] == n_vertices
+assert contrasts.ndim == 2, "contrasts must be (n_subj, n_vertices)"
+n_vertices, n_tracts, n_subj  = densities.shape
+assert contrasts.shape[1] == n_subj and contrasts.shape[0] == n_vertices
 
-# Optional: mask vertices (e.g., exclude vertices with zero density across all subjects)
-mask = np.any(np.any(densities > 0, axis=1), axis=0)   # True for vertex with any density somewhere
-masked_idx = np.where(mask)[0]
-print(f"Using {len(masked_idx)} / {n_vertices} vertices after mask")
+# # Optional: mask vertices (e.g., exclude vertices with zero density across all subjects)
+# mask = np.any(np.any(densities > 0, axis=1), axis=1)   # True for vertex with any density somewhere
+# masked_idx = np.where(mask)[0]
+# print(f"Using {len(masked_idx)} / {n_vertices} vertices after mask")
 
-# We'll work only on masked vertices to save time
-densities_masked = densities[:, :, masked_idx]   # (n_subj, n_tracts, n_masked_vertices)
-contrasts_masked  = contrasts[:, masked_idx]     # (n_subj, n_masked_vertices)
-n_masked = densities_masked.shape[2]
+# # We'll work only on masked vertices to save time
+# densities_masked = densities[:, :, masked_idx]   # (n_subj, n_tracts, n_masked_vertices)
+# contrasts_masked  = contrasts[:, masked_idx]     # (n_subj, n_masked_vertices)
+# n_masked = densities_masked.shape[2]
+
+# Load MT ROI vertices
+wang_hmt_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases','Wang_2015','hmtplus',  f"hemi-L_space-fsaverage_label-hMT_desc-wang.mgh")
+surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+# Get vertex indices where the ROI is nonzero (or above a threshold)
+wang_hmt_vertices = np.where(surf_roi > 0)[0]
+print(f"{len(wang_hmt_vertices)} vertices in ROI")
+
+densities_masked = densities[wang_hmt_vertices,:, :]   # (n_subj, n_tracts, n_masked_vertices)
+contrasts_masked  = contrasts[wang_hmt_vertices,:]     # (n_subj, n_masked_vertices)
+n_masked = densities_masked.shape[0]
 
 # Prepare storage
 predicted = np.zeros_like(contrasts_masked)  # predicted contrast maps for each subject on masked vertices
@@ -160,11 +171,11 @@ for test_idx in range(n_subj):
     # Build training dataset by pooling vertices across training subjects:
     # For each training subject s: create matrix (n_masked_vertices x n_tracts) = densities_masked[s].T
     # Stack them on top of one another -> X_train shape (n_train * n_masked, n_tracts)
-    X_train_list = [densities_masked[s].T for s in train_idx]   # each is (n_masked, n_tracts)
+    X_train_list = [densities_masked[:,:,s] for s in train_idx]   # each is (n_masked, n_tracts)
     X_train = np.vstack(X_train_list)                           # (n_train*n_masked, n_tracts)
 
     # Y_train: stack contrast maps for same training subjects (shape (n_train*n_masked,))
-    y_train_list = [contrasts_masked[s] for s in train_idx]     # each is (n_masked,)
+    y_train_list = [contrasts_masked[:,s] for s in train_idx]     # each is (n_masked,)
     y_train = np.hstack(y_train_list)                           # (n_train*n_masked,)
 
     # Standardize predictors and target using training data
@@ -175,7 +186,7 @@ for test_idx in range(n_subj):
     ytr = scaly.transform(y_train.reshape(-1, 1)).ravel()
 
     # Fit Ridge with built-in CV to choose alpha
-    ridge = RidgeCV(alphas=alphas, scoring='neg_mean_squared_error', cv=inner_cv, store_cv_values=False)
+    ridge = RidgeCV(alphas=alphas, scoring='neg_mean_squared_error', cv=inner_cv)
     ridge.fit(Xtr, ytr)   # multi-sample pooled model
 
     if verbose:
@@ -185,16 +196,16 @@ for test_idx in range(n_subj):
     trained_coefs.append(ridge.coef_.copy())  # shape (n_tracts,)
 
     # Predict for left-out subject: X_test shape (n_masked, n_tracts)
-    X_test = densities_masked[test_idx].T               # (n_masked, n_tracts)
+    X_test = densities_masked[:,:,test_idx]              # (n_masked, n_tracts)
     X_test_s = scalerX.transform(X_test)
 
     y_pred_s_std = ridge.predict(X_test_s)              # predicted standardized y (n_masked,)
     y_pred_s = scaly.inverse_transform(y_pred_s_std.reshape(-1,1)).ravel()
 
-    predicted[test_idx] = y_pred_s
+    predicted[:,test_idx] = y_pred_s
 
     # Evaluate per-subject
-    y_true = contrasts_masked[test_idx]
+    y_true = contrasts_masked[:,test_idx]
     r, p = pearsonr(y_true, y_pred_s)
     mse = mean_squared_error(y_true, y_pred_s)
     if verbose:
@@ -204,8 +215,8 @@ for test_idx in range(n_subj):
 # Collect results and save
 # ----------------------------
 # bring predictions back to full vertex space (fill unmasked with zeros or nan)
-predicted_full = np.full((n_subj, n_vertices), np.nan)
-predicted_full[:, masked_idx] = predicted
+predicted_full = np.full((n_vertices, n_subj), np.nan)
+predicted_full[wang_hmt_vertices,:] = predicted
 
 # Optionally save predicted maps per subject using a reference image
 if 'ref_img_for_save' in globals() and out_dir is not None:

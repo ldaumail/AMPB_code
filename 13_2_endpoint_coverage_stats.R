@@ -1,9 +1,7 @@
 
-library(R.matlab)
-
 ##### Subjective phantom vividness ratings #######
 
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/tdi_maps/dipy_wmgmi_tdi_maps/surface_density_summary_allsubs.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/tdi_maps/dipy_wmgmi_tdi_maps/surface_density_summary_wang.csv'
 file = file.path(path)
 data = read.csv(file) #
 
