@@ -4,9 +4,12 @@
 import os.path as op
 import ants
 from fury import window, actor
+import numpy as np
 
-
-participant ='sub-NSxGxBAx1970' #'sub-EBxGxCCx1986' #'sub-NSxGxHNx1952' #
+#---------------------
+# 1: Look at original ROIs
+#---------------------
+participant = 'sub-NSxLxYKx1964' #'sub-NSxGxBAx1970' #'sub-EBxGxCCx1986' #'sub-NSxGxHNx1952' #
 bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 mni_wang_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases','Wang_2015')
@@ -99,22 +102,22 @@ R_mt_actor = actor.contour_from_roi(
 ## WMGMI
 # -----------
 
-wmgmi_path =  op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi', 'LeftMTxFEF', participant, participant+'_ses-concat_acq-HCPdir99_desc-wmgmi_mask.nii.gz' )
-# --- Load your ROI (WMGMI file) ---
+# wmgmi_path =  op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi', 'LeftMTxFEF', participant, participant+'_ses-concat_acq-HCPdir99_desc-wmgmi_mask.nii.gz' )
+# # --- Load your ROI (WMGMI file) ---
 
-wmgmi_img = ants.image_read(wmgmi_path)
-wmgmi_resampled = ants.resample_image_to_target(
-    image=wmgmi_img, 
-    target=acpc_t1_img, # Use the T1w as the spatial target
-    interp_type='nearestNeighbor' # Crucial for binary masks
-)
+# wmgmi_img = ants.image_read(wmgmi_path)
+# wmgmi_resampled = ants.resample_image_to_target(
+#     image=wmgmi_img, 
+#     target=acpc_t1_img, # Use the T1w as the spatial target
+#     interp_type='nearestNeighbor' # Crucial for binary masks
+# )
 
-# Smooth contour for GMWMI (binary mask)
-wmgmi_actor = actor.contour_from_roi(
-    wmgmi_resampled.numpy(),
-    color=(1, 0, 0),   # red surface
-    opacity=0.5
-)
+# # Smooth contour for GMWMI (binary mask)
+# wmgmi_actor = actor.contour_from_roi(
+#     wmgmi_resampled.numpy(),
+#     color=(1, 0, 0),   # red surface
+#     opacity=0.5
+# )
 # ----------------------------
 # Scene
 # ----------------------------
@@ -129,3 +132,121 @@ scene.add(R_mt_actor)    # right MT ROI
 # scene.add(wmgmi_actor)
 window.show(scene)
 
+
+
+# -----------------------------------------------
+# 2: Look at inflated Wang hMT+ (MT+MST) mask + func MT with the wmgmi
+# -----------------------------------------------
+
+participant = 'sub-EBxGxZAx1990' #'sub-NSxLxYKx1964' #'sub-EBxGxZAx1990' #'sub-NSxLxATx1954' 
+bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
+qsiprep_path = op.join(bids_path, 'derivatives', 'qsiprep', participant, 'anat')
+acpc_t1_path       = op.join(qsiprep_path, participant+'_space-ACPC_desc-preproc_T1w.nii.gz')
+acpc_t1_img       = ants.image_read(acpc_t1_path)
+
+wang_lh_mt_path = op.join(bids_path, 'analysis', 'wang_space-ACPC_rois',participant, f"{participant}_hemi-L_space-ACPC_desc-MT_mask_dilated.nii.gz")
+wang_lh_mt_img       = ants.image_read(wang_lh_mt_path)
+wang_rh_mt_path = op.join(bids_path, 'analysis', 'wang_space-ACPC_rois',participant, f"{participant}_hemi-R_space-ACPC_desc-MT_mask_dilated.nii.gz")
+wang_rh_mt_img       = ants.image_read(wang_rh_mt_path)
+
+func_lh_mt_path = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, f"{participant}_hemi-L_space-ACPC_label-MT_mask.nii.gz")
+func_lh_mt_img = ants.image_read(func_lh_mt_path)
+func_rh_mt_path = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, f"{participant}_hemi-R_space-ACPC_label-MT_mask.nii.gz")
+func_rh_mt_img = ants.image_read(func_rh_mt_path)
+
+# -----------
+## WMGMI
+# -----------
+
+wmgmi_path =  op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi_wang', 'afq-LeftMTxFEF', participant, participant+'_ses-concat_acq-HCPdir99_desc-wmgmi_mask.nii.gz' )
+op.exists(wmgmi_path)
+# --- Load your ROI (WMGMI file) ---
+
+wmgmi_img = ants.image_read(wmgmi_path)
+wmgmi_resampled = ants.resample_image_to_target(
+    image=wmgmi_img, 
+    target=acpc_t1_img, # Use the T1w as the spatial target
+    interp_type='nearestNeighbor' # Crucial for binary masks
+)
+
+# Smooth contour for GMWMI (binary mask)
+wmgmi_actor = actor.contour_from_roi(
+    wmgmi_resampled.numpy(),
+    color=(1, 0, 0),   # red surface
+    opacity=0.2
+)
+
+# --------------------------------------------------------
+# RESTRICT WMGMI TO WANG MT MASK (per hemisphere)
+# --------------------------------------------------------
+import scipy.ndimage as ndi
+
+# --------------------------------------------------------
+# EXPAND (DILATE) WANG MT MASKS BY 1–2 VOXELS
+# --------------------------------------------------------
+
+# Convert ANTs images -> numpy arrays
+wmgmi_arr = wmgmi_resampled.numpy().astype(bool)
+
+wang_lh_arr = ants.resample_image_to_target(
+    wang_lh_mt_img, acpc_t1_img, interp_type="nearestNeighbor"
+).numpy().astype(bool)
+
+wang_rh_arr = ants.resample_image_to_target(
+    wang_rh_mt_img, acpc_t1_img, interp_type="nearestNeighbor"
+).numpy().astype(bool)
+
+# Dilation (choose iterations=1 or 2)
+dilate_by = 20  # <-- change to 1 or 2 depending on how much spill you want
+structure = ndi.generate_binary_structure(3, 1)
+
+wang_lh_dil = ndi.binary_dilation(wang_lh_arr, structure=structure, iterations=dilate_by)
+wang_rh_dil = ndi.binary_dilation(wang_rh_arr, structure=structure, iterations=dilate_by)
+
+# Intersection with WMGMI mask
+wmgmi_lh_masked = np.logical_and(wmgmi_arr, wang_lh_dil)
+wmgmi_rh_masked = np.logical_and(wmgmi_arr, wang_rh_dil)
+
+# Convert to FURY surfaces
+wmgmi_lh_actor = actor.contour_from_roi(
+    wmgmi_lh_masked.astype(np.uint8),
+    color=(1, 0.3, 0),
+    opacity=0.5
+)
+
+wmgmi_rh_actor = actor.contour_from_roi(
+    wmgmi_rh_masked.astype(np.uint8),
+    color=(1, 0.3, 0),
+    opacity=0.5
+)
+
+# ----------------------------
+# Convert ANTs masks -> FURY volume actors
+# ----------------------------
+# Background anatomical T1 actor
+t1_actor = actor.slicer(acpc_t1_img.numpy())
+
+# ROI actors
+wang_lh_mt_actor = actor.contour_from_roi(
+    wang_lh_mt_img.numpy(), color=(0, 0, 1), opacity=0.5
+)
+wang_rh_mt_actor = actor.contour_from_roi(
+    wang_rh_mt_img.numpy(), color=(0, 0, 1), opacity=0.5
+)
+
+func_lh_mt_actor = actor.contour_from_roi(
+    func_lh_mt_img.numpy(), color=(0, 1, 0), opacity=1
+)
+func_rh_mt_actor = actor.contour_from_roi(
+    func_rh_mt_img.numpy(), color=(0, 1, 0), opacity=1
+)
+
+scene = window.Scene()
+scene.add(t1_actor)       # anatomical background
+scene.add(wang_lh_mt_actor)    # left MT ROI
+scene.add(wang_rh_mt_actor)    # right MT ROI
+scene.add(func_lh_mt_actor)    # left MT ROI
+scene.add(func_rh_mt_actor)    # right MT ROI
+# scene.add(wmgmi_lh_actor)
+# scene.add(wmgmi_rh_actor)
+window.show(scene)

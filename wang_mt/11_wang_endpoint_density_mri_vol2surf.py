@@ -12,11 +12,11 @@ project_dir = op.abspath(op.join(current_dir, '..'))  # main_script.py is inside
 sys.path.append(project_dir)
 from utils.overlap_masks import overlap_masks
 
-def main(participants_file, tract_name, bids_path, pyAFQ_path):
+def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
     '''
         Ex usage: python 11_wang_endpoint_density_mri_vol2surf.py --participants_file ./utils/study2_subjects_updated.txt --tract_name MTxLGN --bids_path /Use
     rs/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --pyAFQ_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/deriva
-    tives/pyAFQ/wmgmi_wang
+    tives/pyAFQ/wmgmi_wang --projdist 0
     '''
     for participant in participants_file:
         # participant = 'sub-EBxGxCCx1986' #sub-NSxGxBAx1970
@@ -159,7 +159,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path):
 
             ## STEP 7: Perform volume to surface projection of MTxWMGMI ROI density values
             # Output file name
-            out_fsnative_file = os.path.join(out_path, f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract_name}_desc-fsprojdensity0mm.mgh")
+            out_fsnative_file = os.path.join(out_path, f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract_name}_desc-fsprojdensity{projdist}mm.mgh")
 
             hemi_fs  = "lh" if hemi == "L" else "rh"
             # Build mri_vol2surf command
@@ -169,7 +169,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path):
                 "--regheader", participant,
                 "--hemi", hemi_fs,
                 "--surf", "white",
-                "--projdist", "0",
+                "--projdist", f"-{projdist}",
                 "--sd", fs_path,
                 "--out", out_fsnative_file
             ] #"--projfrac", "-0.3",  "--regheader", participant
@@ -180,7 +180,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path):
 
             # Resample to fsaverage space
             source_density_file = out_fsnative_file
-            out_fsaverage_file = op.join(out_path, f"{participant}_hemi-{hemi_fs}_space-fsaverage_label-wang{tract_name}_desc-fsprojdensity0mm.mgh")
+            out_fsaverage_file = op.join(out_path, f"{participant}_hemi-{hemi_fs}_space-fsaverage_label-wang{tract_name}_desc-fsprojdensity{projdist}mm.mgh")
 
             cmd = ["mri_surf2surf",
             "--srcsubject", participant, 
@@ -220,13 +220,19 @@ if __name__ == "__main__":
         required=True,
         help="Path to pyAFQ output"
     )
+    parser.add_argument(
+        "--projdist",
+        type=str,
+        required=True,
+        help="density map distance from wmgmi to project on the wmgmi in mm"
+    )
     args = parser.parse_args()
 
     # Read participants from file
     with open(args.participants_file, "r") as f:
         participants = [line.strip() for line in f if line.strip()]
 
-    main(participants, args.tract_name, args.bids_path, args.pyAFQ_path)
+    main(participants, args.tract_name, args.bids_path, args.pyAFQ_path, args.projdist)
 
 
 

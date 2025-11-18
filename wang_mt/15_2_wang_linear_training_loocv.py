@@ -24,7 +24,7 @@ func_dir = op.join(bids_path, 'analysis', 'fMRI_data')
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
-tract_order = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU', 'MTxhIP','MTxV1'] #'MTxFEF',
+tract_order = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU', 'MTxFEF','MTxhIP','MTxV1'] #
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
 
@@ -63,7 +63,7 @@ for participant in participants:
             subj_densities.append(data)
 
         # Stack into one array: shape (n_tracts, n_vertices)
-        subj_densities = np.stack(subj_densities, axis=3)  # (7, n_vertices)
+        subj_densities = np.stack(subj_densities, axis=0)  # (7, n_vertices)
         density_data[hemi].append(subj_densities)
 
 # for i, arr in enumerate(density_data[hemi]):
@@ -72,7 +72,7 @@ for participant in participants:
 # Convert to numpy arrays
 
 for hemi in hemis:
-    density_data[hemi] = np.stack(density_data[hemi], axis=4)  # (n_subjects, n_tracts, n_vertices)
+    density_data[hemi] = np.squeeze(np.stack(density_data[hemi], axis=0))  # (n_subjects, n_tracts, n_vertices)
     print(f"✅ {hemi}-hemisphere shape: {density_data[hemi].shape}")
 
 #-------------------------
@@ -105,14 +105,14 @@ for participant in participants:
             subj_contrasts.append(data)
 
         # Stack into one array: shape (n_tracts, n_vertices)
-        subj_contrasts = np.stack(subj_contrasts, axis=3)  # (7, n_vertices)
+        subj_contrasts = np.stack(subj_contrasts, axis=0)  # (7, n_vertices)
         contrast_data[hemi].append(subj_contrasts)
         # for i, arr in enumerate(contrast_data[hemi]):
         #     print(f"{hemi} element {i}: shape = {arr.shape}")
 
 # Convert to numpy arrays
 for hemi in hemis:
-    contrast_data[hemi] = np.stack(contrast_data[hemi], axis=4)  # (n_subjects, n_tracts, n_vertices)
+    contrast_data[hemi] = np.squeeze(np.stack(contrast_data[hemi], axis=0))  # (n_subjects, n_contrasts, n_vertices)
     print(f"✅ {hemi}-hemisphere shape: {contrast_data[hemi].shape}")
 
 #### Analyze data
@@ -127,13 +127,13 @@ verbose = True
 # ----------------------------
 # Basic checks
 # ----------------------------
-densities = np.squeeze(density_data["L"])
-contrasts = np.squeeze(contrast_data["L"][:, 0, 0, 0,:])
+densities = density_data["L"]
+contrasts = contrast_data["L"][:, 0,:]
 
 assert densities.ndim == 3, "densities must be (n_subj, n_tracts, n_vertices)"
 assert contrasts.ndim == 2, "contrasts must be (n_subj, n_vertices)"
-n_vertices, n_tracts, n_subj  = densities.shape
-assert contrasts.shape[1] == n_subj and contrasts.shape[0] == n_vertices
+n_subj, n_tracts, n_vertices  = densities.shape
+assert contrasts.shape[0] == n_subj and contrasts.shape[1] == n_vertices
 
 # # Optional: mask vertices (e.g., exclude vertices with zero density across all subjects)
 # mask = np.any(np.any(densities > 0, axis=1), axis=1)   # True for vertex with any density somewhere
@@ -152,9 +152,28 @@ surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
 wang_hmt_vertices = np.where(surf_roi > 0)[0]
 print(f"{len(wang_hmt_vertices)} vertices in ROI")
 
-densities_masked = densities[wang_hmt_vertices,:, :]   # (n_subj, n_tracts, n_masked_vertices)
-contrasts_masked  = contrasts[wang_hmt_vertices,:]     # (n_subj, n_masked_vertices)
-n_masked = densities_masked.shape[0]
+densities_masked = densities[:, :, wang_hmt_vertices]   # (n_subj, n_tracts, n_masked_vertices)
+for i in range(len(wang_hmt_vertices)):
+    for t in range(n_tracts):
+        x = densities_masked[:, t, i]
+        std = np.nanstd(x)
+        if std == 0 and np.nanmean(x) == 0: #std is 0 if all vertices averaged are 0
+            densities_masked[:, t, i] = 0   # or keep original
+        else:
+            densities_masked[:, t, i] = (x - np.nanmean(x)) / std
+        
+        # nan_vals = np.isnan(densities_masked)
+        # nan_count = nan_vals.sum()
+        # coords = np.argwhere(nan_vals)
+
+contrasts_masked  = contrasts[:,wang_hmt_vertices]     # (n_subj, n_masked_vertices)
+for i in range(len(wang_hmt_vertices)):
+    contrasts_masked[:,i] = (contrasts_masked[:,i] - contrasts_masked[:,i].mean()) / contrasts_masked[:,i].std()
+# nan_vals = np.isnan(contrasts_masked)
+# nan_count = nan_vals.sum()
+# coords = np.argwhere(nan_vals)
+
+n_masked = densities_masked.shape[2]
 
 # Prepare storage
 predicted = np.zeros_like(contrasts_masked)  # predicted contrast maps for each subject on masked vertices
@@ -171,11 +190,11 @@ for test_idx in range(n_subj):
     # Build training dataset by pooling vertices across training subjects:
     # For each training subject s: create matrix (n_masked_vertices x n_tracts) = densities_masked[s].T
     # Stack them on top of one another -> X_train shape (n_train * n_masked, n_tracts)
-    X_train_list = [densities_masked[:,:,s] for s in train_idx]   # each is (n_masked, n_tracts)
+    X_train_list = [densities_masked[s].T for s in train_idx]   # each is (n_masked, n_tracts)
     X_train = np.vstack(X_train_list)                           # (n_train*n_masked, n_tracts)
 
     # Y_train: stack contrast maps for same training subjects (shape (n_train*n_masked,))
-    y_train_list = [contrasts_masked[:,s] for s in train_idx]     # each is (n_masked,)
+    y_train_list = [contrasts_masked[s] for s in train_idx]     # each is (n_masked,)
     y_train = np.hstack(y_train_list)                           # (n_train*n_masked,)
 
     # Standardize predictors and target using training data
@@ -196,16 +215,16 @@ for test_idx in range(n_subj):
     trained_coefs.append(ridge.coef_.copy())  # shape (n_tracts,)
 
     # Predict for left-out subject: X_test shape (n_masked, n_tracts)
-    X_test = densities_masked[:,:,test_idx]              # (n_masked, n_tracts)
+    X_test = densities_masked[test_idx].T              # (n_masked, n_tracts)
     X_test_s = scalerX.transform(X_test)
 
     y_pred_s_std = ridge.predict(X_test_s)              # predicted standardized y (n_masked,)
     y_pred_s = scaly.inverse_transform(y_pred_s_std.reshape(-1,1)).ravel()
 
-    predicted[:,test_idx] = y_pred_s
+    predicted[test_idx] = y_pred_s
 
     # Evaluate per-subject
-    y_true = contrasts_masked[:,test_idx]
+    y_true = contrasts_masked[test_idx]
     r, p = pearsonr(y_true, y_pred_s)
     mse = mean_squared_error(y_true, y_pred_s)
     if verbose:
@@ -224,7 +243,7 @@ if 'ref_img_for_save' in globals() and out_dir is not None:
     for s in range(n_subj):
         outpath = os.path.join(out_dir, f"sub-{s:03d}_predicted_contrast.mgz")
         # If ref_img is MGH and data must be shape (1,1,n_vertices) or so, adapt:
-        data_to_save = predicted_full[s].reshape((1, 1, n_vertices)).astype(np.float32)
+        data_to_save = predicted_full[:,s].reshape((1, 1, n_vertices)).astype(np.float32)
         # For surface mgz you may want a shape matching original — adapt as required
         nib.save(nib.MGHImage(data_to_save, ref_img_for_save.affine, ref_img_for_save.header), outpath)
 
