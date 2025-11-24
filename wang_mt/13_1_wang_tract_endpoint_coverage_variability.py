@@ -43,7 +43,7 @@ for participant in participants:
         for tract in tract_list:
 
             density_map_file = op.join(proj_density_path,participant,
-                f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract}_desc-fsprojdensity3mm.mgh")
+                f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract}_desc-fsprojdensity0mm.mgh")
 
             density_map = nib.load(density_map_file).get_fdata().squeeze()
 

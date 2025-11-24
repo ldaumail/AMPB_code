@@ -9,7 +9,7 @@ import numpy as np
 #---------------------
 # 1: Look at original ROIs
 #---------------------
-participant = 'sub-NSxLxYKx1964' #'sub-NSxGxBAx1970' #'sub-EBxGxCCx1986' #'sub-NSxGxHNx1952' #
+participant = 'sub-NSxLxYKx1964' #'sub-EBxGxZAx1990' #'sub-EBxGxPEx1959' #'sub-NSxLxYKx1964' #'sub-NSxGxBAx1970' #'sub-EBxGxCCx1986' #'sub-NSxGxHNx1952' #
 bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 mni_wang_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases','Wang_2015')
@@ -30,7 +30,7 @@ reg = ants.registration(
 )
 mask_images = {}
 hemisphere = ['L', 'R']
-roi_list = ['roi12', 'roi13']
+roi_list = ['roi12', 'roi13', 'roi7']
 
 for roi in roi_list:
     for h, label in enumerate(hemisphere): # for each label to keep
@@ -39,7 +39,7 @@ for roi in roi_list:
         # roi = roi_list[h]
         mni_mask_img = ants.image_read(op.join(mni_wang_path, 'subj_vol_all', f"perc_VTPM_vol_{roi}_{hemi_fs}.nii.gz"))
 
-        mask_name = f"{hemi_fs}_MST" if '12' in roi else f"{hemi_fs}_MT"
+        mask_name = (f"{hemi_fs}_MST" if '12' in roi else f"{hemi_fs}_MT" if '13' in roi else f"{hemi_fs}_V4")
         #Register and Transform mask from MNI to fs native space
 
             # Apply transform  MNI mask → ACPC space
@@ -79,6 +79,12 @@ wang_lh_mst_actor = actor.contour_from_roi(
 )
 wang_rh_mst_actor = actor.contour_from_roi(
     mask_images["rh_MST"].numpy(), color=(1, 0, 0), opacity=0.8
+)
+wang_lh_v4_actor = actor.contour_from_roi(
+    mask_images["lh_V4"].numpy(), color=(1, 1, 0), opacity=0.8
+)
+wang_rh_v4_actor = actor.contour_from_roi(
+    mask_images["rh_V4"].numpy(), color=(1, 1, 0), opacity=0.8
 )
 
 # ---------------
@@ -127,6 +133,8 @@ scene.add(wang_lh_mt_actor)    # left MT ROI
 scene.add(wang_rh_mt_actor)    # right MT ROI
 scene.add(wang_lh_mst_actor)    # left MST ROI
 scene.add(wang_rh_mst_actor)    # right MST ROI
+scene.add(wang_lh_v4_actor)    # left MST ROI
+scene.add(wang_rh_v4_actor)    # right MST ROI
 scene.add(L_mt_actor)    # left MT ROI
 scene.add(R_mt_actor)    # right MT ROI
 # scene.add(wmgmi_actor)
@@ -135,10 +143,10 @@ window.show(scene)
 
 
 # -----------------------------------------------
-# 2: Look at inflated Wang hMT+ (MT+MST) mask + func MT with the wmgmi
+# 2: Look at dilated Wang hMT+ (MT+MST) mask + func MT with the wmgmi
 # -----------------------------------------------
 
-participant = 'sub-EBxGxZAx1990' #'sub-NSxLxYKx1964' #'sub-EBxGxZAx1990' #'sub-NSxLxATx1954' 
+participant = 'sub-EBxGxPEx1959' #'sub-NSxLxYKx1964' #'sub-EBxGxZAx1990' #'sub-NSxLxATx1954' 
 bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
 qsiprep_path = op.join(bids_path, 'derivatives', 'qsiprep', participant, 'anat')
 acpc_t1_path       = op.join(qsiprep_path, participant+'_space-ACPC_desc-preproc_T1w.nii.gz')
@@ -250,3 +258,99 @@ scene.add(func_rh_mt_actor)    # right MT ROI
 # scene.add(wmgmi_lh_actor)
 # scene.add(wmgmi_rh_actor)
 window.show(scene)
+
+
+
+#---------------------------------------------------------------------------------
+## Check %overlap between Wang MT and func MT
+#---------------------------------------------------------------------------------
+import os.path as op
+import ants
+import numpy as np
+import pandas as pd
+#participant = 'sub-NSxLxYKx1964' #'sub-NSxLxYKx1964' #'sub-EBxGxZAx1990' #'sub-NSxLxATx1954' 
+bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
+participants_file = op.join(bids_path, 'code', 'utils', 'study2_subjects_updated.txt')
+with open(participants_file, "r") as f:
+    participants = [line.strip() for line in f if line.strip()] 
+all_rows = []
+N = len(participants)   # or whatever loop length you're using
+overlap  = [0] * N
+for i, participant in enumerate(participants):
+    qsiprep_path = op.join(bids_path, 'derivatives', 'qsiprep', participant, 'anat')
+
+    for hemi in ['L', 'R']:
+        wang_mt_path = op.join(bids_path, 'analysis', 'wang_space-ACPC_rois',participant, f"{participant}_hemi-{hemi}_space-ACPC_desc-MT_mask_dilated.nii.gz")
+        wang_mt_img       = ants.image_read(wang_mt_path)
+
+        func_mt_path = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, f"{participant}_hemi-{hemi}_space-ACPC_label-MT_mask.nii.gz")
+        func_mt_img = ants.image_read(func_mt_path)
+
+        overlap[i] = np.sum(wang_mt_img.numpy()*func_mt_img.numpy())/np.sum(func_mt_img.numpy())
+
+        all_rows.append({
+                    "participant": participant,
+                    "hemisphere": hemi,
+                    "proportion": overlap[i],
+                    "group": ("EB" if participant.startswith("sub-EB") else "NS" if participant.startswith("sub-NS") else "Other")
+                    })
+df_results = pd.DataFrame(all_rows)
+
+#Perform stats
+from scipy.stats import mannwhitneyu
+
+# Load your dataframe (example)
+# df = pd.read_csv("your_file.csv")
+
+results = {}
+
+for hemi in ["L", "R"]:
+    df_hemi = df_results[df_results["hemisphere"] == hemi]
+
+    eb = df_hemi[df_hemi["group"] == "EB"]["proportion"]
+    ns = df_hemi[df_hemi["group"] == "NS"]["proportion"]
+
+    stat, p = mannwhitneyu(eb, ns, alternative='two-sided')
+
+    results[hemi] = {
+        "EB_n": len(eb),
+        "NS_n": len(ns),
+        "U_statistic": stat,
+        "p_value": p
+    }
+
+print(results)
+
+df_stats = pd.DataFrame(results)
+#------------------------------------------------------------------------
+# Look at overlap of wang MT with V1 and hIP
+#---------------------------------------------------------------------------------
+import os.path as op
+import ants
+import numpy as np
+#participant = 'sub-NSxLxYKx1964' #'sub-NSxLxYKx1964' #'sub-EBxGxZAx1990' #'sub-NSxLxATx1954' 
+bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
+participants_file = op.join(bids_path, 'code', 'utils', 'study2_subjects_updated.txt')
+with open(participants_file, "r") as f:
+    participants = [line.strip() for line in f if line.strip()] 
+N = len(participants)   # or whatever loop length you're using
+
+left_overlap  = [0] * N
+right_overlap = [0] * N
+for i, participant in enumerate(participants):
+    qsiprep_path = op.join(bids_path, 'derivatives', 'qsiprep', participant, 'anat')
+
+    wang_lh_mt_path = op.join(bids_path, 'analysis', 'wang_space-ACPC_rois',participant, f"{participant}_hemi-L_space-ACPC_desc-MT_mask_dilated.nii.gz")
+    wang_lh_mt_img       = ants.image_read(wang_lh_mt_path)
+    wang_rh_mt_path = op.join(bids_path, 'analysis', 'wang_space-ACPC_rois',participant, f"{participant}_hemi-R_space-ACPC_desc-MT_mask_dilated.nii.gz")
+    wang_rh_mt_img       = ants.image_read(wang_rh_mt_path)
+
+    func_lh_mt_path = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', f"{participant}_hemi-L_space-ACPC_desc-hIP_mask.nii.gz")
+    func_lh_mt_img = ants.image_read(func_lh_mt_path)
+    func_rh_mt_path = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', f"{participant}_hemi-R_space-ACPC_desc-hIP_mask.nii.gz")
+    func_rh_mt_img = ants.image_read(func_rh_mt_path)
+
+
+    left_overlap[i] = np.sum(wang_lh_mt_img.numpy()*func_lh_mt_img.numpy())/np.sum(func_lh_mt_img.numpy())
+    right_overlap[i] = np.sum(wang_rh_mt_img.numpy()*func_rh_mt_img.numpy())/np.sum(func_rh_mt_img.numpy())
+

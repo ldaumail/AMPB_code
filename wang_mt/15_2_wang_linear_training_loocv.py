@@ -234,8 +234,8 @@ for test_idx in range(n_subj):
 # Collect results and save
 # ----------------------------
 # bring predictions back to full vertex space (fill unmasked with zeros or nan)
-predicted_full = np.full((n_vertices, n_subj), np.nan)
-predicted_full[wang_hmt_vertices,:] = predicted
+predicted_full = np.full((n_subj, n_vertices), np.nan)
+predicted_full[:,wang_hmt_vertices] = predicted
 
 # Optionally save predicted maps per subject using a reference image
 if 'ref_img_for_save' in globals() and out_dir is not None:
