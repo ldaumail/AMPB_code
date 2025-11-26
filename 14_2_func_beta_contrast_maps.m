@@ -1,5 +1,5 @@
 %%% Script developped to calculate contrasts
-%participant = 'sub-EBxGxEYx1965';
+%participant = 'sub-NSxGxHKx1965';
 
 
 %% Variables
@@ -7,8 +7,11 @@ glmMode = 'surface';
 TR = 2; % seconds
 
 %%% define contrasts by task
-contrasts.ptlocal = 'motion = 1 : stationary = -1';
-contrasts.mtlocal = 'motion = 1 : stationary = -1';
+% contrasts.ptlocal = 'motion = 1 : stationary = -1';
+% contrasts.mtlocal = 'motion = 1 : stationary = -1';
+
+contrasts.ptlocal = 'motion = 1 : silent = -1';
+contrasts.mtlocal = 'motion = 1 : silent = -1';
 % ensure mode is vaild
 % switch glmMode
 %     case {'surface', 'volume'}
@@ -22,7 +25,7 @@ paths.data = fullfile(paths.main);
 
 participants = readlines(fullfile(paths.main, 'code', 'utils', 'study2_subjects_updated.txt'));
 
-for n =14:length(participants)
+for n =1:length(participants)
     participant = participants{n};
     paths.raw  = fullfile(paths.data, participant);
     paths.func = fullfile(paths.data, 'analysis', 'fMRI_data', participant, 'func');

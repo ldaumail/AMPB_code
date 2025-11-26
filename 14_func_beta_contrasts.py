@@ -1,10 +1,7 @@
 #Perform contrasts on the beta data
 
-import nibabel as nib
 import os.path as op
 import os
-import pandas as pd
-import numpy as np
 import subprocess
 
 # -----------------
@@ -20,8 +17,8 @@ conditions = {"motion": 1, "silent": 2, "stationary": 3}
 
 # --- Define contrasts (positive - negative) ---
 contrasts = {
-    "motionXstationary": ("motion", "stationary")
-} #"motionXsilent": ("motion", "silent")
+    "motionXsilent": ("motion", "silent")
+} # "motionXstationary": ("motion", "stationary")
 
 designs = {"mtlocal", "ptlocal"}
 data_type = {"pval", "tstat"}

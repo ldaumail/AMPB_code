@@ -10,7 +10,7 @@ tasks=("mtlocal" "ptlocal")
 hemis=("L" "R")
 runs=("1" "2" "3" "4" "5" "6") 
 # Define the path to your file containing participant names
-participant_list="/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/code/utils/study2_subjects_updated.txt"
+participant_list="/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/code/utils/subjects.txt"
 
 # Use a 'while read' loop to process the file line by line
 while read -r participant_name; do
@@ -37,7 +37,7 @@ while read -r participant_name; do
 
     # Loop through sessions
     for sesname in "${sessions[@]}"; do
-        src_path="$BIDS_ROOT/derivatives/fmriprep/$pname/$sesname/func"
+        src_path="$BIDS_ROOT/analysis/$pname/func"
         
         # Check if the source directory for the session/func exists
         if [ ! -d "$src_path" ]; then

@@ -79,7 +79,7 @@ for hemi in hemis:
 # Generate Beta contrast array
 #-------------------------
 
-contrast_order = ["motionXstationary", "motionXsilent"]
+contrast_order = ["motionXstationary", "motionXsilent"] # 
 # Initialize storage dictionary
 contrast_data = {hemi: [] for hemi in hemis}
 
@@ -94,10 +94,12 @@ for participant in participants:
         hemi_fs = "lh" if hemi == "L" else "rh"
         subj_contrasts = []
 
-                # Loop through *tracts in fixed order*
         for contrast in contrast_order:
             # Find file matching this tract and hemisphere
-            matches = [f for f in os.listdir(contrasts_dir) if f"hemi-{hemi}" in f and "fsaverage" in f and "ptlocal" in f and contrast in f]
+            if "EB" in participant:
+                matches = [f for f in os.listdir(contrasts_dir) if f"hemi-{hemi}" in f and "fsaverage" in f and "ptlocal" in f and contrast in f and "tstat" in f]
+            elif "NS" in participant: 
+                matches = [f for f in os.listdir(contrasts_dir) if f"hemi-{hemi}" in f and "fsaverage" in f and "mtlocal" in f and contrast in f and "tstat" in f]
             # Load the file
             contrast_file = op.join(contrasts_dir, matches[0])
             img = nib.load(contrast_file)
@@ -135,17 +137,9 @@ assert contrasts.ndim == 2, "contrasts must be (n_subj, n_vertices)"
 n_subj, n_tracts, n_vertices  = densities.shape
 assert contrasts.shape[0] == n_subj and contrasts.shape[1] == n_vertices
 
-# # Optional: mask vertices (e.g., exclude vertices with zero density across all subjects)
-# mask = np.any(np.any(densities > 0, axis=1), axis=1)   # True for vertex with any density somewhere
-# masked_idx = np.where(mask)[0]
-# print(f"Using {len(masked_idx)} / {n_vertices} vertices after mask")
-
-# # We'll work only on masked vertices to save time
-# densities_masked = densities[:, :, masked_idx]   # (n_subj, n_tracts, n_masked_vertices)
-# contrasts_masked  = contrasts[:, masked_idx]     # (n_subj, n_masked_vertices)
-# n_masked = densities_masked.shape[2]
-
+#---------------------
 # Load MT ROI vertices
+#---------------------
 wang_hmt_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases','Wang_2015','hmtplus',  f"hemi-L_space-fsaverage_label-hMT_desc-wang.mgh")
 surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
 # Get vertex indices where the ROI is nonzero (or above a threshold)
@@ -153,89 +147,124 @@ wang_hmt_vertices = np.where(surf_roi > 0)[0]
 print(f"{len(wang_hmt_vertices)} vertices in ROI")
 
 densities_masked = densities[:, :, wang_hmt_vertices]   # (n_subj, n_tracts, n_masked_vertices)
-for i in range(len(wang_hmt_vertices)):
+for i in range(n_subj):
     for t in range(n_tracts):
-        x = densities_masked[:, t, i]
+        x = densities_masked[i, t, :]
         std = np.nanstd(x)
         if std == 0 and np.nanmean(x) == 0: #std is 0 if all vertices averaged are 0
-            densities_masked[:, t, i] = 0   # or keep original
+            densities_masked[i, t, :] = 0   # or keep original
         else:
-            densities_masked[:, t, i] = (x - np.nanmean(x)) / std
+            densities_masked[i, t, :] = (x - np.nanmean(x)) / std
         
         # nan_vals = np.isnan(densities_masked)
         # nan_count = nan_vals.sum()
         # coords = np.argwhere(nan_vals)
 
+#-------------------------------------
+#Convert t-stat map to a z-score map
+#-------------------------------------
 contrasts_masked  = contrasts[:,wang_hmt_vertices]     # (n_subj, n_masked_vertices)
-for i in range(len(wang_hmt_vertices)):
-    contrasts_masked[:,i] = (contrasts_masked[:,i] - contrasts_masked[:,i].mean()) / contrasts_masked[:,i].std()
+for i in range(n_subj):
+    contrasts_masked[i,:] = (contrasts_masked[i,:] - contrasts_masked[i,:].mean()) / contrasts_masked[i,:].std()
 # nan_vals = np.isnan(contrasts_masked)
 # nan_count = nan_vals.sum()
 # coords = np.argwhere(nan_vals)
 
 n_masked = densities_masked.shape[2]
 
-# Prepare storage
-predicted = np.zeros_like(contrasts_masked)  # predicted contrast maps for each subject on masked vertices
-trained_coefs = []                           # store ridge.coef_ for each fold (global model weights across tracts)
+# Storage
+predicted = np.zeros_like(densities_masked)          # shape (n_subj, n_tracts, n_masked)
+trained_coefs = np.zeros((n_subj, n_tracts))         # coef[test_subject, tract]
 
-# Outer LOOCV across subjects
+# ---- Outer LOOCV across subjects ----
 for test_idx in range(n_subj):
     if verbose:
         print(f"\nLOOCV fold: leaving out subject {test_idx+1}/{n_subj}")
 
-    # Train indices
     train_idx = [i for i in range(n_subj) if i != test_idx]
 
-    # Build training dataset by pooling vertices across training subjects:
-    # For each training subject s: create matrix (n_masked_vertices x n_tracts) = densities_masked[s].T
-    # Stack them on top of one another -> X_train shape (n_train * n_masked, n_tracts)
-    X_train_list = [densities_masked[s].T for s in train_idx]   # each is (n_masked, n_tracts)
-    X_train = np.vstack(X_train_list)                           # (n_train*n_masked, n_tracts)
+    # ---- Build training matrix ----
+    X_train = np.vstack([densities_masked[s].T for s in train_idx])   # (n_train*n_masked, n_tracts)
+    y_train = np.hstack([contrasts_masked[s]    for s in train_idx])  # (n_train*n_masked,)
 
-    # Y_train: stack contrast maps for same training subjects (shape (n_train*n_masked,))
-    y_train_list = [contrasts_masked[s] for s in train_idx]     # each is (n_masked,)
-    y_train = np.hstack(y_train_list)                           # (n_train*n_masked,)
+    # ---- Train tract-specific models ----
+    for tract_idx in range(n_tracts):
 
-    # Standardize predictors and target using training data
-    scalerX = StandardScaler().fit(X_train)
-    scaly  = StandardScaler().fit(y_train.reshape(-1, 1))
+        # Standardize (per tract)
+        scalerX = StandardScaler().fit(X_train[:, tract_idx].reshape(-1, 1))
+        scaly   = StandardScaler().fit(y_train.reshape(-1, 1))
 
-    Xtr = scalerX.transform(X_train)
-    ytr = scaly.transform(y_train.reshape(-1, 1)).ravel()
+        Xtr = scalerX.transform(X_train[:, tract_idx].reshape(-1, 1))
+        ytr = scaly.transform(y_train.reshape(-1, 1)).ravel()
 
-    # Fit Ridge with built-in CV to choose alpha
-    ridge = RidgeCV(alphas=alphas, scoring='neg_mean_squared_error', cv=inner_cv)
-    ridge.fit(Xtr, ytr)   # multi-sample pooled model
+        # Ridge CV for this tract
+        ridge = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error", cv=inner_cv)
+        ridge.fit(Xtr, ytr)
 
-    if verbose:
-        print(f"  -> chosen alpha: {ridge.alpha_}")
+        # SAVE COEFFICIENT: 1 number per tract
+        trained_coefs[test_idx, tract_idx] = ridge.coef_[0]
 
-    # Save coefficients (they map standardized X to standardized y)
-    trained_coefs.append(ridge.coef_.copy())  # shape (n_tracts,)
+        # ---- Predict left-out subject ----
+        X_test = densities_masked[test_idx, tract_idx, :].reshape(-1, 1)
+        X_test_s = scalerX.transform(X_test)
 
-    # Predict for left-out subject: X_test shape (n_masked, n_tracts)
-    X_test = densities_masked[test_idx].T              # (n_masked, n_tracts)
-    X_test_s = scalerX.transform(X_test)
+        y_pred_std = ridge.predict(X_test_s)
+        y_pred     = scaly.inverse_transform(y_pred_std.reshape(-1, 1)).ravel()
 
-    y_pred_s_std = ridge.predict(X_test_s)              # predicted standardized y (n_masked,)
-    y_pred_s = scaly.inverse_transform(y_pred_s_std.reshape(-1,1)).ravel()
+        predicted[test_idx, tract_idx, :] = y_pred
 
-    predicted[test_idx] = y_pred_s
+        # ---- Evaluate ----
+        if verbose:
+            y_true = contrasts_masked[test_idx]
+            r, p = pearsonr(y_true, y_pred)
+            mse = mean_squared_error(y_true, y_pred)
+            print(f"  Tract {tract_idx}: r={r:.4f}, MSE={mse:.4e}, p={p:.4e}")
 
-    # Evaluate per-subject
-    y_true = contrasts_masked[test_idx]
-    r, p = pearsonr(y_true, y_pred_s)
-    mse = mean_squared_error(y_true, y_pred_s)
-    if verbose:
-        print(f"  Subject {test_idx}: Pearson r = {r:.4f}, MSE = {mse:.4e}, p = {p:.4e}")
+# ------------------------------------
+# Collect results
+# ------------------------------------
+# Fill full vertex space
+predicted_full = np.full((n_subj, n_tracts, n_vertices), np.nan)
+predicted_full[:, :, wang_hmt_vertices] = predicted
 
-# ----------------------------
-# Collect results and save
-# ----------------------------
-# bring predictions back to full vertex space (fill unmasked with zeros or nan)
-predicted_full = np.full((n_subj, n_vertices), np.nan)
-predicted_full[:,wang_hmt_vertices] = predicted
+# Coefficients already organized: (n_subj, n_tracts)
+coefs_arr = trained_coefs.copy()
+
+# Mean coefficient per tract
+mean_coefs = np.mean(coefs_arr, axis=0)
+
+print("\nDone. Summary:")
+
+# Store tract-wise Pearson r and MSE:
+# rs[s, t] = correlation between predicted[s, t, :] and true[s]
+rs   = np.full((n_subj, n_tracts), np.nan)
+mses = np.full((n_subj, n_tracts), np.nan)
+
+for s in range(n_subj):
+
+    y_true = contrasts_masked[s]  # shape (n_masked,)
+
+    for t in range(n_tracts):
+
+        y_pred = predicted[s, t, :]  # shape (n_masked,)
+
+        # Compute performance
+        r, _ = pearsonr(y_true, y_pred)
+        mse = mean_squared_error(y_true, y_pred)
+
+        rs[s, t] = r
+        mses[s, t] = mse
+
+# ---- Print summary ----
+
+# print(f"\nMean Pearson r across subjects & tracts = {np.nanmean(rs):.4f} ± {np.nanstd(rs):.4f}")
+# print(f"Mean MSE across subjects & tracts = {np.nanmean(mses):.4e}")
+
+# # ---- Mean weight per tract ----
+# print("\nMean ridge weight per tract:")
+# for t in range(n_tracts):
+#     print(f"  Tract {t}: mean weight = {mean_coefs[t]:.4e}")
+
 
 # Optionally save predicted maps per subject using a reference image
 if 'ref_img_for_save' in globals() and out_dir is not None:
@@ -247,20 +276,157 @@ if 'ref_img_for_save' in globals() and out_dir is not None:
         # For surface mgz you may want a shape matching original — adapt as required
         nib.save(nib.MGHImage(data_to_save, ref_img_for_save.affine, ref_img_for_save.header), outpath)
 
-# Aggregate coefficient map across folds (mean)
-coefs_arr = np.vstack(trained_coefs)  # (n_subj, n_tracts)
-mean_coefs = np.mean(coefs_arr, axis=0)  # average weight per tract
 
-print("\nDone. Summary:")
-rs = []
-mses = []
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+# rs has shape (n_subj, n_tracts)
+# rows = subjects
+# columns = tracts
+
+plt.figure(figsize=(10, 6))
+plt.imshow(rs, aspect='auto', interpolation='nearest')
+plt.colorbar(label='Pearson r')
+
+plt.xlabel("Tracts")
+plt.ylabel("Subjects")
+plt.title("Correlation Between Predicted and True Maps\nPer Subject × Per Tract")
+
+# Tract labels
+plt.xticks(np.arange(n_tracts), [f"T{t}" for t in range(n_tracts)], rotation=45)
+
+# Subject labels (optional)
+plt.yticks(np.arange(n_subj), [f"S{s}" for s in range(n_subj)])
+
+plt.tight_layout()
+plt.show()
+
+
+
+#--------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+# --- add imports at top if not already present ---
+import numpy as np
+from sklearn.linear_model import LinearRegression, Ridge
+from scipy.stats import pearsonr
+import matplotlib.pyplot as plt
+import os
+
+# (Optional) reference to uploaded file (from your session)
+# uploaded_img_path = '/mnt/data/f437bf28-e107-4685-956c-756ef7cf6179.png'
+
+# -------------------------
+# After your LOOCV loop ends
+# -------------------------
+# Make sure we have: densities_masked (n_subj, n_tracts, n_masked)
+#                   contrasts_masked (n_subj, n_masked)
+#                   trained_coefs (list of length n_subj, each (n_tracts,))
+#                   predicted (n_subj, n_masked)
+
+n_subj, n_tracts, n_masked = densities_masked.shape
+
+# Pre-allocate
+betas_per_subject = np.full((n_subj, n_tracts), np.nan, dtype=np.float64)
+r_per_subject     = np.full((n_subj, n_tracts), np.nan, dtype=np.float64)
+pval_per_subject  = np.full((n_subj, n_tracts), np.nan, dtype=np.float64)
+
+# Choose whether to use simple OLS (LinearRegression) or per-subject Ridge
+use_ridge_per_subject = False
+ridge_alpha = 1.0   # only used if use_ridge_per_subject = True
+
 for s in range(n_subj):
-    r, _ = pearsonr(contrasts_masked[s], predicted[s])
-    rs.append(r)
-    mses.append(mean_squared_error(contrasts_masked[s], predicted[s]))
-print(f"  Mean Pearson r across subjects = {np.nanmean(rs):.4f} ± {np.nanstd(rs):.4f}")
-print(f"  Mean MSE across subjects = {np.mean(mses):.4e}")
+    # X_s: (n_masked, n_tracts) ; y_s: (n_masked,)
+    X_s = densities_masked[s].T.copy()
+    y_s = contrasts_masked[s].copy()
 
-# Print mean weight per tract
-for t in range(n_tracts):
-    print(f"Tract {t}: mean weight = {mean_coefs[t]:.4e}")
+    # remove rows with NaNs in X or y
+    valid_mask = np.all(np.isfinite(X_s), axis=1) & np.isfinite(y_s)
+    Xv = X_s[valid_mask]
+    yv = y_s[valid_mask]
+
+    if Xv.shape[0] < 2:
+        # not enough samples to fit
+        continue
+
+    # Fit OLS
+    if not use_ridge_per_subject:
+        lr = LinearRegression(fit_intercept=True)
+        lr.fit(Xv, yv)
+        betas_per_subject[s, :] = lr.coef_
+    else:
+        # optional: per-subject ridge
+        rg = Ridge(alpha=ridge_alpha, fit_intercept=True)
+        rg.fit(Xv, yv)
+        betas_per_subject[s, :] = rg.coef_
+
+    # Per-tract correlations (tract density vs subject contrast)
+    for t in range(n_tracts):
+        xt = Xv[:, t]
+        if np.all(xt == xt[0]) or np.std(xt) == 0:
+            # constant predictor -> correlation undefined
+            r_per_subject[s, t] = np.nan
+            pval_per_subject[s, t] = np.nan
+            continue
+
+        r, p = pearsonr(xt, yv)
+        r_per_subject[s, t] = r
+        pval_per_subject[s, t] = p
+
+# Convert trained_coefs (list) to array if not already
+if len(trained_coefs) > 0:
+    coefs_arr = np.vstack(trained_coefs)  # shape (n_folds, n_tracts)
+    mean_coefs = np.nanmean(coefs_arr, axis=0)
+else:
+    mean_coefs = np.nanmean(betas_per_subject, axis=0)
+
+# -------------------------
+# Quick plotting examples
+# -------------------------
+# 1) Mean beta across subjects (bar plot)
+plt.figure(figsize=(8,4))
+x = np.arange(n_tracts) + 1
+plt.bar(x - 0.15, mean_coefs, width=0.3, label='mean ridge weights (LOOCV)')
+plt.bar(x + 0.15, np.nanmean(betas_per_subject, axis=0), width=0.3, label='mean per-subject OLS betas', alpha=0.8)
+plt.xlabel('Tract index')
+plt.ylabel('Beta (weight)')
+plt.title('Tract beta estimates')
+plt.legend()
+plt.tight_layout()
+
+# 2) Heatmap of per-subject correlations (subjects x tracts)
+plt.figure(figsize=(8,6))
+plt.imshow(r_per_subject, aspect='auto', interpolation='nearest', cmap='RdBu_r', vmin=-1, vmax=1)
+plt.colorbar(label='Pearson r')
+plt.xlabel('Tract index')
+plt.ylabel('Subject index')
+plt.title('Per-subject per-tract correlation (density vs contrast)')
+plt.tight_layout()
+
+# Show figures (if running interactively)
+plt.show()
+
+# -------------------------
+# Save arrays for plotting later
+# -------------------------
+out_dir_results = './tract_regression_results'
+os.makedirs(out_dir_results, exist_ok=True)
+np.save(os.path.join(out_dir_results, 'betas_per_subject.npy'), betas_per_subject)
+np.save(os.path.join(out_dir_results, 'r_per_subject.npy'), r_per_subject)
+np.save(os.path.join(out_dir_results, 'pval_per_subject.npy'), pval_per_subject)
+np.save(os.path.join(out_dir_results, 'mean_coefs.npy'), mean_coefs)
+
+print(f"Saved results to {out_dir_results}")
+print("Shapes:")
+print(" betas_per_subject:", betas_per_subject.shape)
+print(" r_per_subject   :", r_per_subject.shape)
+print(" mean_coefs      :", mean_coefs.shape)
