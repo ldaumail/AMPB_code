@@ -6,7 +6,7 @@ import sys
 import argparse
 import re
 current_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = op.abspath(op.join(current_dir, '..'))   # main_script.py is inside project/
+project_dir = current_dir  # main_script.py is inside project/
 sys.path.append(project_dir)
 from utils.resample_file import resample_file
 
@@ -19,22 +19,22 @@ def main(participants_file, bids_path):
     for participant in participants_file:
         target_file =  op.join(bids_path, 'derivatives', 'qsiprep', participant, 'ses-concat', 'dwi', participant+'_ses-concat_acq-HCPdir99_space-ACPC_desc-brain_mask.nii.gz')
          
-        # mask_name = ['lhV1', 'lhPT', 'lhSTS1', 'lhLGN', 'lhPO', 'lhFEF', 'lhPU', 'lhhIP',
-        #             'rhV1', 'rhPT', 'rhSTS1', 'rhLGN', 'rhPO', 'rhFEF', 'rhPU', 'rhhIP']
+        mask_name = ['lhV1', 'lhPT', 'lhSTS1', 'lhLGN', 'lhPO', 'lhFEF', 'lhPU', 'lhhIP',
+                    'rhV1', 'rhPT', 'rhSTS1', 'rhLGN', 'rhPO', 'rhFEF', 'rhPU', 'rhhIP']
         
-        # for mask in mask_name:
-        #     hemi  = re.sub(".*(lh|rh).*", "\\1", mask)
-        #     hemi  = "L" if hemi == "lh" else "R"
-        #     roi = re.sub(".*(?:lh|rh)(.*)", "\\1", mask)
-        #     input_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_desc-'+roi+'_mask.nii.gz')
-        #     output_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_label-'+roi+'_mask.nii.gz')
-        #     resample_file(input_file, target_file, output_file, interpolator = "linear")
+        for mask in mask_name:
+            hemi  = re.sub(".*(lh|rh).*", "\\1", mask)
+            hemi  = "L" if hemi == "lh" else "R"
+            roi = re.sub(".*(?:lh|rh)(.*)", "\\1", mask)
+            input_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_desc-'+roi+'_mask.nii.gz')
+            output_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_label-'+roi+'_mask.nii.gz')
+            resample_file(input_file, target_file, output_file, interpolator = "linear")
         
         func_mask_name = ['MT'] #, 'PT'
         for mask in func_mask_name:
             for hemi in ['L', 'R']:
-                input_file = op.join(bids_path, 'analysis', 'wang_space-ACPC_rois', participant, participant+'_hemi-'+hemi+'_space-ACPC_desc-'+mask+'_mask_dilated.nii.gz')
-                output_file = op.join(bids_path, 'analysis', 'wang_space-ACPC_rois', participant, participant+'_hemi-'+hemi+'_space-ACPC_label-'+mask+'_mask_dilated.nii.gz')
+                input_file = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, participant+'_hemi-'+hemi+'_space-ACPC_label-'+mask+'_mask_dilated.nii.gz')
+                output_file = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, participant+'_hemi-'+hemi+'_space-ACPC_label-'+mask+'_mask_dilated.nii.gz')
                 resample_file(input_file, target_file, output_file, interpolator = "linear")
 
 if __name__ == "__main__":

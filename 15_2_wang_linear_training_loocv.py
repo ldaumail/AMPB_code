@@ -2,7 +2,6 @@
 #Started on 11/10/2025
 #Trains a linear regression to predict functional activation based on tract end point densitiess
 
-
 import numpy as np
 from sklearn.linear_model import RidgeCV
 from sklearn.preprocessing import StandardScaler
@@ -76,7 +75,7 @@ for hemi in hemis:
     print(f"✅ {hemi}-hemisphere shape: {density_data[hemi].shape}")
 
 #-------------------------
-# Generate Beta contrast array
+# Generate Beta contrasts array
 #-------------------------
 
 contrast_order = ["motionXstationary", "motionXsilent"] # 
@@ -280,7 +279,7 @@ for h, hemi in enumerate(hemis):
             task = "ptlocal"
         elif "NS" in participant: 
             task = "mtlocal"
-        true_map_path = os.path.join(out_dir, participant, f"{participant}_task-{task}_hemi-{hemi}_space-fsaverage_label-{tract}_desc-{contrast_order[0]}_tstat_wangmask.mgz")
+        true_map_path = os.path.join(out_dir, participant, f"{participant}_task-{task}_hemi-{hemi}_space-fsaverage_desc-{contrast_order[0]}_tstat_wangmask.mgz")
         true_map = true_full[s, :].reshape((1, 1, n_vertices)).astype(np.float32)
         nib.save(nib.MGHImage(true_map, ref_img_for_save.affine, ref_img_for_save.header), true_map_path)
 
@@ -307,7 +306,7 @@ import numpy as np
 # columns = tracts
 
 plt.figure(figsize=(10, 6))
-plt.imshow(rs, aspect='auto', interpolation='nearest')
+plt.imshow(rs[:,:, h], aspect='auto', interpolation='nearest')
 plt.colorbar(label='Pearson r')
 
 plt.xlabel("Tracts")
@@ -427,7 +426,7 @@ for i, hemi in enumerate(hemispheres):
                 s=40,
                 label=group if (j == 0 and i == 0) else ""  # legend only once
             )
-
+            
             # Plot mean ± std
             m = summary.query(
                 "group == @group and hemisphere == @hemi and tract == @tract"
@@ -448,7 +447,8 @@ for i, hemi in enumerate(hemispheres):
                     lw=1.2,
                     zorder=5,
                 )
-
+            ax.axhline(0, color='gray', linestyle='--', linewidth=1)
+    
     ax.set_title(f"{'Left' if hemi == 'L' else 'Right'} Hemisphere")
     ax.set_xticks(np.arange(len(tracts)) + 0.125)
     ax.set_xticklabels(tracts, rotation=30, ha="right")

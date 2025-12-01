@@ -1,5 +1,5 @@
 
-##### Subjective phantom vividness ratings #######
+##### Percent endpoint coverage stats #######
 
 path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/tdi_maps/dipy_wmgmi_tdi_maps/surface_density_summary_wang.csv'
 file = file.path(path)
@@ -70,3 +70,13 @@ result[[13]] =t.test(data$proportion[data$tract == "MTxhIP" & data$hemisphere ==
 
 result[[14]] =t.test(data$proportion[data$tract == "MTxV1" & data$hemisphere == "R" & data$group == "EB"], data$proportion[data$tract == "MTxV1" & data$hemisphere == "R" & data$group == "NS"],
                     alternative = "two.sided", mu = 0, paired = FALSE, conf.level = 0.90)
+
+###---------------------
+## Test each hemisphere separately
+###---------------------
+library(rstatix) #Anova test within subjects
+res.aov <- anova_test(data = data[data$hemisphere == "L",], dv = proportion, wid = participant, within = c(tract ), between = group)
+get_anova_table(res.aov, correction = "none")
+
+res.aov <- anova_test(data = data[data$hemisphere == "R",], dv = proportion, wid = participant, within = c(tract ), between = group)
+get_anova_table(res.aov, correction = "none")
