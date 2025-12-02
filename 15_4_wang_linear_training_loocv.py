@@ -3,7 +3,7 @@
 #Trains a linear regression to predict functional activation based on tract end point densitiess
 
 import numpy as np
-from sklearn.linear_model import RidgeCV
+from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from scipy.stats import pearsonr
@@ -116,152 +116,114 @@ for hemi in hemis:
     contrast_data[hemi] = np.squeeze(np.stack(contrast_data[hemi], axis=0))  # (n_subjects, n_contrasts, n_vertices)
     print(f"✅ {hemi}-hemisphere shape: {contrast_data[hemi].shape}")
 
-#### Analyze data
+#----------------
+### Analyze data
+#----------------
 
-# ----------------------------
-# Parameters
-# ----------------------------
-alphas = np.logspace(-4, 4, 25)      # Ridge alpha grid (adjust if needed)
-inner_cv = 5                         # internal CV to choose alpha (could use LeaveOneOut if many subjects)
 verbose = True
 
 n_subj, n_tracts, n_vertices  = density_data["L"].shape
 rs   = np.full((n_subj, n_tracts, len(hemis)), np.nan)
 mses = np.full((n_subj, n_tracts, len(hemis)), np.nan)
 hemis = ["L", "R"]
+
 for h, hemi in enumerate(hemis):
 
-    #Data of interest (= hemisphere of interest)
     densities = density_data[hemi]
-    contrasts = contrast_data[hemi][:, 0,:]
+    contrasts = contrast_data[hemi][:, 0, :]
 
     # ----------------------------
-    # Basic checks
+    # Load MT ROI
     # ----------------------------
-    assert densities.ndim == 3, "densities must be (n_subj, n_tracts, n_vertices)"
-    assert contrasts.ndim == 2, "contrasts must be (n_subj, n_vertices)"
-    
-    assert contrasts.shape[0] == n_subj and contrasts.shape[1] == n_vertices
-
-    #---------------------
-    # Load MT ROI vertices
-    #---------------------
-    wang_hmt_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases','Wang_2015','hmtplus',  f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang.mgh")
+    wang_hmt_path = op.join(
+        '/Users','ldaumail3','Documents','research','brain_atlases',
+        'Wang_2015','hmtplus',
+        f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang.mgh"
+    )
     surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
-    # Get vertex indices where the ROI is nonzero (or above a threshold)
     wang_hmt_vertices = np.where(surf_roi > 0)[0]
     print(f"{len(wang_hmt_vertices)} vertices in ROI")
 
-    #----------------------------
-    # Mask density and contrast data with MT ROI
-    #----------------------------
-    densities_masked = densities[:, :, wang_hmt_vertices]   # (n_subj, n_tracts, n_masked_vertices)
-    # for i in range(n_subj):
-    #     for t in range(n_tracts):
-    #         x = densities_masked[i, t, :]
-    #         std = np.nanstd(x)
-    #         if std == 0 and np.nanmean(x) == 0: #std is 0 if all vertices averaged are 0
-    #             densities_masked[i, t, :] = 0   # or keep original
-    #         else:
-    #             densities_masked[i, t, :] = (x - np.nanmean(x)) / std
-            
-            # nan_vals = np.isnan(densities_masked)
-            # nan_count = nan_vals.sum()
-            # coords = np.argwhere(nan_vals)
-
-    #-------------------------------------
-    #Convert t-stat map to a z-score map
-    #-------------------------------------
-    contrasts_masked  = contrasts[:,wang_hmt_vertices]     # (n_subj, n_masked_vertices)
-    # for i in range(n_subj):
-    #     contrasts_masked[i,:] = (contrasts_masked[i,:] - contrasts_masked[i,:].mean()) / contrasts_masked[i,:].std()
-    # nan_vals = np.isnan(contrasts_masked)
-    # nan_count = nan_vals.sum()
-    # coords = np.argwhere(nan_vals)
+    # Masking
+    densities_masked = densities[:, :, wang_hmt_vertices]  # (subj, tracts, vertices)
+    contrasts_masked = contrasts[:, wang_hmt_vertices]     # (subj, vertices)
 
     n_masked = densities_masked.shape[2]
 
-    # Storage
-    predicted = np.zeros_like(densities_masked)          # shape (n_subj, n_tracts, n_masked)
-    trained_coefs = np.zeros((n_subj, n_tracts))         # coef[test_subject, tract]
+    # Storage per hemisphere
+    predicted    = np.zeros_like(densities_masked)
+    trained_coefs = np.zeros((n_subj, n_tracts))
 
-    # ---- Train tract-specific models ----
+    # --------------------------------
+    # Train tract-specific linear model
+    # --------------------------------
     for tract_idx in range(n_tracts):
-    # ---- Outer LOOCV across subjects ----
+
         for test_idx in range(n_subj):
             if verbose:
-                print(f"\nLOOCV fold: leaving out subject {test_idx+1}/{n_subj}")
+                print(f"\nLOOCV: leaving out subject {test_idx+1}/{n_subj} — tract {tract_idx}")
 
             train_idx = [i for i in range(n_subj) if i != test_idx]
 
-            # ---- Build training matrix ----
-            X_train = np.vstack([densities_masked[s,tract_idx].T for s in train_idx])   # (n_train*n_masked, n_tracts)
-            y_train = np.hstack([contrasts_masked[s]    for s in train_idx])  # (n_train*n_masked,)
+            # Build training data
+            X_train = np.vstack([densities_masked[s, tract_idx] for s in train_idx]).reshape(-1, 1)
+            y_train = np.hstack([contrasts_masked[s]            for s in train_idx])
 
-            # Standardize (per tract)
-            scalerX = StandardScaler().fit(X_train.reshape(-1, 1))
+            # Standardize
+            scalerX = StandardScaler().fit(X_train)
             scaly   = StandardScaler().fit(y_train.reshape(-1, 1))
 
-            Xtr = scalerX.transform(X_train.reshape(-1, 1))
+            Xtr = scalerX.transform(X_train)
             ytr = scaly.transform(y_train.reshape(-1, 1)).ravel()
 
-            # Ridge CV for this tract
-            ridge = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error", cv=inner_cv)
-            ridge.fit(Xtr, ytr)
+            # --------------------------
+            # SIMPLE LINEAR REGRESSION
+            # --------------------------
+            linreg = LinearRegression()
+            linreg.fit(Xtr, ytr)
 
-            # SAVE COEFFICIENT: 1 number per tract
-            trained_coefs[test_idx, tract_idx] = ridge.coef_[0]
+            # Save coefficient (one per tract)
+            trained_coefs[test_idx, tract_idx] = linreg.coef_[0]
 
-            # ---- Predict left-out subject ----
+            # Predict left-out subject
             X_test = densities_masked[test_idx, tract_idx, :].reshape(-1, 1)
             X_test_s = scalerX.transform(X_test)
 
-            y_pred_std = ridge.predict(X_test_s)
-            y_pred     = scaly.inverse_transform(y_pred_std.reshape(-1, 1)).ravel()
+            y_pred_std = linreg.predict(X_test_s)
+            y_pred = scaly.inverse_transform(y_pred_std.reshape(-1, 1)).ravel()
 
             predicted[test_idx, tract_idx, :] = y_pred
 
-            # ---- Evaluate ----
+            # Evaluate
             if verbose:
                 y_true = contrasts_masked[test_idx]
                 r, p = pearsonr(y_true, y_pred)
                 mse = mean_squared_error(y_true, y_pred)
-                print(f"  Tract {tract_idx}: r={r:.4f}, MSE={mse:.4e}, p={p:.4e}")
+                print(f"  r={r:.4f}, MSE={mse:.4e}, p={p:.4e}")
 
     # ------------------------------------
-    # Collect results
+    # Save results
     # ------------------------------------
-    # Fill full vertex space
     predicted_full = np.full((n_subj, n_tracts, n_vertices), np.nan)
     predicted_full[:, :, wang_hmt_vertices] = predicted
 
     true_full = np.full((n_subj, n_vertices), np.nan)
     true_full[:, wang_hmt_vertices] = contrasts_masked
 
-    # Coefficients already organized: (n_subj, n_tracts)
-    coefs_arr = trained_coefs.copy()
-
-    # Mean coefficient per tract
-    mean_coefs = np.mean(coefs_arr, axis=0)
-
-    print("\nDone. Summary:")
-
-    # Store tract-wise Pearson r and MSE:
-    # rs[s, t] = correlation between predicted[s, t, :] and true[s]
+    # Store performance per tract × subject
     for s in range(n_subj):
-
-        y_true = contrasts_masked[s]  # shape (n_masked,)
+        y_true = contrasts_masked[s]
 
         for t in range(n_tracts):
+            y_pred = predicted[s, t, :]
 
-            y_pred = predicted[s, t, :]  # shape (n_masked,)
-
-            # Compute performance
             r, _ = pearsonr(y_true, y_pred)
             mse = mean_squared_error(y_true, y_pred)
 
             rs[s, t, h] = r
             mses[s, t, h] = mse
+
+    print("\nFinished hemisphere", hemi)
 
 
 
@@ -321,7 +283,7 @@ plt.yticks(np.arange(n_subj), [f"{s}" for s in participants])
 
 plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
-plt.savefig(op.join(saveDir,f"hemi-{hemi}_pearsonrs_ridgecv_heatmap.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir,f"hemi-{hemi}_pearsonrs_linearcv_heatmap.png"), dpi=300, bbox_inches='tight')
 
 plt.show()
 
@@ -329,39 +291,84 @@ plt.show()
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
+all_rows = []
+for p, participant in enumerate(participants):
+    gp = "EB" if "EB" in participant else "NS"
+    for h, hemi in enumerate(hemis):
+        for t, tract in enumerate(tract_order):
+            all_rows.append({
+                "participant": participant,
+                "hemisphere": hemi,
+                "tract": tract,
+                "correlation": rs[p,t, h],
+                "group": gp,
+            })
+
+# ==== STORE ALL RESULTS ====
+df_pearson = pd.DataFrame(all_rows)
 # rs shape: (n_subj, n_tracts)
-tract_means = np.nanmean(rs, axis=0)
-tract_stds  = np.nanstd(rs, axis=0)
+
+# Compute mean and std per group × hemisphere × tract
+summary = (
+    df_pearson.groupby(["group", "hemisphere", "tract"])["correlation"]
+    .agg(["mean", "std"])
+    .reset_index()
+)
+
+
+groups = ["EB", "NS"]
+hemispheres = hemis  # ["L", "R"]
+colors = {"EB": "#1f77b4", "NS": "#ff7f0e"}
+
+# ---- Build arrays for plotting ----
+means = np.zeros((len(groups), len(hemispheres)))
+stds  = np.zeros((len(groups), len(hemispheres)))
+
+for gi, g in enumerate(groups):
+    for hi, h in enumerate(hemispheres):
+        row = summary[(summary["group"] == g) & (summary["hemisphere"] == h)]
+        means[gi, hi] = row["mean"].values[0]
+        stds[gi, hi]  = row["std"].values[0]
+
+# ---- Plot grouped bar chart ----
+x = np.arange(len(hemispheres))              # bar positions (L, R)
+width = 0.35                                 # bar width
 
 plt.figure(figsize=(10, 6))
 
-# Bar plot with error bars
-plt.bar(
-    np.arange(n_tracts),
-    tract_means,
-    yerr=tract_stds,
-    capsize=5,
-    alpha=0.8
-)
+for gi, g in enumerate(groups):
+    plt.bar(
+        x + gi * width - width/2,
+        means[gi],
+        yerr=stds[gi],
+        width=width,
+        capsize=5,
+        color=colors[g],
+        alpha=0.9,
+        label=g,
+    )
 
-# Labels & title
-plt.xlabel("Tracts")
+# ---- Labels ----
+plt.xticks(x, hemispheres)
+plt.xlabel("Hemisphere")
 plt.ylabel("Pearson r (mean ± SD)")
-plt.title("Mean Prediction Accuracy per Tract\nLeft Hemisphere")
-
-plt.xticks(np.arange(n_tracts), [f"{t}" for t in tract_order], rotation=45)
+plt.title("Prediction Accuracy \n Grouped by Hemisphere and Group")
+plt.legend(title="Group")
 
 plt.tight_layout()
 
-# Save
+# ---- Save ----
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
+
 plt.savefig(
-    op.join(saveDir, f"hemi-{hemi}_pearsonrs_ridgecv_barplot.png"),
-    dpi=300, bbox_inches='tight'
+    op.join(saveDir, "pearsonrs_linearcv_grouped_barplot_wang.png"),
+    dpi=300, bbox_inches="tight"
 )
 plt.show()
+
 
 
 

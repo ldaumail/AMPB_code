@@ -126,8 +126,8 @@ inner_cv = 5                         # internal CV to choose alpha (could use Le
 verbose = True
 
 n_subj, n_tracts, n_vertices  = density_data["L"].shape
-rs   = np.full((n_subj, len(hemis)), np.nan)
-mses = np.full((n_subj, len(hemis)), np.nan)
+rs   = np.full((n_subj, n_tracts, len(hemis)), np.nan)
+mses = np.full((n_subj, n_tracts, len(hemis)), np.nan)
 hemis = ["L", "R"]
 for h, hemi in enumerate(hemis):
 
@@ -156,11 +156,28 @@ for h, hemi in enumerate(hemis):
     # Mask density and contrast data with MT ROI
     #----------------------------
     densities_masked = densities[:, :, wang_hmt_vertices]   # (n_subj, n_tracts, n_masked_vertices)
+    # for i in range(n_subj):
+    #     for t in range(n_tracts):
+    #         x = densities_masked[i, t, :]
+    #         std = np.nanstd(x)
+    #         if std == 0 and np.nanmean(x) == 0: #std is 0 if all vertices averaged are 0
+    #             densities_masked[i, t, :] = 0   # or keep original
+    #         else:
+    #             densities_masked[i, t, :] = (x - np.nanmean(x)) / std
+            
+            # nan_vals = np.isnan(densities_masked)
+            # nan_count = nan_vals.sum()
+            # coords = np.argwhere(nan_vals)
+
     #-------------------------------------
     #Convert t-stat map to a z-score map
     #-------------------------------------
     contrasts_masked  = contrasts[:,wang_hmt_vertices]     # (n_subj, n_masked_vertices)
-  
+    # for i in range(n_subj):
+    #     contrasts_masked[i,:] = (contrasts_masked[i,:] - contrasts_masked[i,:].mean()) / contrasts_masked[i,:].std()
+    # nan_vals = np.isnan(contrasts_masked)
+    # nan_count = nan_vals.sum()
+    # coords = np.argwhere(nan_vals)
 
     n_masked = densities_masked.shape[2]
 
@@ -168,48 +185,48 @@ for h, hemi in enumerate(hemis):
     predicted = np.zeros_like(densities_masked)          # shape (n_subj, n_tracts, n_masked)
     trained_coefs = np.zeros((n_subj, n_tracts))         # coef[test_subject, tract]
 
-    # # ---- Train tract-specific models ----
-    # for tract_idx in range(n_tracts):
+    # ---- Train tract-specific models ----
+    for tract_idx in range(n_tracts):
     # ---- Outer LOOCV across subjects ----
-    for test_idx in range(n_subj):
-        if verbose:
-            print(f"\nLOOCV fold: leaving out subject {test_idx+1}/{n_subj}")
+        for test_idx in range(n_subj):
+            if verbose:
+                print(f"\nLOOCV fold: leaving out subject {test_idx+1}/{n_subj}")
 
-        train_idx = [i for i in range(n_subj) if i != test_idx]
+            train_idx = [i for i in range(n_subj) if i != test_idx]
 
-        # ---- Build training matrix ----
-        X_train = np.vstack([densities_masked[s,].T for s in train_idx])   # (n_train*n_masked, n_tracts)
-        y_train = np.hstack([contrasts_masked[s]    for s in train_idx])  # (n_train*n_masked,)
+            # ---- Build training matrix ----
+            X_train = np.vstack([densities_masked[s,tract_idx].T for s in train_idx])   # (n_train*n_masked, n_tracts)
+            y_train = np.hstack([contrasts_masked[s]    for s in train_idx])  # (n_train*n_masked,)
 
-        # Standardize (per tract)
-        scalerX = StandardScaler().fit(X_train)
-        scaly   = StandardScaler().fit(y_train.reshape(-1, 1))
+            # Standardize (per tract)
+            scalerX = StandardScaler().fit(X_train.reshape(-1, 1))
+            scaly   = StandardScaler().fit(y_train.reshape(-1, 1))
 
-        Xtr = scalerX.transform(X_train)
-        ytr = scaly.transform(y_train.reshape(-1, 1)).ravel()
+            Xtr = scalerX.transform(X_train.reshape(-1, 1))
+            ytr = scaly.transform(y_train.reshape(-1, 1)).ravel()
 
-        # Ridge CV for this tract
-        ridge = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error", cv=inner_cv)
-        ridge.fit(Xtr, ytr)
+            # Ridge CV for this tract
+            ridge = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error", cv=inner_cv)
+            ridge.fit(Xtr, ytr)
 
-        # SAVE COEFFICIENT: 1 number per tract
-        trained_coefs[test_idx, :] = ridge.coef_
+            # SAVE COEFFICIENT: 1 number per tract
+            trained_coefs[test_idx, tract_idx] = ridge.coef_[0]
 
-        # ---- Predict left-out subject ----
-        X_test = densities_masked[test_idx, :, :].T
-        X_test_s = scalerX.transform(X_test)
+            # ---- Predict left-out subject ----
+            X_test = densities_masked[test_idx, tract_idx, :].reshape(-1, 1)
+            X_test_s = scalerX.transform(X_test)
 
-        y_pred_std = ridge.predict(X_test_s)
-        y_pred     = scaly.inverse_transform(y_pred_std.reshape(-1, 1)).ravel()
+            y_pred_std = ridge.predict(X_test_s)
+            y_pred     = scaly.inverse_transform(y_pred_std.reshape(-1, 1)).ravel()
 
-        predicted[test_idx, :] = y_pred
+            predicted[test_idx, tract_idx, :] = y_pred
 
-        # ---- Evaluate ----
-        if verbose:
-            y_true = contrasts_masked[test_idx]
-            r, p = pearsonr(y_true, y_pred)
-            mse = mean_squared_error(y_true, y_pred)
-            print(f"r={r:.4f}, MSE={mse:.4e}, p={p:.4e}")
+            # ---- Evaluate ----
+            if verbose:
+                y_true = contrasts_masked[test_idx]
+                r, p = pearsonr(y_true, y_pred)
+                mse = mean_squared_error(y_true, y_pred)
+                print(f"  Tract {tract_idx}: r={r:.4f}, MSE={mse:.4e}, p={p:.4e}")
 
     # ------------------------------------
     # Collect results
@@ -243,8 +260,8 @@ for h, hemi in enumerate(hemis):
             r, _ = pearsonr(y_true, y_pred)
             mse = mean_squared_error(y_true, y_pred)
 
-            rs[s, h] = r
-            mses[s, h] = mse
+            rs[s, t, h] = r
+            mses[s, t, h] = mse
 
 
 
@@ -280,83 +297,69 @@ for h, hemi in enumerate(hemis):
 
 #Plotting results
 
+#1. Heat map
+import matplotlib.pyplot as plt
+import numpy as np
+
+# rs has shape (n_subj, n_tracts)
+# rows = subjects
+# columns = tracts
+
+plt.figure(figsize=(10, 6))
+plt.imshow(rs[:,:, h], aspect='auto', interpolation='nearest')
+plt.colorbar(label='Pearson r')
+
+plt.xlabel("Tracts")
+plt.ylabel("Participants")
+plt.title("Correlation Between Predicted and True Maps\n Right hemisphere")
+
+# Tract labels
+plt.xticks(np.arange(n_tracts), [f"{t}" for t in tract_order], rotation=45)
+
+# Subject labels (optional)
+plt.yticks(np.arange(n_subj), [f"{s}" for s in participants])
+
+plt.tight_layout()
+saveDir = op.join(bids_path, 'analysis', 'plots')
+plt.savefig(op.join(saveDir,f"hemi-{hemi}_pearsonrs_ridgecv_heatmap.png"), dpi=300, bbox_inches='tight')
+
+plt.show()
+
 ## Bar plot
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 
-all_rows = []
-for p, participant in enumerate(participants):
-    gp = "EB" if "EB" in participant else "NS"
-    for h, hemi in enumerate(hemis):
-        all_rows.append({
-            "participant": participant,
-            "hemisphere": hemi,
-            "correlation": rs[p,h],
-            "group": gp,
-        })
-
-# ==== STORE ALL RESULTS ====
-df_pearson = pd.DataFrame(all_rows)
 # rs shape: (n_subj, n_tracts)
-
-# Compute mean and std per group × hemisphere × tract
-summary = (
-    df_pearson.groupby(["group", "hemisphere"])["correlation"]
-    .agg(["mean", "std"])
-    .reset_index()
-)
-
-
-groups = ["EB", "NS"]
-hemispheres = hemis  # ["L", "R"]
-colors = {"EB": "#1f77b4", "NS": "#ff7f0e"}
-
-# ---- Build arrays for plotting ----
-means = np.zeros((len(groups), len(hemispheres)))
-stds  = np.zeros((len(groups), len(hemispheres)))
-
-for gi, g in enumerate(groups):
-    for hi, h in enumerate(hemispheres):
-        row = summary[(summary["group"] == g) & (summary["hemisphere"] == h)]
-        means[gi, hi] = row["mean"].values[0]
-        stds[gi, hi]  = row["std"].values[0]
-
-# ---- Plot grouped bar chart ----
-x = np.arange(len(hemispheres))              # bar positions (L, R)
-width = 0.35                                 # bar width
+tract_means = np.nanmean(rs, axis=0)
+tract_stds  = np.nanstd(rs, axis=0)
 
 plt.figure(figsize=(10, 6))
 
-for gi, g in enumerate(groups):
-    plt.bar(
-        x + gi * width - width/2,
-        means[gi],
-        yerr=stds[gi],
-        width=width,
-        capsize=5,
-        color=colors[g],
-        alpha=0.9,
-        label=g,
-    )
+# Bar plot with error bars
+plt.bar(
+    np.arange(n_tracts),
+    tract_means,
+    yerr=tract_stds,
+    capsize=5,
+    alpha=0.8
+)
 
-# ---- Labels ----
-plt.xticks(x, hemispheres)
-plt.xlabel("Hemisphere")
+# Labels & title
+plt.xlabel("Tracts")
 plt.ylabel("Pearson r (mean ± SD)")
-plt.title("Prediction Accuracy (All Tracts Combined)\nGrouped by Hemisphere and Group")
-plt.legend(title="Group")
+plt.title("Mean Prediction Accuracy per Tract\nLeft Hemisphere")
+
+plt.xticks(np.arange(n_tracts), [f"{t}" for t in tract_order], rotation=45)
 
 plt.tight_layout()
 
-# ---- Save ----
+# Save
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
-
 plt.savefig(
-    op.join(saveDir, "pearsonrs_ridgecv_combtracts_grouped_barplot_wang.png"),
-    dpi=300, bbox_inches="tight"
+    op.join(saveDir, f"hemi-{hemi}_pearsonrs_ridgecv_barplot.png"),
+    dpi=300, bbox_inches='tight'
 )
 plt.show()
 
@@ -369,9 +372,32 @@ import pandas as pd
 import numpy as np
 import matplotlib.patches as mpatches
 
+all_rows = []
+for p, participant in enumerate(participants):
+    gp = "EB" if "EB" in participant else "NS"
+    for t, tract in enumerate(tract_order):
+        for h, hemi in enumerate(hemis):
+            all_rows.append({
+                "participant": participant,
+                "hemisphere": hemi,
+                "tract": tract,
+                "correlation": rs[p,t,h],
+                "group": gp,
+            })
+
+# ==== STORE ALL RESULTS ====
+df_pearson = pd.DataFrame(all_rows)
+
+# Compute mean and std per group × hemisphere × tract
+summary = (
+    df_pearson.groupby(["group", "hemisphere", "tract"])["correlation"]
+    .agg(["mean", "std"])
+    .reset_index()
+)
 
 hemispheres = ["L", "R"]
 groups = ["EB", "NS"]
+tracts = df_pearson["tract"].unique()
 
 # Define consistent colors per group
 colors = {"EB": "#1f77b4", "NS": "#ff7f0e"}  # blue and orange
@@ -384,45 +410,48 @@ for i, hemi in enumerate(hemispheres):
 
     for g, group in enumerate(groups):
         group_data = hemi_data[hemi_data["group"] == group]
-            
-        # Jitter x positions to avoid overlap
-        x_jitter = np.random.normal(g * 0.25, 0.015, size=len(group_data))
-        
-        # Scatter individual participant data
-        ax.scatter(
-            x_jitter,
-            group_data["correlation"],
-            color=colors[group],
-            alpha=0.6,
-            s=40,
-            label=group if (i == 0) else ""  # legend only once
-        )
-        
-        # Plot mean ± std
-        m = summary.query(
-            "group == @group and hemisphere == @hemi"
-        )["mean"]
-        s = summary.query(
-            "group == @group and hemisphere == @hemi"
-        )["std"]
 
-        if not m.empty:
-            ax.errorbar(
-                g * 0.25,
-                m.values[0],
-                yerr=s.values[0],
-                fmt="o",
-                color="black",
-                capsize=5,
-                markersize=6,
-                lw=1.2,
-                zorder=5,
+        for j, tract in enumerate(tracts):
+            tract_data = group_data[group_data["tract"] == tract]
+            
+            # Jitter x positions to avoid overlap
+            x_jitter = np.random.normal(j + g * 0.25, 0.04, size=len(tract_data))
+            
+            # Scatter individual participant data
+            ax.scatter(
+                x_jitter,
+                tract_data["correlation"],
+                color=colors[group],
+                alpha=0.6,
+                s=40,
+                label=group if (j == 0 and i == 0) else ""  # legend only once
             )
-        ax.axhline(0, color='gray', linestyle='--', linewidth=1)
+            
+            # Plot mean ± std
+            m = summary.query(
+                "group == @group and hemisphere == @hemi and tract == @tract"
+            )["mean"]
+            s = summary.query(
+                "group == @group and hemisphere == @hemi and tract == @tract"
+            )["std"]
+
+            if not m.empty:
+                ax.errorbar(
+                    j + g * 0.25,
+                    m.values[0],
+                    yerr=s.values[0],
+                    fmt="o",
+                    color="black",
+                    capsize=5,
+                    markersize=6,
+                    lw=1.2,
+                    zorder=5,
+                )
+            ax.axhline(0, color='gray', linestyle='--', linewidth=1)
     
     ax.set_title(f"{'Left' if hemi == 'L' else 'Right'} Hemisphere")
-    ax.set_xticks([0, 0.25])
-    ax.set_xticklabels(["EB", "NS"])
+    ax.set_xticks(np.arange(len(tracts)) + 0.125)
+    ax.set_xticklabels(tracts, rotation=30, ha="right")
     ax.set_ylabel("Pearson R" if i == 0 else "")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -435,12 +464,4 @@ legend_handles = [
 ]
 fig.legend(handles=legend_handles, loc="upper center", ncol=2, frameon=False)
 plt.tight_layout(rect=[0, 0, 1, 0.95])
-# ---- Save ----
-saveDir = op.join(bids_path, 'analysis', 'plots')
-os.makedirs(saveDir, exist_ok=True)
-
-plt.savefig(
-    op.join(saveDir, "pearsonrs_ridgecv_combtracts_grouped_jitter_wang.png"),
-    dpi=300, bbox_inches="tight"
-)
 plt.show()
