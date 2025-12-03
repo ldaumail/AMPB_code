@@ -47,12 +47,12 @@ for n =1:length(participants)
         'UniformOutput', false);
 
     taskList = regexprep(boldFiles, '.+_task-(\w+)_.+', '$1');
-    list.task = unique(taskList); % unique task list
+    list.task = unique(taskList(~contains(taskList, 'ampb'))); % unique task list
     conds = combvec_conditions(list);
 
     %Compute contrasts
 
-    for i = 3:length(conds) % for each task
+    for i = 1:length(conds) % for each task
         % subset bold files by task types
         indx = struct_contains(boldFiles, conds(i));
         currBold = boldFiles(indx);

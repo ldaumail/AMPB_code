@@ -17,8 +17,8 @@ conditions = {"motion": 1, "silent": 2, "stationary": 3}
 
 # --- Define contrasts (positive - negative) ---
 contrasts = {
-    "motionXsilent": ("motion", "silent")
-} # "motionXstationary": ("motion", "stationary")
+   "motionXstationary": ("motion", "stationary")
+} #   "motionXsilent": ("motion", "silent")
 
 designs = {"mtlocal", "ptlocal"}
 data_type = {"pval", "tstat"}

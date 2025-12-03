@@ -41,7 +41,7 @@ for participant in participants:
         # for tract in ['MTmaskxLGN', 'MTmaskxPT', 'MTmaskxSTS1', 'MTmaskxPU', 'MTmaskxFEF', 'MTmaskxhIP', 'MTmaskxV1']:
         print(f"   🧩 Hemisphere: {hemi}")
         hemi_fs = "lh" if hemi == "L" else "rh"
-        subj_dir = op.join(density_dir, participant)
+        subj_dir = op.join(density_dir, participant, 'wang_MT')
         subj_densities = []
 
         # Loop through *tracts in fixed order*
