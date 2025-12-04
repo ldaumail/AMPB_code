@@ -132,10 +132,7 @@ for participant in participants:
 
         # Save this subject's data for this hemisphere
         contrast_data[hemi].append(subj_final)
-# Convert to numpy arrays
-# for hemi in hemis:
-#     contrast_data[hemi] = np.squeeze(np.stack(contrast_data[hemi], axis=0))  # (n_subjects, n_contrasts, n_vertices)
-#     print(f"✅ {hemi}-hemisphere shape: {contrast_data[hemi].shape}")
+#contrast_data[hemi][0][contrast][0].shape #dim 1 = hemisphere initial, dim 2 = participant number, dim 3 = contrast type, dim 4: run number of each contrast map
 
 
 #---------------------------
@@ -147,105 +144,151 @@ verbose = True
 hemis = ["L", "R"]
 contrast = contrast_order[0]   # e.g. "motionXstationary"
 
-n_subj, n_tracts, n_vertices  = density_data["L"].shape
+# get n_subj, n_tracts
+n_subj, n_tracts, _  = density_data["L"].shape
 rs   = np.full((n_subj, n_tracts, len(hemis)), np.nan)
 mses = np.full((n_subj, n_tracts, len(hemis)), np.nan)
 
 for h, hemi in enumerate(hemis):
 
+    _, _, n_vertices  = density_data[hemi].shape
     densities = density_data[hemi]        # (subj, tract, vertices)
     subj_contrasts = contrast_data[hemi]  # list: one dict per participant
 
     # ----------------------------
     # Load MT ROI
     # ----------------------------
-    wang_hmt_path = op.join('/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang.mgh")
+    wang_hmt_path = op.join(
+        '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
+        f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang.mgh"
+    )
     surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
     wang_hmt_vertices = np.where(surf_roi > 0)[0]
-    print(f"{len(wang_hmt_vertices)} vertices in ROI")
+    print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
 
-    # Masking
+    # Masking densities (subj, tract, masked_vertices)
     densities_masked = densities[:, :, wang_hmt_vertices]
     n_masked = densities_masked.shape[2]
 
-    # ------------------------------------------------------------------
-    # STORAGE: now run-level per subject
-    # predicted[s, t, r, v] = prediction for subject s, tract t, run r
-    # ------------------------------------------------------------------
-    predicted = np.full((n_subj, n_tracts, 6, n_masked), np.nan)  # allow up to 6 runs
-    trained_coefs = np.zeros((n_subj, n_tracts, 6))
+    # Predicted and coef storage
+    predicted = np.full((n_subj, n_tracts, 6, n_masked), np.nan)  # predicted maps per run
+    trained_coefs = np.zeros((n_subj, n_tracts, 6))  # scalar summary per tract/run
 
-    # --------------------------------
-    # Train tract-specific linear model
-    # --------------------------------
+    # -------------------------
+    # main loop: subject -> tract -> run-LOOCV
+    # -------------------------
     for s in range(n_subj):
 
-        # subject run-level contrasts: shape (n_runs, n_vertices)
-        C = subj_contrasts[s][contrast]       # (runs, vertices)
-        C = C[:, wang_hmt_vertices]           # mask ROI
+        # get this subject's run maps for the chosen contrast
+        subj_dict = subj_contrasts[s]
+        if contrast not in subj_dict:
+            print(f"Subject {s} missing contrast {contrast} for hemi {hemi}, skipping")
+            continue
+
+        C_full = subj_dict[contrast]              # (n_runs, n_vertices_fullspace)
+        # mask ROI
+        C = C_full[:, wang_hmt_vertices]          # (n_runs, n_masked)
         n_runs = C.shape[0]
 
         if verbose:
-            print(f"\nSubject {s+1}: {n_runs} runs")
+            print(f"\nSubject {s+1}: {n_runs} runs (hemi {hemi})")
+
+        # For each tract, we will treat each run as one sample:
+        # X_train shape -> (n_train_runs, n_masked)
+        # y_train shape -> (n_train_runs, n_masked)
+        # This is a multi-output regression: features = vertices, outputs = vertices
 
         for tract_idx in range(n_tracts):
 
-            # run-level LOOCV
+            if verbose:
+                print(f" Tract {tract_idx+1}/{n_tracts}")
+
+            # anatomical vector for this subject and tract (length = n_masked)
+            anat_vec = densities_masked[s, tract_idx, :]  # shape (n_masked,)
+
+            # NOTE: anat_vec does NOT vary by run. We nonetheless use different runs as different samples
+            # for multi-output regression (X rows repeated). This may be ill-conditioned if n_runs is small.
+
             for test_run in range(n_runs):
 
                 if verbose:
-                    print(f"  Tract {tract_idx}, Run LOOCV {test_run+1}/{n_runs}")
+                    print(f"  Test run {test_run+1}/{n_runs}")
 
+                # training run indices
                 train_runs = [r for r in range(n_runs) if r != test_run]
+                if len(train_runs) < 1:
+                    # cannot train with zero samples -> skip
+                    continue
 
+                # Build X_train: one row per train run, columns = vertices/features
+                # Because anatomy does not vary across runs, this will be repeated rows of the same anat_vec.
+                # Still construct correctly:
                 # Build training data
-                X_train = np.vstack([densities_masked[s, tract_idx, :] for _r in train_runs]).reshape(-1, 1)
+                # Build training data
+                X_train = densities_masked[s, tract_idx, :][None, :]
+                X_train = np.repeat(X_train, len(train_runs), axis=0)   # (n_train_runs, V)
 
-                y_train = np.hstack([C[_r] for _r in train_runs])
+                # y_train: keep 2D, do NOT flatten
+                y_train = np.squeeze(C[train_runs, :])                              # (n_train_runs, V)
 
-                # Standardize
+                # Standardize X by vertices
                 scalerX = StandardScaler().fit(X_train)
-                scaly   = StandardScaler().fit(y_train.reshape(-1, 1))
-
                 Xtr = scalerX.transform(X_train)
-                ytr = scaly.transform(y_train.reshape(-1, 1)).ravel()
 
-                # Simple linear regression
+                # Standardize y by vertices (multi-output)
+                scaly = StandardScaler().fit(y_train)
+                ytr = scaly.transform(y_train)
+
+                # Train linear model (multi-output regression)
                 linreg = LinearRegression()
                 linreg.fit(Xtr, ytr)
 
-                trained_coefs[s, tract_idx, test_run] = linreg.coef_[0]
+                trained_coefs[s, tract_idx, test_run] = linreg.coef_.mean()
 
                 # Predict left-out run
-                X_test = densities_masked[s, tract_idx, :].reshape(-1, 1)
+                X_test = densities_masked[s, tract_idx, :][None, :]
                 X_test_s = scalerX.transform(X_test)
 
-                y_pred_std = linreg.predict(X_test_s)
-                y_pred     = scaly.inverse_transform(y_pred_std.reshape(-1, 1)).ravel()
+                y_pred_std = linreg.predict(X_test_s)      # (1, V)
+                y_pred = scaly.inverse_transform(y_pred_std)[0]
 
                 predicted[s, tract_idx, test_run, :] = y_pred
 
+
+                # Evaluate this test_run if verbose
+                if verbose:
+                    y_run_true = np.squeeze(C[test_run, :])
+                    r_run, p_run = pearsonr(np.squeeze(y_run_true), y_pred)
+                    mse_run = mean_squared_error(np.squeeze(y_run_true), y_pred)
+                    print(f"   run r={r_run:.4f}, MSE={mse_run:.4e}, p={p_run:.4e}")
+
     # ------------------------------------
-    # Compute performance metrics
+    # Compute subject-level performance (concatenate runs)
     # ------------------------------------
     for s in range(n_subj):
-
-        C = subj_contrasts[s][contrast][:, wang_hmt_vertices]
+        subj_dict = subj_contrasts[s]
+        if contrast not in subj_dict:
+            continue
+        C_full = subj_dict[contrast]
+        C = C_full[:, wang_hmt_vertices]
         n_runs = C.shape[0]
 
         for t in range(n_tracts):
-
-            # concatenate over runs
+            # flatten across runs
             y_true = C.reshape(-1)
             y_pred = predicted[s, t, :n_runs, :].reshape(-1)
 
-            r, _ = pearsonr(y_true, y_pred)
-            mse = mean_squared_error(y_true, y_pred)
+            # if predictions are nan (e.g., missing), skip
+            if np.isnan(y_pred).all():
+                continue
 
-            rs[s, t, h] = r
-            mses[s, t, h] = mse
+            r_all, _ = pearsonr(y_true, y_pred)
+            mse_all = mean_squared_error(y_true, y_pred)
+            rs[s, t, h] = r_all
+            mses[s, t, h] = mse_all
 
-    print("\nFinished hemisphere", hemi)
+    print(f"\nFinished hemisphere {hemi}")
+
 
 
 

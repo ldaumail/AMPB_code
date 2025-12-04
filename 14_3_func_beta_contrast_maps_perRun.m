@@ -130,7 +130,7 @@ for n =1:length(participants)
                     %%% compute design matrix for each hrf in hrf library
                     hrfs = num2cell(getcanonicalhrflibrary(stimdur, TR), 2); % hrf library
                     designSingleRun = designSINGLE{f};
-                    d = designSingleRun(:, (f-1)*matSize(end)/length(currBold)+1:f*matSize(end)/length(currBold)); %sum(cat(3, designSingleFile), 3); % collapse single-trial design matrix
+                    d = designSingleRun(:, (f-1)*matSize(end)/length(currBold)+1:f*matSize(end)/length(currBold)); %sum(cat(3, designSINGLE{:}), 3); % collapse single-trial design matrix
                     X = cellfun(@(x) convn(d, x(:)), hrfs, 'UniformOutput', false); %convolve
                     X = cellfun(@(x) TR .* x(1:nt,:), X, 'UniformOutput', false); %get the integral of the hrf
 
