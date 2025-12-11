@@ -1,7 +1,7 @@
 
 ##### Percent endpoint coverage stats #######
 
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/tdi_maps/dipy_wmgmi_tdi_maps/surface_density_summary_wang.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/tdi_maps/dipy_wmgmi_tdi_maps/surface_density_dice_wang.csv'
 file = file.path(path)
 data = read.csv(file) #
 
@@ -23,8 +23,9 @@ plot(linearModel, sqrt(abs(resid(.)))~fitted(.), type = c("p","smooth"))
 Anova(linearModel, type = "II") 
 
 ##If normal/homoscedasticity:
+data = data[data$tract %in% c("MTxLGN", "MTxPT", "MTxFEF"), ]
 library(rstatix) #Anova test within subjects
-res.aov <- anova_test(data = data, dv = proportion, wid = participant, within = c(hemisphere, tract ), between = group)
+res.aov <- anova_test(data = data, dv = dice, wid = participant, within = c(hemisphere, tract ), between = group)
 get_anova_table(res.aov, correction = "none")
 
 
@@ -75,8 +76,8 @@ result[[14]] =t.test(data$proportion[data$tract == "MTxV1" & data$hemisphere == 
 ## Test each hemisphere separately
 ###---------------------
 library(rstatix) #Anova test within subjects
-res.aov <- anova_test(data = data[data$hemisphere == "L",], dv = proportion, wid = participant, within = c(tract ), between = group)
+res.aov <- anova_test(data = data[data$hemisphere == "L",], dv = dice, wid = participant, within = c(tract ), between = group)
 get_anova_table(res.aov, correction = "none")
 
-res.aov <- anova_test(data = data[data$hemisphere == "R",], dv = proportion, wid = participant, within = c(tract ), between = group)
+res.aov <- anova_test(data = data[data$hemisphere == "R",], dv = dice, wid = participant, within = c(tract ), between = group)
 get_anova_table(res.aov, correction = "none")

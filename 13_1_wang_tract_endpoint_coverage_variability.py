@@ -42,7 +42,7 @@ for participant in participants:
         # Loop over tracts
         for tract in tract_list:
 
-            density_map_file = op.join(proj_density_path,participant,
+            density_map_file = op.join(proj_density_path,participant, 'wang_MT',
                 f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract}_desc-fsprojdensity0mm.mgh")
 
             density_map = nib.load(density_map_file).get_fdata().squeeze()
@@ -53,18 +53,19 @@ for participant in participants:
             # Compute stats
             nonzero_count = np.count_nonzero(roi_values)
             total_count = len(roi_values)
-            proportion = nonzero_count / total_count if total_count > 0 else np.nan
-
+            # proportion = nonzero_count / total_count if total_count > 0 else np.nan
+             #Dice similarity coefficient (DSC)
+            DSC =  2*np.sum((roi_values) > 0) / (np.sum(density_map >0)+ np.sum(label_vertices > 0))
             all_rows.append({
                 "participant": participant,
                 "hemisphere": hemi,
                 "tract": tract,
-                "proportion": proportion,
+                "dice": DSC,
                 "total_vertices": total_count,
                 "nonzero_vertices": nonzero_count
             })
 
-            print(f"{participant} {hemi_fs}-{tract}: {proportion:.2%} non-empty MT vertices")
+            print(f"{participant} {hemi_fs}-{tract}: {DSC:.2%}")
 
 # ==== STORE ALL RESULTS ====
 df_results = pd.DataFrame(all_rows)
@@ -80,7 +81,7 @@ df_results["group"] = df_results["participant"].apply(
 
 # 2️⃣ Compute mean and std per hemisphere, tract, and group
 summary = (
-    df_results.groupby(["hemisphere", "tract", "group"])["proportion"]
+    df_results.groupby(["hemisphere", "tract", "group"])["dice"]
     .agg(["mean", "std"])
     .reset_index()
 )
@@ -118,7 +119,7 @@ for i, hemi in enumerate(hemispheres):
     axes[i].set_title(f"{'Left' if hemi == 'L' else 'Right'} Hemisphere")
     axes[i].set_xticks(x)
     axes[i].set_xticklabels(tracts, rotation=30, ha="right")
-    axes[i].set_ylabel("Non-empty MT vertices (%)" if i == 0 else "")
+    axes[i].set_ylabel("Dice similarity coefficient" if i == 0 else "")
     axes[i].legend()
 
 plt.tight_layout()
@@ -140,7 +141,7 @@ df_results["group"] = df_results["participant"].apply(
 
 # Compute mean and std per group × hemisphere × tract
 summary = (
-    df_results.groupby(["group", "hemisphere", "tract"])["proportion"]
+    df_results.groupby(["group", "hemisphere", "tract"])["dice"]
     .agg(["mean", "std"])
     .reset_index()
 )
@@ -170,7 +171,7 @@ for i, hemi in enumerate(hemispheres):
             # Scatter individual participant data
             ax.scatter(
                 x_jitter,
-                tract_data["proportion"] * 100,
+                tract_data["dice"],
                 color=colors[group],
                 alpha=0.6,
                 s=40,
@@ -188,8 +189,8 @@ for i, hemi in enumerate(hemispheres):
             if not m.empty:
                 ax.errorbar(
                     j + g * 0.25,
-                    m.values[0] * 100,
-                    yerr=s.values[0] * 100,
+                    m.values[0],
+                    yerr=s.values[0],
                     fmt="o",
                     color="black",
                     capsize=5,
@@ -201,7 +202,7 @@ for i, hemi in enumerate(hemispheres):
     ax.set_title(f"{'Left' if hemi == 'L' else 'Right'} Hemisphere")
     ax.set_xticks(np.arange(len(tracts)) + 0.125)
     ax.set_xticklabels(tracts, rotation=30, ha="right")
-    ax.set_ylabel("Non-empty MT vertices (%)" if i == 0 else "")
+    ax.set_ylabel("Dice similarity coefficient" if i == 0 else "")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
