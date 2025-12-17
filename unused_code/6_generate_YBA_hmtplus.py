@@ -6,6 +6,7 @@ import os
 import os.path as op
 import ants
 import numpy as np
+import nibabel.freesurfer as fs
 import argparse
 import sys
 import subprocess
@@ -19,9 +20,10 @@ from utils.dilate_mask import dilate_mask
 # -------------------------------
 
 def main(participants_file, bids_path):
+    mni_yba_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases','YBA_696parcels')
     # bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
     # fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
-    mni_yba_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases','YBA_696parcels')
+
     # save_dir = op.join(bids_path, 'analysis','ROIs', 'YBA_space-ACPC_rois', 'fsaverage')
     # os.makedirs(save_dir, exist_ok=True)
     # #First: resample ROI to fsaverage
@@ -34,20 +36,21 @@ def main(participants_file, bids_path):
     #     #atlas_labels = np.unique(mni_yba_data)
     #     lookup = np.zeros(int(mni_yba_data.max()) + 1, dtype=bool)
     #     if hemi == "L":
-    #         lookup[[31,32,38,39,45,60,69,70,71, 82, 91]] = True 
-    #     # 31: L_T2.1.F probably the most anterior
-    #     # 32: L_T2.1.G seems to overlap a lot with 31 once projected, and quite small but necessary
-    #     # 38: L_T2.2_F anterior, inferior to 31 (not sure if needed)
-    #     # 39: L_T2.2_G high overlap with NS func MT, absolutely needed
-    #     # 45: L_T3.1_F anterior, inferior to 38, very ventral
-    #     # 60: L_O2.1_E posterior, slightly dorsal
-    #     # 69: L_O2.2_I posterior, quite close to NS func MT
-    #     # 70: L_O2.2_J overlaps with NS func MT
-    #     # 71: L_O2.2_K overlaps with NS func MT
-    #     # 82: L_O3.I part overlaps with NS func MT, rest is very ventral
-    #     # 91: L_AN2_D superior, overlaps slightly with NS func MT
+    #         lookup[[31,32,38,39,45,60,69,70,71, 82, 91]] = True #, 109
+    #     # 31: L_T2.1.F probably the most anterior (RH: 379)
+    #     # 32: L_T2.1.G seems to overlap a lot with 31 once projected, and quite small but necessary (RH: 380)
+    #     # 38: L_T2.2_F anterior, inferior to 31 (not sure if needed) (RH: 386)
+    #     # 39: L_T2.2_G high overlap with NS func MT, absolutely needed (RH: 387)
+    #     # 45: L_T3.1_F anterior, inferior to 38, very ventral (RH: 393)
+    #     # 60: L_O2.1_E posterior, slightly dorsal (RH: 408)
+    #     # 69: L_O2.2_I posterior, quite close to NS func MT (RH: 417)
+    #     # 70: L_O2.2_J overlaps with NS func MT (RH: 418)
+    #     # 71: L_O2.2_K overlaps with NS func MT (RH: 419)
+    #     # 82: L_O3.I part overlaps with NS func MT, rest is very ventral (RH: 430)
+    #     # 91: L_AN2_D superior, overlaps slightly with NS func MT (RH: 439)
+    #     # 109: L_SM5_E superior need it to cover part of right hemisphere func MT (RH: 457)
     #     elif hemi == "R":
-    #        lookup[[379,380,386,387,393,408,417,418,419, 430, 439]] = True #numbers for the right hemisphere
+    #        lookup[[379,380,386,387,393,408,417,418,419, 430, 439]] = True #numbers for the right hemisphere , 457
 
 
     #     lh_MT_mask = lookup[mni_yba_data].astype(np.uint8)
@@ -59,9 +62,9 @@ def main(participants_file, bids_path):
     #     input_mask = vol_hMT_file
     #     output_mask = op.join(save_dir,  'hemi-'+hemi+'_space-mni152_desc-MT_desc-yba_mask_dilated.nii.gz')
 
-    #     dilate_mask(input_mask, output_mask, dilate = 3)
+    #     dilate_mask(input_mask, output_mask, dilate = 8)
 
-    #     out_fsaverage_file = op.join(save_dir, f"hemi-{hemi}_space-fsaverage_label-hMT_desc-yba5mm.mgh")
+    #     out_fsaverage_file = op.join(save_dir, f"hemi-{hemi}_space-fsaverage_label-hMT_desc-yba0mm.mgh")
 
     #     # Build mri_vol2surf command
     #     cmd = [
@@ -70,7 +73,7 @@ def main(participants_file, bids_path):
     #         "--regheader", 'fsaverage',
     #         "--hemi", hemi_fs,
     #         "--surf", "white",
-    #         "--projdist", "5",
+    #         "--projdist", "0",
     #         "--sd", fs_path,
     #         "--out", out_fsaverage_file
     #     ]
@@ -79,6 +82,15 @@ def main(participants_file, bids_path):
     #     print("Running:", " ".join(cmd))
     #     subprocess.run(cmd, check=True, env={**os.environ, "SUBJECTS_DIR": fs_path})
 
+    #     #Save as a label file
+    #     fsavg_mask = ants.image_read(out_fsaverage_file).numpy()
+    #     output_label = op.join(save_dir, f"hemi-{hemi}_space-fsaverage_label-hMT_desc-yba0mm.label")
+    #     roi_verts = np.where(fsavg_mask == 1)[0]
+    #     with open(output_label, "w") as f:
+    #         f.write(f"#!ascii label  , from subject fsaverage vox2ras=TkReg\n")
+    #         f.write(f"{len(roi_verts)}\n")
+    #         for vertex in roi_verts: # for each vertex
+    #             f.write(f"{vertex} 0 0 0 0\n")
 
 
     for participant in participants_file:
@@ -93,6 +105,8 @@ def main(participants_file, bids_path):
         mni_t1_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases','Wang_2015')
         mni_t1_img = ants.image_read(op.join(mni_t1_path, 'MNI152_T1_1mm.nii.gz'))
         
+        # if os.path.exists(op.join(save_dir, participant+'_hemi-L_space-ACPC_desc-MT_mask.nii.gz')):
+        #     continue
         # MNI to ACPC T1 registration
         reg = ants.registration(
             fixed = acpc_t1_img,
@@ -109,8 +123,6 @@ def main(participants_file, bids_path):
         
         for hemi in ["L", "R"]:
         # #First: resample ROI to ACPC
-
-            hemi_fs = "lh" if hemi == "L" else "rh"
             #Register and Transform mask from MNI to ACPC
             lookup = np.zeros(int(mni_yba_data.max()) + 1, dtype=bool) #Create boolean vector of atlas regions indices 
             if hemi == "L":
@@ -156,8 +168,8 @@ def main(participants_file, bids_path):
             ants.image_write(transformed_mask, transformed_hMT_path)
 
             #Apply transform to dilated mask
-            dilated_mask_file = op.join(save_dir,  'hemi-'+hemi+'_space-mni152_desc-MT_desc-yba_mask_dilated.nii.gz')
-            dilate_mask(vol_hMT_mask_file, dilated_mask_file, dilate = 3)
+            dilated_mask_file = op.join(save_dir,  participant+'_hemi-'+hemi+'_space-mni152_desc-MT_desc-yba_mask_dilated.nii.gz')
+            dilate_mask(vol_hMT_mask_file, dilated_mask_file, dilate = 8)
             dilated_mni_hMT_img = ants.image_read(dilated_mask_file)
             transformed_dilated_mask = ants.apply_transforms(
                 moving = dilated_mni_hMT_img, 

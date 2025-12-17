@@ -71,6 +71,7 @@ for hemi in hemis:
 #----------------------------------------------------------
 #Compute average functionally defined hMT+ in NS
 #----------------------------------------------------------
+# +
 #----------------------------------------------------------
 #Compute average functionally defined hMT+ in EB
 #----------------------------------------------------------
@@ -88,7 +89,7 @@ utils = op.join(bids_path, 'code','utils')
 sys.path.append(op.expanduser(f'{utils}'))
 
 fs_dir = op.join(bids_path, "derivatives", "freesurfer")
-roi_dir = op.join(bids_path, "analysis", "ROIs", "funcMT_roi", "functional_surf_roi")
+roi_dir = op.join(bids_path, "analysis", "ROIs", "func_roi", "functional_surf_roi")
 
 hemis = ["L", "R"]
 participants = sorted([d for d in os.listdir(roi_dir) if d.startswith("sub-") and "sub-EBxGxYZx1949" not in d])
@@ -174,11 +175,11 @@ for hemi in hemis:
 
 
     # Threshold at 0.5 for group-level ROI
-    consensus_mask_binary = (average_masks[hemi] >= 0.3).astype(int)
+    consensus_mask_binary = (average_masks[hemi] >= 0.1).astype(int)
 
     # Find vertices of consensus ROI
     roi_verts = np.where(consensus_mask_binary == 1)[0]
-    save_dir = op.join(bids_path, "analysis", "ROIs", "funcMT_roi", "functional_surf_roi", "group_averages")
+    save_dir = op.join(bids_path, "analysis", "ROIs", "func_roi", "functional_surf_roi", "group_averages")
     os.makedirs(save_dir, exist_ok=True)
     # txt_out = op.join(save_dir,f"{hemi_fs}_consensus_temp.txt")
     # np.savetxt(txt_out, roi_verts, fmt="%d")

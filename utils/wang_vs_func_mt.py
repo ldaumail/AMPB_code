@@ -280,10 +280,10 @@ for i, participant in enumerate(participants):
     qsiprep_path = op.join(bids_path, 'derivatives', 'qsiprep', participant, 'anat')
 
     for hemi in ['L', 'R']:
-        wang_mt_path = op.join(bids_path, 'analysis', 'wang_space-ACPC_rois',participant, f"{participant}_hemi-{hemi}_space-ACPC_desc-MT_mask_dilated.nii.gz")
+        wang_mt_path = op.join(bids_path, 'analysis', 'ROIs', 'wang_space-ACPC_rois',participant, f"{participant}_hemi-{hemi}_space-ACPC_desc-MT_mask_dilated.nii.gz")
         wang_mt_img       = ants.image_read(wang_mt_path)
 
-        func_mt_path = op.join(bids_path, 'analysis', 'functional_vol_roi', participant, f"{participant}_hemi-{hemi}_space-ACPC_label-MT_mask.nii.gz")
+        func_mt_path = op.join(bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_vol_roi', participant, f"{participant}_hemi-{hemi}_space-ACPC_label-MT_mask.nii.gz")
         func_mt_img = ants.image_read(func_mt_path)
 
         overlap[i] = np.sum(wang_mt_img.numpy()*func_mt_img.numpy())/np.sum(func_mt_img.numpy())
@@ -294,6 +294,7 @@ for i, participant in enumerate(participants):
                     "proportion": overlap[i],
                     "group": ("EB" if participant.startswith("sub-EB") else "NS" if participant.startswith("sub-NS") else "Other")
                     })
+
 df_results = pd.DataFrame(all_rows)
 
 #Perform stats
