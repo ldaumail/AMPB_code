@@ -170,7 +170,7 @@ def main(participants_file, bids_path):
                 input_mask = transformed_MT_path
                 output_mask = op.join(save_dir,  participant+'_hemi-'+hemi+'_space-ACPC_desc-MT_mask_dilated.nii.gz')
 
-                dilate_mask(input_mask, output_mask, dilate = 9)
+                dilate_mask(input_mask, output_mask, dilate = 2)
 
 
 if __name__ == "__main__":

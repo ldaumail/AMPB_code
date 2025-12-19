@@ -23,9 +23,9 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
         # tract_name = 'LeftMTxLGN'
         # bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
         analysis_path = op.join(bids_path, 'analysis')
-        roi_path = op.join(analysis_path, 'wang_space-ACPC_rois', participant)
+        roi_path = op.join(analysis_path, 'ROIs','wang_space-ACPC_rois', participant)
         fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
-        out_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant)
+        out_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant, 'wang_MT')
         os.makedirs(out_path, exist_ok=True)
 
         #Files 
@@ -60,7 +60,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
             # mt_mask_img = ants.image_read(mt_mask_file)
             # wmgmi_mask_img = ants.image_read(wmgmi_mask_file)
 
-            #--- STEP 2: Calculate overlap mask
+            #--- STEP 2: Calculate overlap mask between MT mask and WMGMI from pyAFQ (used to catch endpoint values)
             side = "Left" if hemi == "L" else "Right" 
             afq_path = op.join(pyAFQ_path, f"afq-{side}{tract_name}", participant)
             wmgmi_mask_file = op.join(afq_path, f"{participant}_ses-concat_acq-HCPdir99_desc-wmgmi_mask.nii.gz")
@@ -74,7 +74,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
             ### --- STEP 3: load streamline density map
             # -----------------------------
              #roi_names[h] 
-            density_path = op.join(out_path, f"{participant}_ses-concat_desc-wang{side}{tract_name}_tdi_map.nii.gz")
+            density_path = op.join(out_path, f"{participant}_ses-concat_desc-wang{side}{tract_name}_tdi_map2.nii.gz")
             density_map_img = ants.image_read(density_path)
 
             # -----------------------------
@@ -106,7 +106,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
             # mt_mask_fs.shape
             # outer_vox_fs.shape
             # -----------------------------
-            ### --- STEP 6: Extract intensities from density map ---
+            ### --- STEP 6: Extract MTxWMGMI intensities from density map ---
             # -----------------------------
             # --- Get MTxWMGMI voxel intensities ---
             density = density_fs_img.numpy()
@@ -126,7 +126,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
             # -----------------------------
             # STEP 6: Save as NIfTI (.nii.gz)
             # -----------------------------
-            mt_density_path = op.join(analysis_path, "tdi_maps", "wmgmi_voxels", participant,f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract_name}xWMGMI_density.nii.gz")
+            mt_density_path = op.join(analysis_path, "tdi_maps", "wmgmi_voxels", participant,f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract_name}xWMGMI_density2.nii.gz")
             os.makedirs(op.dirname(mt_density_path), exist_ok=True)
             ants.image_write(out_img, mt_density_path)
 
@@ -159,7 +159,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
 
             ## STEP 7: Perform volume to surface projection of MTxWMGMI ROI density values
             # Output file name
-            out_fsnative_file = os.path.join(out_path, f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract_name}_desc-fsprojdensity{projdist}mm.mgh")
+            out_fsnative_file = os.path.join(out_path, f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract_name}_desc-fsprojdensity{projdist}mm2.mgh")
 
             hemi_fs  = "lh" if hemi == "L" else "rh"
             # Build mri_vol2surf command
@@ -180,7 +180,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
 
             # Resample to fsaverage space
             source_density_file = out_fsnative_file
-            out_fsaverage_file = op.join(out_path, f"{participant}_hemi-{hemi_fs}_space-fsaverage_label-wang{tract_name}_desc-fsprojdensity{projdist}mm.mgh")
+            out_fsaverage_file = op.join(out_path, f"{participant}_hemi-{hemi_fs}_space-fsaverage_label-wang{tract_name}_desc-fsprojdensity{projdist}mm2.mgh")
 
             cmd = ["mri_surf2surf",
             "--srcsubject", participant, 

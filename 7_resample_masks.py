@@ -21,21 +21,23 @@ def main(participants_file, bids_path):
          
         # mask_name = ['lhV1', 'lhPT', 'lhSTS1', 'lhLGN', 'lhPO', 'lhFEF', 'lhPU', 'lhhIP',
         #             'rhV1', 'rhPT', 'rhSTS1', 'rhLGN', 'rhPO', 'rhFEF', 'rhPU', 'rhhIP']
+        mask_name = ['lhPTxSTS1', 'lhLGNxPU',
+                     'rhPTxSTS1', 'rhLGNxPU']
         
-        # for mask in mask_name:
-        #     hemi  = re.sub(".*(lh|rh).*", "\\1", mask)
-        #     hemi  = "L" if hemi == "lh" else "R"
-        #     roi = re.sub(".*(?:lh|rh)(.*)", "\\1", mask)
-        #     input_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_desc-'+roi+'_mask.nii.gz')
-        #     output_file = op.join(bids_path, 'analysis', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_label-'+roi+'_mask.nii.gz')
-        #     resample_file(input_file, target_file, output_file, interpolator = "linear")
+        for mask in mask_name:
+            hemi  = re.sub(".*(lh|rh).*", "\\1", mask)
+            hemi  = "L" if hemi == "lh" else "R"
+            roi = re.sub(".*(?:lh|rh)(.*)", "\\1", mask)
+            input_file = op.join(bids_path, 'analysis', 'ROIs', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_desc-'+roi+'_mask.nii.gz')
+            output_file = op.join(bids_path, 'analysis', 'ROIs', 'julich_space-ACPC_rois', participant, 'ses-concat', 'anat', participant+'_hemi-'+hemi+'_space-ACPC_label-'+roi+'_mask.nii.gz')
+            resample_file(input_file, target_file, output_file, interpolator = "linear")
         
-        func_mask_name = ['MT'] #, 'PT'
-        for mask in func_mask_name:
-            for hemi in ['L', 'R']:
-                input_file = op.join(bids_path, 'analysis', 'wang_space-ACPC_rois', participant, participant+'_hemi-'+hemi+'_space-ACPC_desc-'+mask+'_mask_dilated.nii.gz')
-                output_file = op.join(bids_path, 'analysis', 'wang_space-ACPC_rois', participant, participant+'_hemi-'+hemi+'_space-ACPC_label-'+mask+'_mask_dilated.nii.gz')
-                resample_file(input_file, target_file, output_file, interpolator = "linear")
+        # func_mask_name = ['MT'] #, 'PT'
+        # for mask in func_mask_name:
+        #     for hemi in ['L', 'R']:
+        #         input_file = op.join(bids_path, 'analysis', 'wang_space-ACPC_rois', participant, participant+'_hemi-'+hemi+'_space-ACPC_desc-'+mask+'_mask_dilated.nii.gz')
+        #         output_file = op.join(bids_path, 'analysis', 'wang_space-ACPC_rois', participant, participant+'_hemi-'+hemi+'_space-ACPC_label-'+mask+'_mask_dilated.nii.gz')
+        #         resample_file(input_file, target_file, output_file, interpolator = "linear")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Resample mask to target resolution for a list of participants.")

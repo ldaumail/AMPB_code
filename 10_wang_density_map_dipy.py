@@ -14,18 +14,18 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path):
     '''
     Ex usage: python 10_wang_density_map_dipy.py --participants_file ./utils/study2_subjects_updated.txt --tract_name LeftMTxLGN --bids_path /Use
 rs/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --pyAFQ_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/deriva
-tives/pyAFQ/wmgmi
+tives/pyAFQ/wmgmi_wang
     '''
     for participant in participants_file:
         # participant = 'sub-EBxGxCCx1986'
         # tract_name = 'RightMTmaskxLGN'
         # pyAFQ_path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/pyAFQ/wmgmi/RightMTxLGN'
-        tdi_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant)
+        tdi_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant, 'wang_MT')
         os.makedirs(tdi_path, exist_ok=True)
         
         new_name = tract_name.replace("MT", "MTmask")
         tract_path = os.path.join(pyAFQ_path, f"afq-{tract_name}", participant, 'bundles', participant+'_ses-concat_acq-HCPdir99_desc-' + new_name + '_tractography.trx')
-        tract_tdi_map = os.path.join(tdi_path, participant+'_ses-concat_desc-wang' + tract_name + '_tdi_map.nii.gz')
+        tract_tdi_map = os.path.join(tdi_path, participant+'_ses-concat_desc-wang' + tract_name + '_tdi_map2.nii.gz')
         template = op.join(pyAFQ_path, f"afq-{tract_name}", participant, participant+'_ses-concat_acq-HCPdir99_b0ref.nii.gz')
 
         streamline2dipy_density(tract_path, template, tract_tdi_map)

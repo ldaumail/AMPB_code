@@ -1,54 +1,77 @@
 #!/bin/bash
+
 # Check if input file is provided
 if [ $# -ne 1 ]; then
   echo "Usage: $0 participants.txt"
   exit 1
 fi
 
-# Read participant list file
 PARTICIPANT_FILE=$1
 
-# Define the source and destination directories
-SOURCE_DIR="/Volumes/cos-lab-wpark78/YangYang/analysis"
-DEST_DIR="/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/functional_surf_roi"
+SOURCE_DIR="/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/ROIs/julich_space-ACPC_rois"
+DEST_DIR="/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/ROIs/new_julich_space-ACPC_rois"
 
-# Loop through each participant ID in the text file
-while IFS= read -r participant_id; do
-  # Skip empty lines
-  [ -z "$participant_id" ] && continue
+HEMIS=("L" "R")
+LABELS=("LGNxPU" "PTxSTS1")
 
-  # Define source roi directory
-  SRC_ROI_DIR="$SOURCE_DIR/$participant_id/roi"
+while IFS= read -r participant; do
+  [ -z "$participant" ] && continue
 
-  if [ -d "$SRC_ROI_DIR" ]; then
-    # Make destination directory
-    mkdir -p "$DEST_DIR/$participant_id"
+  SRC_DIR="$SOURCE_DIR/$participant/ses-concat/anat"
+  DST_DIR="$DEST_DIR/$participant"
 
-    # Copy ROI files
-    cp -r "$SRC_ROI_DIR"/* "$DEST_DIR/$participant_id/"
-
-    echo "Copied files for $participant_id"
-  else
-    echo "ROI directory not found for $participant_id"
+  if [ ! -d "$SRC_DIR" ]; then
+    echo "ROI directory not found for $participant"
+    continue
   fi
+
+  mkdir -p "$DST_DIR"
+
+  for hemi in "${HEMIS[@]}"; do
+    for label in "${LABELS[@]}"; do
+      file="${participant}_hemi-${hemi}_space-ACPC_label-${label}_mask.nii.gz"
+
+      if [ -f "$SRC_DIR/$file" ]; then
+        cp "$SRC_DIR/$file" "$DST_DIR/"
+        echo "Copied $file"
+      else
+        echo "Missing $file"
+      fi
+    done
+  done
+
 done < "$PARTICIPANT_FILE"
 
 echo "All done!"
 
-# # Loop through all matching directories in the source directory
-# for dir in "$SOURCE_DIR"/sub-*; do
-#     if [ -d "$dir/roi" ]; then
-#         # Extract the directory name (e.g., sub-EBxGxCCx1986)
-#         subdir_name=$(basename "$dir")
 
-#         # Create the corresponding directory structure in the destination
-#         mkdir -p "$DEST_DIR/$subdir_name"
 
-#         # Copy all files from the roi directory to the new location
-#         cp -r "$dir/roi"/* "$DEST_DIR/$subdir_name/"
 
-#         echo "Copied files from $dir/roi to $DEST_DIR/$subdir_name/"
-#     fi
-# done
+# Define the source and destination directories
+# SOURCE_DIR="/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/ROIs/julich_space-ACPC_rois"
+# DEST_DIR="/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/ROIs/new_julich_space-ACPC_rois"
 
-# echo "All files copied successfully!"
+# Loop through each participant ID in the text file
+# while IFS= read -r participant_id; do
+  # Skip empty lines
+#  [ -z "$participant_id" ] && continue
+
+  # Define source roi directory
+#  SRC_ROI_DIR="$SOURCE_DIR/$participant_id/ses-concat/anat"
+
+#  if [ -d "$SRC_ROI_DIR" ]; then
+    # Make destination directory
+#    mkdir -p "$DEST_DIR/$participant_id"
+
+    # Copy ROI files
+#    cp -r "$SRC_ROI_DIR"/* "$DEST_DIR/$participant_id/"
+
+#    echo "Copied files for $participant_id"
+#  else
+#    echo "ROI directory not found for $participant_id"
+#  fi
+#done < "$PARTICIPANT_FILE"
+
+#echo "All done!"
+
+

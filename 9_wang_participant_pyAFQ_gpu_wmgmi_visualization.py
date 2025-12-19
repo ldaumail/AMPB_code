@@ -15,11 +15,11 @@ participant = 'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990' #'sub-EBxLxTZx1956'
 
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research',
                     'ampb_mt_tractometry_analysis', 'ampb')
-afq_path = op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
+afq_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')##op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
 qsiprep_path = op.join(bids_path, 'derivatives', 'qsiprep', participant)
 
 # Files
-gmwmi_mask_file = op.join(afq_path, 'afq-LeftMTxPU', participant,
+gmwmi_mask_file = op.join(afq_path, 'afq-LeftMTxLGNxPU', participant,
                           f"{participant}_ses-concat_acq-HCPdir99_desc-wmgmi_mask.nii.gz")
 t1w_acpc_file = op.join(qsiprep_path, 'anat',
                         f"{participant}_space-ACPC_desc-preproc_T1w.nii.gz")
@@ -60,10 +60,10 @@ def lines_as_tubes(streamlines, line_width, color):
 #     "RightMTxHIP": (0.5, 0.5, 0.5)
 # }
 tracts = {
-    "afq-LeftMTxPU": (1, 0.2, 0.2),
-    "afq-LeftMTxLGN": (0, 0.8, 0.2),
-    "afq-RightMTxPU": (1, 0.2, 0.2),
-    "afq-RightMTxLGN": (0, 0.8, 0.2),
+    "afq-LeftMTxLGNxPU": (1, 0.2, 0.2),
+    "afq-LeftMTxPTxSTS1": (0, 0.8, 0.2),
+    "afq-RightMTxLGNxPU": (1, 0.2, 0.2),
+    "afq-RightMTxPTxSTS1": (0, 0.8, 0.2),
 }
 # -------------------------------------------------------------------------
 # 5. Load and transform tracts
@@ -109,9 +109,9 @@ def roi_actor(roi_path, color):
 #     "hIP":   ("analysis/julich_space-ACPC_rois", "hIP_mask", (0.5, 0.5, 0.5))
 # } #    "MT":    ("analysis/functional_vol_roi", "MT_mask_dilated", (0, 0, 1)),
 roi_defs = {
-     "MT":    ("analysis/functional_vol_roi", "MT_mask_dilated", (0, 0, 1)),
-    "PU":    ("analysis/julich_space-ACPC_rois", "PU_mask", (0, 0.8, 0.2)),
-    "LGN":   ("analysis/julich_space-ACPC_rois", "LGN_mask", (1, 0, 0)),
+     "MT":    ("analysis/ROIs/wang_space-ACPC_rois", "MT_mask_dilated", (0, 0, 1)),
+    "LGNxPU":    ("analysis/ROIs/julich_space-ACPC_rois", "LGNxPU_mask", (0, 0.8, 0.2)),
+    "PTxSTS1":   ("analysis/ROIs/julich_space-ACPC_rois", "PTxSTS1_mask", (1, 0, 0)),
 }
 roi_actors = []
 
