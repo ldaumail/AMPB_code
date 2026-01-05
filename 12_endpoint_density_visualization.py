@@ -18,10 +18,10 @@ import ants
 # ----------------------------
 # Load data
 # ----------------------------
-tract_name = 'RightMTmaskxSTS1'
-participant = 'sub-EBxGxCCx1986'
+tract_name = 'wangMTxLGNxPU'
+participant = 'sub-NSxGxHKx1965' #'sub-EBxGxCCx1986'
 bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
-proj_density_path = op.join(bids_path, 'analysis', 'tdi_maps','dipy_wmgmi_tdi_maps', participant)
+proj_density_path = op.join(bids_path, 'analysis', 'tdi_maps','dipy_wmgmi_tdi_maps', participant, 'wang_MT')
 analysis_path = op.join(bids_path, 'analysis')
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 
@@ -31,12 +31,12 @@ wm_surf = op.join(fs_path, participant, 'surf', f"{hemi_fs}.inflated")    # Free
 coords, faces = read_geometry(wm_surf)
 
 # Load projected density map (per vertex values)
-output_file = op.join(proj_density_path, f"{participant}_hemi-{hemi}_space-fsnative_label-{tract_name}_desc-fsprojdensity0mm.mgh")
+output_file = op.join(proj_density_path, f"{participant}_hemi-{hemi}_space-fsnative_label-{tract_name}_desc-fsprojdensity0mm2.mgh")
 surf_map = nib.load(output_file).get_fdata().squeeze()
 
 # Load MT label vertices
 label_file = op.join(
-    analysis_path,
+    analysis_path, 'ROIs', 'func_roi',
     'functional_surf_roi',
     participant,
     f"{participant}_hemi-{hemi}_space-fsnative_label-MT_mask.label"
@@ -102,7 +102,7 @@ reg = ants.registration(
 # ----------------------------
 # STEP 2: Load volumetric ROI and resample to fs native space
 # ----------------------------
-roi_path = op.join(analysis_path, 'functional_vol_roi', participant)
+roi_path = op.join(analysis_path, 'ROIs', 'func_roi', 'functional_vol_roi', participant)
 mt_mask_img = ants.image_read(op.join(roi_path, participant+'_hemi-'+hemi+'_space-ACPC_label-MT_mask_dilated.nii.gz'))
 mt_mask = mt_mask_img.numpy()
 #Resample mask into freesurfer native space

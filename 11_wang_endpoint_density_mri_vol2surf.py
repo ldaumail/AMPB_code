@@ -14,7 +14,7 @@ from utils.overlap_masks import overlap_masks
 
 def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
     '''
-        Ex usage: python 11_wang_endpoint_density_mri_vol2surf.py --participants_file ./utils/study2_subjects_updated.txt --tract_name MTxLGN --bids_path /Use
+        Ex usage: python 11_wang_endpoint_density_mri_vol2surf.py --participants_file ./utils/study2_subjects_updated.txt --tract_name MTxLGNxPU --bids_path /Use
     rs/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --pyAFQ_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/deriva
     tives/pyAFQ/wmgmi_wang --projdist 0
     '''

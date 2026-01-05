@@ -7,6 +7,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from scipy.stats import pearsonr
+import random
 import nibabel as nib
 import os
 import os.path as op
@@ -23,7 +24,7 @@ func_dir = op.join(bids_path, 'analysis', 'fMRI_data')
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
-tract_order = ['MTxLGN',  'MTxSTS1'] #'MTxPT', 'MTxPU' 'MTxFEF','MTxhIP','MTxV1'
+tract_order = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] #'MTxPT', 'MTxPU' 'MTxFEF','MTxhIP','MTxV1'
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
 
@@ -48,7 +49,7 @@ for participant in participants:
         for tract in tract_order:
             
             # Find file matching this tract and hemisphere
-            matches = [f for f in os.listdir(subj_dir) if f"wang{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith("fsprojdensity0mm.mgh")]
+            matches = [f for f in os.listdir(subj_dir) if f"wang{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith("fsprojdensity0mm2.mgh")]
 
             if not matches:
                 print(f"   ⚠️ Missing: {tract} ({hemi}) for {participant}")
@@ -146,10 +147,11 @@ contrast = contrast_order[0]   # e.g. "motionXstationary"
 
 # get n_subj, n_tracts
 n_subj, n_tracts, _  = density_data["L"].shape
-rs   = np.full((6, n_subj, len(hemis)), np.nan)
-mses = np.full((6, n_subj, len(hemis)), np.nan)
+rs   = np.full((3, n_subj, len(hemis)), np.nan)
+mses = np.full((3, n_subj, len(hemis)), np.nan)
 r_all = np.full(( n_subj, len(hemis)), np.nan)
-trained_coefs = np.zeros((6, n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
+rnd_run_idx = np.full((n_subj, 3), np.nan)
+trained_coefs = np.zeros((3, n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
 for h, hemi in enumerate(hemis):
 
     _, _, n_vertices  = density_data[hemi].shape
@@ -172,13 +174,13 @@ for h, hemi in enumerate(hemis):
     n_masked = densities_masked.shape[2]
 
     # Predicted and coef storage
-    predicted = np.full((n_subj, 6, n_masked), np.nan)  # predicted maps per run
+    predicted = np.full((n_subj, 3, n_masked), np.nan)  # predicted maps per run
     
 
     # -------------------------
     # main loop: subject -> tract -> run-LOOCV
     # -------------------------
-    for s in range(n_subj):
+    for s, participant in enumerate(participants):
 
         # get this subject's run maps for the chosen contrast
         subj_dict = subj_contrasts[s]
@@ -186,7 +188,13 @@ for h, hemi in enumerate(hemis):
             print(f"Subject {s} missing contrast {contrast} for hemi {hemi}, skipping")
             continue
 
-        C_full = subj_dict[contrast]              # (n_runs, n_vertices_fullspace)
+        if "NS" in participant:
+            C_full = subj_dict[contrast]              # (n_runs, n_vertices_fullspace)
+            rnd_run_idx[s,:] = [0, 1, 2]
+        elif "EB" in participant: #need to randomize across runs selected for EB as they have 6 runs, and NS only has 3 runs
+            r_idx = random.sample(range(6), 3)
+            rnd_run_idx[s,:] = np.array(r_idx, dtype=int)
+            C_full = subj_dict[contrast][r_idx,:]   
         # mask ROI
         C = np.squeeze(C_full[:, wang_hmt_vertices] )         # (n_runs, n_masked)
         #zscore the runs for a given participant
@@ -251,8 +259,10 @@ for h, hemi in enumerate(hemis):
         #------------------
         #Performance metrics
         #------------------
+        #overall correlation across all runs (concatenated)
         r_all[s, h], _ = pearsonr(C.reshape(-1), predicted[s, :n_runs, :].reshape(-1))
 
+        #Calculate correlation for a given run
         for r in range(n_runs):
 
             y_true = C[r, :].reshape(-1)
@@ -475,7 +485,7 @@ plt.tight_layout()
 # Saving
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "pearson_mean_linreg_loro_combined_tracts_LGN-STS1.png"), dpi=300, bbox_inches='tight')
+# plt.savefig(op.join(saveDir, "pearson_mean_linreg_loro_combined_tracts_LGN-STS1.png"), dpi=300, bbox_inches='tight')
 
 plt.show()
 

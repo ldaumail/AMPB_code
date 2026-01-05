@@ -23,7 +23,7 @@ with open(subjects_file, 'r') as f:
 print(f"Loaded {len(participants)} participants:")
 print(participants)
 
-tract_list = ['MTxLGN', 'MTxPT', 'MTxSTS1', 'MTxPU', 'MTxFEF', 'MTxhIP', 'MTxV1'] # , 'MTxV1'
+tract_list = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] # 
 hemispheres = ['L', 'R']
 
 # ==== RESULTS STORAGE ====
@@ -36,14 +36,14 @@ for participant in participants:
         hemi_fs = 'lh' if hemi == 'L' else 'rh'
 
         # Load MT ROI vertices
-        label_file = op.join(analysis_path, 'functional_surf_roi', participant, f"{participant}_hemi-{hemi}_space-fsnative_label-MT_mask.label")
+        label_file = op.join(analysis_path, 'ROIs', 'func_roi','functional_surf_roi', participant, f"{participant}_hemi-{hemi}_space-fsnative_label-MT_mask.label")
         label_vertices = read_label(label_file)
 
         # Loop over tracts
         for tract in tract_list:
 
             density_map_file = op.join(proj_density_path,participant, 'wang_MT',
-                f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract}_desc-fsprojdensity0mm.mgh")
+                f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract}_desc-fsprojdensity0mm2.mgh")
 
             density_map = nib.load(density_map_file).get_fdata().squeeze()
 

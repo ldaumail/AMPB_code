@@ -3,7 +3,7 @@
 #Trains a linear regression to predict functional activation based on tract end point densitiess
 
 import numpy as np
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import RidgeCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from scipy.stats import pearsonr
@@ -139,7 +139,8 @@ for participant in participants:
 #---------------------------
 ## Fit linear model to data
 #---------------------------
-
+alphas = np.logspace(-4, 4, 25)      # Ridge alpha grid (adjust if needed)
+inner_cv = 5                         # internal CV to choose alpha (could use LeaveOneOut if many subjects)
 verbose = True
 
 hemis = ["L", "R"]
@@ -220,14 +221,6 @@ for h, hemi in enumerate(hemis):
             #Zscore the density data of the tract of this participant
             zscored_densities = (densities_masked[s, tract_idx, :] - np.mean(densities_masked[s, tract_idx, :]))/np.std(densities_masked[s, tract_idx, :])
 
-            # NOTE: anat_vec does NOT vary by run. We nonetheless use different runs as different samples
-            # for multi-output regression (X rows repeated). This may be ill-conditioned if n_runs is small.
-                    # Determine allowed runs based on group
-            # if "NS" in participant:        # NS → only 3 runs
-            #     valid_runs = range(3)      # 0,1,2
-            # else:                          # EB → all 6 runs
-            #     valid_runs = range(6)
-            # n_runs = len(valid_runs)
             for test_idx in range(n_runs):
 
                 if verbose:
@@ -243,14 +236,16 @@ for h, hemi in enumerate(hemis):
 
 
                 # Train linear model (multi-output regression)
-                linreg = LinearRegression()
-                linreg.fit(X_train, y_train)
+                # linreg = LinearRegression()
+                # linreg.fit(X_train, y_train)
+                ridge = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error", cv=inner_cv)
+                ridge.fit(X_train, y_train)
 
-                trained_coefs[test_idx, tract_idx, s, h] = linreg.coef_[0].item()
-                # linreg.intercept_
+                trained_coefs[test_idx, tract_idx, s, h] = ridge.coef_.copy()
+
 
                 X_test = zscored_densities.reshape(-1, 1)
-                y_pred_std = linreg.predict(X_test)
+                y_pred_std = ridge.predict(X_test)
                 y_pred = (y_pred_std*np.std(C[test_idx,:]) + np.mean(C[test_idx,:])).ravel()
 
                 predicted[s, tract_idx, test_idx, :] = y_pred
@@ -451,7 +446,7 @@ for h in range(n_hemi):
                 "Subject": s,
                 "Hemisphere": hemi_labels[h],
                 "Group": gp,    # EB or NS
-                "Correlation": r_all[s, t, h] #np.nanmean(pearsons) #
+                "Correlation": np.nanmean(pearsons) ##r_all[s, t, h] #
             })
 
 df_pearson = pd.DataFrame(rows)
@@ -533,7 +528,7 @@ plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
 
-plt.savefig(op.join(saveDir, "pearsonr_linearcv_loro_jitter_wang_new.png"),
+plt.savefig(op.join(saveDir, "runmean_pearsonr_ridgecv_loro_jitter_wang_indep_new.png"),
             dpi=300, bbox_inches='tight')
 plt.show()
 
@@ -650,6 +645,6 @@ plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
 
-plt.savefig(op.join(saveDir, "betas_linearcv_loro_jitter_wang_new.png"),
+plt.savefig(op.join(saveDir, "indep_betas_ridgecv_loro_jitter_wang_new.png"),
             dpi=300, bbox_inches='tight')
 plt.show()

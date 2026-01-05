@@ -1,4 +1,4 @@
-#Resample Wang MT from MNI to fsaverage space
+#Resample Wang MT from volume MNI to surface fsaverage space
 #Loic Daumail 
 #11/12/2025
 import os
