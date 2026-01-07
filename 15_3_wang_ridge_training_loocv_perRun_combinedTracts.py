@@ -154,7 +154,10 @@ r_all = np.full(( n_subj, len(hemis)), np.nan)
 rnd_run_idx = np.full((n_subj, 3), np.nan)
 trained_coefs = np.zeros((3, n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
 for h, hemi in enumerate(hemis):
-
+        #h = 0
+        #hemi = "L"
+        #s = 0
+        #'sub-EBxGxCCx1986'
     _, _, n_vertices  = density_data[hemi].shape
     densities = density_data[hemi]        # (subj, tract, vertices)
     subj_contrasts = contrast_data[hemi]  # list: one dict per participant
@@ -232,13 +235,46 @@ for h, hemi in enumerate(hemis):
             if len(train_idx) < 1:
                 # cannot train with zero samples -> skip
                 continue
-            X_train = np.vstack([zscored_densities for _r in train_idx]).reshape(len(train_idx)*n_masked, n_tracts) # (n_train*n_masked, n_tracts)
+            X_train = np.vstack([zscored_densities for _r in train_idx]).reshape(n_tracts, len(train_idx), n_masked).transpose(1,2,0) #.reshape(len(train_idx)*n_masked, n_tracts) # (n_train*n_masked, n_tracts)
+            X_train = X_train.reshape(len(train_idx)*n_masked, n_tracts)
             y_train = np.squeeze(zscored_C[train_idx, :]).reshape(-1, 1)  # (n_train*n_masked,)
-
+            
+            # Save X_train maps
+            # ref_img_for_save = nib.load(wang_hmt_path)
+            # ref_affine = ref_img_for_save.affine
+            # ref_header = ref_img_for_save.header
+            # map_dir = op.join(bids_path, 'analysis', 'example_maps', 'density_maps', participant)
+            # os.makedirs(map_dir, exist_ok=True)
+            # dens_maps_all = np.vstack([zscored_densities for _r in train_idx]).reshape(n_tracts, len(train_idx), n_masked).transpose(2, 0, 1)
+            # idx = 0
+            # for tr in range(len(train_idx)):
+            #     for t, tract in enumerate(tract_order):
+            #         dens_map = dens_maps_all[:,t, tr] #dens_maps_all[idx, :]
+            #         idx += 1 #
+            #         dens_full = np.full((n_vertices), np.nan)
+            #         dens_full[wang_hmt_vertices] = dens_map
+            #         dens_map = dens_full.reshape((1, 1, n_vertices)).astype(np.float32)
+            #         dens_out = op.join(map_dir, f"{participant}_hemi-{hemi}_label-{tract}_trrun-{tr+1}_desc-training_density.mgz")
+            #         nib.save(nib.MGHImage(dens_map, ref_affine, ref_header), dens_out)
+            # Save y_train maps
+            # ref_img_for_save = nib.load(wang_hmt_path)
+            # ref_affine = ref_img_for_save.affine
+            # ref_header = ref_img_for_save.header
+            # map_dir = op.join(bids_path, 'analysis', 'example_maps', 'beta_maps', participant)
+            # os.makedirs(map_dir, exist_ok=True)
+            # beta_maps_all = np.squeeze(zscored_C[train_idx, :]).transpose(1,0)
+            # idx = 0
+            # for tr in range(len(train_idx)):
+            #     dens_map = beta_maps_all[:, tr] #dens_maps_all[idx, :]
+            #     idx += 1 #
+            #     dens_full = np.full((n_vertices), np.nan)
+            #     dens_full[wang_hmt_vertices] = dens_map
+            #     dens_map = dens_full.reshape((1, 1, n_vertices)).astype(np.float32)
+            #     dens_out = op.join(map_dir, f"{participant}_hemi-{hemi}_trrun-{tr+1}_desc-training_beta.mgz")
+            #     nib.save(nib.MGHImage(dens_map, ref_affine, ref_header), dens_out)
+ 
 
             # Train linear model (multi-output regression)
-            # linreg = LinearRegression()
-            # linreg.fit(X_train, y_train)
             ridge = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error", cv=inner_cv)
             ridge.fit(X_train, y_train)
 
@@ -249,7 +285,7 @@ for h, hemi in enumerate(hemis):
             y_pred_std = ridge.predict(X_test)
             y_pred = (y_pred_std*np.std(C[test_idx,:]) + np.mean(C[test_idx,:])).ravel()
 
-            predicted[s, test_idx, :] = y_pred
+            predicted[s, test_idx, :] = y_pred_std
 
 
             # Evaluate this test_run if verbose
@@ -292,15 +328,15 @@ for h, hemi in enumerate(hemis):
 # Save predicted maps 
 # ----------------------------------------------------------
 # ----------------------------------------------------------
-# Save predicted maps (all 6 runs, with NaN-check)
+# Save predicted maps (all 3 runs, with NaN-check)
 # ----------------------------------------------------------
 
-N_RUNS_SAVED = 6
+N_RUNS_SAVED = 3
 
-predicted_full = np.full((n_subj, n_tracts, N_RUNS_SAVED, n_vertices), np.nan)
-predicted_full[:, :, :, wang_hmt_vertices] = predicted
+predicted_full = np.full((n_subj, N_RUNS_SAVED, n_vertices), np.nan)
+predicted_full[:, :, wang_hmt_vertices] = predicted
 
-out_dir = op.join(bids_path, 'analysis', 'diff2func_model_fits', 'linearcv_loro_predicted_maps')
+out_dir = op.join(bids_path, 'analysis', 'example_maps', 'predicted_beta_maps')
 os.makedirs(out_dir, exist_ok=True)
 
 ref_img_for_save = nib.load(wang_hmt_path)
@@ -323,23 +359,21 @@ for s in range(n_subj):
     # -----------------------------------------------------
     # Save predicted map for each tract and each run
     # -----------------------------------------------------
-    for t, tract in enumerate(tract_order):
+    for r in range(N_RUNS_SAVED):
 
-        for r in range(N_RUNS_SAVED):
+        pred_map = predicted_full[s, r, :]      # (n_vertices,)
+        pred_map = pred_map.reshape((1, 1, n_vertices)).astype(np.float32)
 
-            pred_map = predicted_full[s, t, r, :]      # (n_vertices,)
-            pred_map = pred_map.reshape((1, 1, n_vertices)).astype(np.float32)
+        # --- NEW CHECK: skip run if map is empty ---
+        if np.isnan(pred_map).all():
+            continue
 
-            # --- NEW CHECK: skip run if map is empty ---
-            if np.isnan(pred_map).all():
-                continue
+        pred_out = op.join(
+            subj_dir,
+            f"{participant}_hemi-{hemi}_run-{r+1}_desc-predicted_contrast.mgz"
+        )
 
-            pred_out = op.join(
-                subj_dir,
-                f"{participant}_hemi-{hemi}_label-{tract}_run-{r+1}_desc-predicted_contrast.mgz"
-            )
-
-            nib.save(nib.MGHImage(pred_map, ref_affine, ref_header), pred_out)
+        nib.save(nib.MGHImage(pred_map, ref_affine, ref_header), pred_out)
 
 print(f"Saved predicted maps to: {out_dir}")
 
@@ -412,7 +446,7 @@ for h in range(2):     # left/right hemispheres
             "Subject": s,
             "Hemisphere": hemi_labels[h],
             "Group": gp,
-            "Correlation": r_all[s, h] #pearson.mean() #
+            "Correlation": pearson.mean() #r_all[s, h] #
         })
 
 df = pd.DataFrame(rows)
@@ -480,7 +514,7 @@ for ax, hemi in zip(axes, hemi_labels):
     ax.axhline(0, color='gray', linestyle='--', linewidth=1)
     ax.set_xticklabels(["EB", "NS"], fontsize=13)
 
-axes[0].set_ylabel("Concat Pearson's r", fontsize=14)
+axes[0].set_ylabel("Mean Pearson's r", fontsize=14)
 # axes[1].get_legend().remove()   # remove duplicated legend
 sns.despine()
 plt.tight_layout()
@@ -488,7 +522,7 @@ plt.tight_layout()
 # Saving
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "pearson_concat_ridgereg_loro_combined_tracts_new.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "pearson_mean_ridgereg_loro_combined_tracts_new.png"), dpi=300, bbox_inches='tight')
 
 plt.show()
 
