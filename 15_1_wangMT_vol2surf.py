@@ -5,6 +5,10 @@ import os
 import os.path as op
 import ants
 import subprocess
+import sys
+current_dir = op.dirname(op.abspath(__file__))
+sys.path.append(current_dir)
+from utils.dilate_mask import dilate_mask
 
 mni_wang_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases','Wang_2015')
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
@@ -35,11 +39,16 @@ for h, hemi in enumerate(hemisphere):
     out_path = op.join(mni_wang_path, 'hmtplus')
     os.makedirs(out_path, exist_ok=True)
     wang_mask_img = ants.from_numpy(union_img, origin=mni_mt_img.origin, spacing=mni_mt_img.spacing, direction=mni_mt_img.direction)
-    # # save transformed mask
+    # # save transformed volume mask
     vol_hMT_file = op.join(out_path, f"hemi-{hemi}_space-mni_label-hMT_desc-wangvol.nii.gz")
     ants.image_write(wang_mask_img, vol_hMT_file)
 
+    #Save a dilated version as well
+    ##Dilate and save
+    vol_hMT_file_dilated = op.join(out_path, f"hemi-{hemi}_space-mni_label-hMT_desc-wangvol_dilated.nii.gz")
+    dilate_mask(vol_hMT_file, vol_hMT_file_dilated, dilate = 2)
 
+    #Project volume mask onto surface
     out_fsaverage_file = op.join(out_path, f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang.mgh")
 
     hemi_fs  = "lh" if hemi == "L" else "rh"
@@ -59,6 +68,24 @@ for h, hemi in enumerate(hemisphere):
     print("Running:", " ".join(cmd))
     subprocess.run(cmd, check=True, env={**os.environ, "SUBJECTS_DIR": fs_path})
 
+    out_dilated_file = op.join(out_path, f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh")
+
+    hemi_fs  = "lh" if hemi == "L" else "rh"
+    # Build mri_vol2surf command
+    cmd = [
+        "mri_vol2surf",
+        "--mov", vol_hMT_file_dilated,
+        "--regheader", 'fsaverage',
+        "--hemi", hemi_fs,
+        "--surf", "white",
+        "--projdist", "0",
+        "--sd", fs_path,
+        "--out", out_dilated_file
+    ] #"--projfrac", "-0.3",  "--regheader", participant
+
+    # Run the command
+    print("Running:", " ".join(cmd))
+    subprocess.run(cmd, check=True, env={**os.environ, "SUBJECTS_DIR": fs_path})
     # # Resample to fsaverage space
     # source_mt_file = out_mni_file
     # out_fsaverage_file = op.join(out_path, f"hemi-{hemi_fs}_space-fsaverage_label-MT_desc-wang.mgh")

@@ -167,7 +167,7 @@ for h, hemi in enumerate(hemis):
     # ----------------------------
     wang_hmt_path = op.join(
         '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
-        f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang.mgh"
+        f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
     )
     surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
     wang_hmt_vertices = np.where(surf_roi > 0)[0]
