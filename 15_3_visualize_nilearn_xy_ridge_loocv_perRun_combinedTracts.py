@@ -1,4 +1,5 @@
 from nilearn import plotting, surface
+from nibabel.freesurfer import read_geometry, read_label
 import numpy as np
 import nibabel as nib
 import os
@@ -164,7 +165,7 @@ for h, hemi in enumerate(hemis):
     subj_contrasts = contrast_data[hemi]  # list: one dict per participant
 
     # ----------------------------
-    # Load MT ROI !!! Change needed: Need to dilate it 2 times !!!
+    # Load MT ROI 
     # ----------------------------
     wang_hmt_path = op.join(
         '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
@@ -188,13 +189,6 @@ for h, hemi in enumerate(hemis):
         # get this subject's run maps for the chosen contrast
         subj_dict = subj_contrasts[s]
 
-        # if "NS" in participant:
-        #     C_full = subj_dict[contrast]              # (n_runs, n_vertices_fullspace)
-        #     rnd_run_idx[s,:] = [0, 1, 2]
-        # elif "EB" in participant: #need to randomize across runs selected for EB as they have 6 runs, and NS only has 3 runs
-        #     r_idx = random.sample(range(6), 3)
-        #     rnd_run_idx[s,:] = np.array(r_idx, dtype=int)
-        #     C_full = subj_dict[contrast][r_idx,:]   
         C_full = subj_dict[contrast]
         # mask ROI
         C = np.squeeze(C_full[:, wang_hmt_vertices] )         # (n_runs, n_masked)
@@ -224,7 +218,24 @@ for h, hemi in enumerate(hemis):
         y_train = np.squeeze(zscored_C).reshape(-1, 1)  # (n_train*n_masked,)
         
 
-        #Contrast Map visualization
+        # ----------------------------
+        # Functional MT ROI (binary surface map)
+        # ----------------------------
+        label_file = op.join(
+            bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi',
+            participant,
+            f"{participant}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
+        )
+
+        func_mt_vertices = read_label(label_file)
+
+        func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
+        func_mt_roi[func_mt_vertices] = 1
+
+
+        # ----------------------------
+        # Functional Contrast Map visualization
+        # ----------------------------
         img_out_dir = op.join(bids_path, "analysis", "surface_pngs", participant)
         os.makedirs(img_out_dir, exist_ok=True)
 
@@ -238,10 +249,10 @@ for h, hemi in enumerate(hemis):
 
             out_png = op.join(
                 img_out_dir,
-                f"{participant}_hemi-{hemi}_run-{run_idx+1}_inflated.png"
+                f"{participant}_hemi-{hemi}_run-{run_idx+1}_desc-motionXstationary_inflated.png"
             )
 
-            plotting.plot_surf_stat_map(
+            display = plotting.plot_surf_stat_map(
                 surf_mesh=infl_surf,
                 stat_map=surf_map,
                 hemi="left" if hemi == "L" else "right",
@@ -252,7 +263,60 @@ for h, hemi in enumerate(hemis):
                 vmax=vmax,
                 bg_map=None,
                 threshold=None,
-                output_file=out_png
+            )
+            # ---- MT boundary overlay ----
+            plotting.plot_surf_contours(
+                surf_mesh=infl_surf,
+                roi_map=func_mt_roi,
+                levels=[1],
+                colors=["green"],
+                linewidths=2.0,
+                figure=display.figure,
+                axes=display.axes[0]
+            )
+            # ---- save + close ----
+            display.savefig(out_png, dpi=300)
+            plt.close(display.figure)
+
+        # ----------------------------
+        # Density Map visualization
+        # ----------------------------
+        img_out_dir = op.join(bids_path, "analysis", "surface_pngs", participant)
+        os.makedirs(img_out_dir, exist_ok=True)
+        for tract_idx in range(n_tracts):
+            # X_train_full = np.full((n_vertices), np.nan)
+            # X_train_full[wang_hmt_vertices] = X_train[:,tract_idx]
+            # full surface vector
+            surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
+            surf_map[wang_hmt_vertices] =  X_train[:,tract_idx]
+
+            out_png = op.join(
+                img_out_dir,
+                f"{participant}_hemi-{hemi}_tract-{tract_order[tract_idx]}_desc-density_inflated.png"
             )
 
-            plt.close("all")
+            display = plotting.plot_surf_stat_map(
+                surf_mesh=infl_surf,
+                stat_map=surf_map,
+                hemi="left" if hemi == "L" else "right",
+                view="lateral",
+                cmap="plasma",
+                colorbar=True,
+                vmin=vmin,
+                vmax=vmax,
+                bg_map=None,
+                threshold=None,
+            )
+            # ---- MT boundary overlay ----
+            plotting.plot_surf_contours(
+                surf_mesh=infl_surf,
+                roi_map=func_mt_roi,
+                levels=[1],
+                colors=["green"],
+                linewidths=2.0,
+                figure=display.figure,
+                axes=display.axes[0]
+            )
+            # ---- save + close ----
+            display.savefig(out_png, dpi=300)
+            plt.close(display.figure)
