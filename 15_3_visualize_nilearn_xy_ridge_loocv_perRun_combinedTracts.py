@@ -232,6 +232,17 @@ for h, hemi in enumerate(hemis):
         func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
         func_mt_roi[func_mt_vertices] = 1
 
+        # ----------------------------
+        # Load curvature map (sulci/gyri)
+        # ----------------------------
+        curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
+        curv = nib.freesurfer.read_morph_data(curv_file)
+
+        # normalize curvature for nicer background display
+        curv_norm = (curv - np.percentile(curv, 5)) / (
+            np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
+        )
+        curv_norm = np.clip(curv_norm, 0, 1)
 
         # ----------------------------
         # Functional Contrast Map visualization
@@ -240,43 +251,94 @@ for h, hemi in enumerate(hemis):
         os.makedirs(img_out_dir, exist_ok=True)
 
         vmin, vmax = -5.0, 5.0
+        # -------------------------------------------------
+        # Compute average functional map across runs FIRST
+        # -------------------------------------------------
 
-        for run_idx in range(zscored_C.shape[0]):
+        # Average only within the Wang HMT vertices
+        mean_vals = np.nanmean(zscored_C, axis=0)
 
-            # full surface vector
-            surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
-            surf_map[wang_hmt_vertices] = zscored_C[run_idx, :]
+        # Build full-surface vector once
+        surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
+        surf_map[wang_hmt_vertices] = mean_vals
 
-            out_png = op.join(
-                img_out_dir,
-                f"{participant}_hemi-{hemi}_run-{run_idx+1}_desc-motionXstationary_inflated.png"
-            )
+        # Output filename (no run index)
+        out_png = op.join(
+            img_out_dir,
+            f"{participant}_hemi-{hemi}_desc-motionXstationary_mean_inflated.png"
+        )
 
-            display = plotting.plot_surf_stat_map(
-                surf_mesh=infl_surf,
-                stat_map=surf_map,
-                hemi="left" if hemi == "L" else "right",
-                view="lateral",
-                cmap="plasma",
-                colorbar=True,
-                vmin=vmin,
-                vmax=vmax,
-                bg_map=None,
-                threshold=None,
-            )
-            # ---- MT boundary overlay ----
-            plotting.plot_surf_contours(
-                surf_mesh=infl_surf,
-                roi_map=func_mt_roi,
-                levels=[1],
-                colors=["green"],
-                linewidths=2.0,
-                figure=display.figure,
-                axes=display.axes[0]
-            )
-            # ---- save + close ----
-            display.savefig(out_png, dpi=300)
-            plt.close(display.figure)
+        # -------------------------------------------------
+        # Plot only once
+        # -------------------------------------------------
+
+        display = plotting.plot_surf_stat_map(
+            surf_mesh=infl_surf,
+            stat_map=surf_map,
+            hemi="left" if hemi == "L" else "right",
+            view="lateral",
+            cmap="plasma",
+            colorbar=True,
+            vmin=vmin,
+            vmax=vmax,
+            threshold=None,
+            bg_map=curv_norm,
+            bg_on_data=True,
+            darkness=0.6,
+        )
+
+        # ---- MT boundary overlay ----
+        plotting.plot_surf_contours(
+            surf_mesh=infl_surf,
+            roi_map=func_mt_roi,
+            levels=[1],
+            colors=["lightgray"],
+            linewidths=2.0,
+            figure=display.figure,
+            axes=display.axes[0]
+        )
+
+        # ---- save + close ----
+        display.savefig(out_png, dpi=300)
+        plt.close(display.figure)
+        # for run_idx in range(zscored_C.shape[0]):
+
+        #     # full surface vector
+        #     surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
+        #     surf_map[wang_hmt_vertices] = zscored_C[run_idx, :]
+
+        #     out_png = op.join(
+        #         img_out_dir,
+        #         f"{participant}_hemi-{hemi}_run-{run_idx+1}_desc-motionXstationary_inflated.png"
+        #     )
+
+        #     display = plotting.plot_surf_stat_map(
+        #         surf_mesh=infl_surf,
+        #         stat_map=surf_map,
+        #         hemi="left" if hemi == "L" else "right",
+        #         view="lateral",
+        #         cmap="plasma",
+        #         colorbar=True,
+        #         vmin=vmin,
+        #         vmax=vmax,
+        #         threshold=None,
+        #         bg_map=curv_norm,
+        #         bg_on_data=True,          # blend curvature with stat map
+        #         darkness=0.6,             # how strong the background is
+        #     )
+        #     # ---- MT boundary overlay ----
+        #     plotting.plot_surf_contours(
+        #         surf_mesh=infl_surf,
+        #         roi_map=func_mt_roi,
+        #         levels=[1],
+        #         colors=["lightgray"],
+        #         linewidths=2.0,
+        #         figure=display.figure,
+        #         axes=display.axes[0]
+        #     )
+        #     # ---- save + close ----
+        #     display.savefig(out_png, dpi=300)
+        #     plt.close(display.figure)
 
         # ----------------------------
         # Density Map visualization
@@ -304,15 +366,17 @@ for h, hemi in enumerate(hemis):
                 colorbar=True,
                 vmin=vmin,
                 vmax=vmax,
-                bg_map=None,
                 threshold=None,
+                bg_map=curv_norm,
+                bg_on_data=True,          # blend curvature with stat map
+                darkness=0.6,             # how strong the background is
             )
             # ---- MT boundary overlay ----
             plotting.plot_surf_contours(
                 surf_mesh=infl_surf,
                 roi_map=func_mt_roi,
                 levels=[1],
-                colors=["green"],
+                colors=["lightgray"],
                 linewidths=2.0,
                 figure=display.figure,
                 axes=display.axes[0]
