@@ -11,6 +11,9 @@ import random
 import nibabel as nib
 import os
 import os.path as op
+from nibabel.freesurfer import read_label
+from nilearn import plotting
+import matplotlib.pyplot as plt
 
 # ----------------------------
 # Inputs preparation
@@ -19,6 +22,7 @@ import os.path as op
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
 density_dir = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps')
 func_dir = op.join(bids_path, 'analysis', 'fMRI_data')
+fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 # -----------------------
 #1 Generate endpoint densities array
 #-------------------------
@@ -465,6 +469,110 @@ for h, hemi in enumerate(hemis):
             darkness=0.6,
         )
 
+        # ---- MT boundary overlay ----
+        plotting.plot_surf_contours(
+            surf_mesh=infl_surf,
+            roi_map=func_mt_roi,
+            levels=[1],
+            colors=["lightgray"],
+            linewidths=2.0,
+            figure=display.figure,
+            axes=display.axes[0]
+        )
+
+        # ---- save + close ----
+        display.savefig(out_png, dpi=300)
+        plt.close(display.figure)
+
+#--------------------------------------------------------------
+#----------------------------------------------
+# Plot average predicted contrast map across participants
+#----------------------------------------------
+
+hemis = ["L", "R"]
+groups = ["EB", "NS"]
+for h, hemi in enumerate(hemis):
+    for g, group in enumerate(groups):
+        infl_surf = op.join(fs_path, "fsaverage", "surf", f"{'lh' if hemi == 'L' else 'rh'}.inflated")
+        _, _, n_vertices  = density_data[hemi].shape
+        #-----------------------------
+        # Load func MT ROI
+        #-----------------------------
+        label_file = op.join(
+            bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi',
+            'group_averages',
+            f"group-{group}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
+        )
+
+        func_mt_vertices = read_label(label_file)
+
+        func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
+        func_mt_roi[func_mt_vertices] = 1
+        # ----------------------------
+        # Load Wang MT ROI 
+        # ----------------------------
+        wang_hmt_path = op.join(
+            '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
+            f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+        )
+        surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+        wang_hmt_vertices = np.where(surf_roi > 0)[0]
+        print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
+        # ----------------------------
+        # Load curvature map (sulci/gyri)
+        # ----------------------------
+        hemi_fs = "lh" if hemi == "L" else "rh"
+        curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
+        curv = nib.freesurfer.read_morph_data(curv_file)
+
+        # normalize curvature for nicer background display
+        curv_norm = (curv - np.percentile(curv, 5)) / (
+            np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
+        )
+        curv_norm = np.clip(curv_norm, 0, 1)
+
+        # ----------------------------
+        # Functional Contrast Map visualization
+        # ----------------------------
+        img_out_dir = op.join(bids_path, "analysis", "surface_pngs", "mean")
+        os.makedirs(img_out_dir, exist_ok=True)
+
+        vmin, vmax = -.5, 0.5
+        # -------------------------------------------------
+        # Compute average functional map across runs FIRST
+        # -------------------------------------------------
+        hemi_maps = predicted_maps[hemi]
+        sub_mean_maps = np.nanmean(hemi_maps[[group in p for p in participants],:,:], axis = 1)
+        mean_vals = np.nanmean(sub_mean_maps, axis=0)
+
+        # Build full-surface vector once
+        surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
+        surf_map[wang_hmt_vertices] = mean_vals
+
+        # Output filename (no run index)
+        out_png = op.join(
+            img_out_dir,
+            f"{group}-mean_hemi-{hemi}_desc-pred-motionXstationary_mean_inflated.png"
+        )
+
+        # -------------------------------------------------
+        # Plot average participant map
+        # -------------------------------------------------
+
+        display = plotting.plot_surf_stat_map(
+            surf_mesh=infl_surf,
+            stat_map=surf_map,
+            hemi="left" if hemi == "L" else "right",
+            view="lateral",
+            cmap="plasma",
+            colorbar=True,
+            vmin=vmin,
+            vmax=vmax,
+            threshold=None,
+            bg_map=curv_norm,
+            bg_on_data=True,
+            darkness=0.6,
+        )
         # ---- MT boundary overlay ----
         plotting.plot_surf_contours(
             surf_mesh=infl_surf,
