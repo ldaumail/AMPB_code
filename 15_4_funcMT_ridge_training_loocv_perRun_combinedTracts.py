@@ -3,8 +3,9 @@
 #Trains a linear regression to predict functional activation based on tract end point densitiess
 
 import numpy as np
+from nibabel.freesurfer import read_label
 from sklearn.linear_model import RidgeCV
-from sklearn.preprocessing import StandardScaler
+# from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from scipy.stats import pearsonr
 import random
@@ -154,6 +155,7 @@ r_all = np.full(( n_subj, len(hemis)), np.nan)
 rnd_run_idx = np.full((n_subj, 3), np.nan)
 trained_coefs = np.zeros((3, n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
 predicted_maps = {hemi: [] for hemi in hemis}
+
 for h, hemi in enumerate(hemis):
         #h = 0
         #hemi = "L"
@@ -163,29 +165,28 @@ for h, hemi in enumerate(hemis):
     densities = density_data[hemi]        # (subj, tract, vertices)
     subj_contrasts = contrast_data[hemi]  # list: one dict per participant
 
-    # ----------------------------
-    # Load MT ROI
-    # ----------------------------
-    wang_hmt_path = op.join(
-        '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
-        f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
-    )
-    surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
-    wang_hmt_vertices = np.where(surf_roi > 0)[0]
-    print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
-
-    # Masking densities (subj, tract, masked_vertices)
-    densities_masked = densities[:, :, wang_hmt_vertices]
-    n_masked = densities_masked.shape[2]
-
     # Predicted and coef storage
-    predicted = np.full((n_subj, 3, n_masked), np.nan)  # predicted maps per run
+    predicted = {participant: [] for participant in participants} #np.full((n_subj, 3, n_masked), np.nan)  # predicted maps per run
     
 
     # -------------------------
     # main loop: subject -> tract -> run-LOOCV
     # -------------------------
     for s, participant in enumerate(participants):
+
+        # ----------------------------
+        # Load func MT ROI
+        # ----------------------------
+
+        label_file = op.join( bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi', participant,
+            f"{participant}_hemi-{hemi}_space-fsaverage_label-MT_mask.label")
+
+        func_mt_vertices = read_label(label_file)
+
+        # func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
+        # func_mt_roi[func_mt_vertices] = 1
+
+        print(f"{len(func_mt_vertices)} vertices in func MT ROI ({hemi})")
 
         # get this subject's run maps for the chosen contrast
         subj_dict = subj_contrasts[s]
@@ -201,7 +202,7 @@ for h, hemi in enumerate(hemis):
             rnd_run_idx[s,:] = np.array(r_idx, dtype=int)
             C_full = subj_dict[contrast][r_idx,:]   
         # mask ROI
-        C = np.squeeze(C_full[:, wang_hmt_vertices] )         # (n_runs, n_masked)
+        C = np.squeeze(C_full[:, func_mt_vertices] )         # (n_runs, n_masked)
         #zscore the runs for a given participant
         n_runs = C.shape[0]
         zscored_C = np.array([(C[r_num,:] - np.mean(C[r_num,:]))/np.std(C[r_num,:]) for r_num in range(n_runs)])
@@ -211,6 +212,9 @@ for h, hemi in enumerate(hemis):
             print(f"\nSubject {s+1}: {n_runs} runs (hemi {hemi})")
 
         #Prepare zscored density maps for each tract
+          # 1 Masking densities (subj, tract, masked_vertices)
+        densities_masked = densities[s, :, func_mt_vertices].transpose(1,0)
+        n_masked = densities_masked.shape[1]
         zscored_densities = np.full((n_tracts, n_masked), np.nan)
         for tract_idx in range(n_tracts):
 
@@ -220,10 +224,10 @@ for h, hemi in enumerate(hemis):
             # anatomical vector for this subject and tract (length = n_masked)
             # anat_vec = densities_masked[s, tract_idx, :]  # shape (n_masked,)
             #Zscore the density data of the tract of this participant
-            if np.std(densities_masked[s, tract_idx, :]) == 0:
+            if np.std(densities_masked[tract_idx, :]) == 0:
                 zscored_densities[tract_idx,:] = 0
             else:
-                zscored_densities[tract_idx,:] = (densities_masked[s, tract_idx, :] - np.mean(densities_masked[s, tract_idx, :]))/np.std(densities_masked[s, tract_idx, :])
+                zscored_densities[tract_idx,:] = (densities_masked[tract_idx, :] - np.mean(densities_masked[tract_idx, :]))/np.std(densities_masked[tract_idx, :])
             # np.sum(np.isnan(densities_masked))
 
         for test_idx in range(n_runs):
@@ -286,7 +290,7 @@ for h, hemi in enumerate(hemis):
             y_pred_std = ridge.predict(X_test)
             y_pred = (y_pred_std*np.std(C[test_idx,:]) + np.mean(C[test_idx,:])).ravel()
 
-            predicted[s, test_idx, :] = y_pred_std
+            predicted[participant].append(y_pred_std)
             
 
 
@@ -301,13 +305,13 @@ for h, hemi in enumerate(hemis):
         #Performance metrics
         #------------------
         #overall correlation across all runs (concatenated)
-        r_all[s, h], _ = pearsonr(C.reshape(-1), predicted[s, :n_runs, :].reshape(-1))
+        r_all[s, h], _ = pearsonr(C.reshape(-1), np.array(predicted[participant][:n_runs]).reshape(-1))
 
         #Calculate correlation for a given run
         for r in range(n_runs):
 
             y_true = C[r, :].reshape(-1)
-            y_pred = predicted[s, r, :].reshape(-1)
+            y_pred = predicted[participant][r].reshape(-1)
 
             # Skip if prediction missing
             if np.isnan(y_pred).all():
@@ -411,7 +415,7 @@ for h, hemi in enumerate(hemis):
         f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
     )
     surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
-    wang_hmt_vertices = np.where(surf_roi > 0)[0]
+    # wang_hmt_vertices = np.where(surf_roi > 0)[0]
 
     for s, participant in enumerate(participants):
         # ----------------------------
@@ -438,12 +442,12 @@ for h, hemi in enumerate(hemis):
 
         # Build full-surface vector 
         surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
-        surf_map[wang_hmt_vertices] = np.nanmean(predicted_maps[hemi][s, :, :], axis=0)
+        surf_map[func_mt_vertices] = np.nanmean(np.array(predicted_maps[hemi][participant]), axis=0)
 
         # Output filename (no run index)
         out_png = op.join(
             img_out_dir,
-            f"{participant}_hemi-{hemi}_desc-pred-motionXstationary_mean_inflated.png"
+            f"{participant}_hemi-{hemi}_mask-funcMT_desc-pred-motionXstationary_mean_inflated.png"
         )
 
         # -------------------------------------------------
@@ -468,7 +472,7 @@ for h, hemi in enumerate(hemis):
         # ---- MT boundary overlay ----
         plotting.plot_surf_contours(
             surf_mesh=infl_surf,
-            roi_map=func_mt_roi,
+            roi_map=surf_roi,
             levels=[1],
             colors=["lightgray"],
             linewidths=2.0,
@@ -483,41 +487,11 @@ for h, hemi in enumerate(hemis):
 #--------------------------------------------------------------
 
 #Plotting results
-import matplotlib.pyplot as plt
 # ============================
-# HEATMAP OF PEARSON r
+#PEARSON r
 # ============================
 
-for h, hemi in enumerate(hemis):
-
-    plt.figure(figsize=(10, 6))
-    plt.imshow(rs[:, :, h], aspect='auto', interpolation='nearest')
-    plt.colorbar(label='Pearson r')
-
-    plt.xlabel("Tracts")
-    plt.ylabel("Participants")
-    plt.title(f"Correlation Between Predicted and True Maps\n Hemisphere: {hemi}")
-
-    # Tract labels
-    plt.xticks(np.arange(n_tracts), tract_order, rotation=45)
-
-    # Participant labels
-    plt.yticks(np.arange(n_subj), participants)
-
-    plt.tight_layout()
-
-    saveDir = op.join(bids_path, 'analysis', 'plots')
-    os.makedirs(saveDir, exist_ok=True)
-
-    plt.savefig(op.join(saveDir, f"hemi-{hemi}_pearsonrs_linearcv_perrun_heatmap.png"),
-                dpi=300, bbox_inches='tight')
-    plt.show()
-
-
-
-# =====================================
 # SCATTER + JITTER PLOT BY GROUP × HEMI × TRACT
-# =====================================
 
 import numpy as np
 import pandas as pd
@@ -740,7 +714,7 @@ plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
 
-plt.savefig(op.join(saveDir, "betas_ridgereg_loro_combined_tracts_new.png"),
+plt.savefig(op.join(saveDir, "betas_ridgereg_loro_combined_tracts_mask-funcMT.png"),
             dpi=300, bbox_inches='tight')
 plt.show()
 
@@ -803,7 +777,7 @@ for s, participant in enumerate(participants):
         # ------------------------
         out_png = op.join(
             saveDir,
-            f"{participant}_hemi-{hemi}_betas_barplot.png"
+            f"{participant}_hemi-{hemi}_mask-funcMT_betas_barplot.png"
         )
         plt.savefig(out_png, dpi=300, bbox_inches="tight")
         plt.close(fig)
