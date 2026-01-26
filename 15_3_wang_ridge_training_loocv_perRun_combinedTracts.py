@@ -139,7 +139,53 @@ for participant in participants:
         contrast_data[hemi].append(subj_final)
 #contrast_data[hemi][0][contrast][0].shape #dim 1 = hemisphere initial, dim 2 = participant number, dim 3 = contrast type, dim 4: run number of each contrast map
 
+#================Useful functions ============
+#Define a goodness of fit function
+def r2_score(y_t, y_p):
+    ss_res = np.sum((y_t - y_p)**2)
+    ss_tot = np.sum((y_t - np.mean(y_t))**2)
+    return 1 - ss_res / ss_tot
 
+def split_half_reliability(C):
+    """
+    C: array (n_runs, n_vertices)
+    Returns split-half reliability r
+    """
+    n_runs = C.shape[0]
+    if n_runs < 2:
+        return np.nan
+
+    # random split of runs
+    perm = np.random.permutation(n_runs)
+    half = n_runs // 2
+
+    A = C[perm[:half]].mean(axis=0)
+    B = C[perm[half:]].mean(axis=0)
+
+    r, _ = pearsonr(A, B)
+    return r
+
+def split_half_reliability_bootstrap(C, n_boot=100):
+    rs = []
+    for _ in range(n_boot):
+        r = split_half_reliability(C)
+        if not np.isnan(r):
+            rs.append(r)
+    return np.mean(rs)
+
+def noise_normalized_r(y_true, y_pred, reliability):
+    """
+    y_true: (n_vertices,)
+    y_pred: (n_vertices,)
+    reliability: split-half reliability of y_true
+
+    Returns noise-normalized r
+    """
+    if reliability <= 0 or np.isnan(reliability):
+        return np.nan
+
+    r, _ = pearsonr(y_true, y_pred)
+    return r / np.sqrt(reliability)
 #---------------------------
 ## Fit linear model to data
 #---------------------------
@@ -153,9 +199,11 @@ contrast = contrast_order[0]   # e.g. "motionXstationary"
 # get n_subj, n_tracts
 n_subj, n_tracts, _  = density_data["L"].shape
 rs   = np.full((3, n_subj, len(hemis)), np.nan)
-mses = np.full((3, n_subj, len(hemis)), np.nan)
+mses = np.full((3, n_subj, len(hemis)), np.nan) #
+rsquared = np.full((3, n_subj, len(hemis)), np.nan) #goodness of fit
+noise_norm_r = np.full((3, n_subj, len(hemis)), np.nan)
 r_all = np.full(( n_subj, len(hemis)), np.nan)
-rnd_run_idx = np.full((n_subj, 3), np.nan)
+rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan)
 trained_coefs = np.zeros((3, n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
 predicted_maps = {hemi: [] for hemi in hemis}
 for h, hemi in enumerate(hemis):
@@ -163,9 +211,9 @@ for h, hemi in enumerate(hemis):
         #hemi = "L"
         #s = 0
         #'sub-EBxGxCCx1986'
-    _, _, n_vertices  = density_data[hemi].shape
-    densities = density_data[hemi]        # (subj, tract, vertices)
-    subj_contrasts = contrast_data[hemi]  # list: one dict per participant
+    #X and Y of given hemisphere of all subjects
+    densities = density_data[hemi]        # X; (subj, tract, vertices)
+    subj_contrasts = contrast_data[hemi]  # Y; list: one dict per participant
 
     # ----------------------------
     # Load MT ROI
@@ -178,20 +226,19 @@ for h, hemi in enumerate(hemis):
     wang_hmt_vertices = np.where(surf_roi > 0)[0]
     print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
 
-    # Masking densities (subj, tract, masked_vertices)
+    # Densities within Wang MT only (subj, tract, masked_vertices)
     densities_masked = densities[:, :, wang_hmt_vertices]
     n_masked = densities_masked.shape[2]
 
-    # Predicted and coef storage
+    # Predicted and coef storage preallocation
     predicted = np.full((n_subj, 3, n_masked), np.nan)  # predicted maps per run
-    
-
+    _, _, n_vertices  = density_data[hemi].shape #get total number of vertices within fsaverage hemisphere
     # -------------------------
     # main loop: subject -> tract -> run-LOOCV
     # -------------------------
     for s, participant in enumerate(participants):
-
-        # get this subject's run maps for the chosen contrast
+        #Prepare subject's Y = functional maps
+        # get this subject's run maps of the chosen contrast
         subj_dict = subj_contrasts[s]
         if contrast not in subj_dict:
             print(f"Subject {s} missing contrast {contrast} for hemi {hemi}, skipping")
@@ -199,10 +246,10 @@ for h, hemi in enumerate(hemis):
 
         if "NS" in participant:
             C_full = subj_dict[contrast]              # (n_runs, n_vertices_fullspace)
-            rnd_run_idx[s,:] = [0, 1, 2]
-        elif "EB" in participant: #need to randomize across runs selected for EB as they have 6 runs, and NS only has 3 runs
+            rnd_run_idx[s,:,h] = [0, 1, 2]
+        elif "EB" in participant: #need to randomize across runs selected for EB as they have 6 runs, while NS only has 3 runs
             r_idx = random.sample(range(6), 3)
-            rnd_run_idx[s,:] = np.array(r_idx, dtype=int)
+            rnd_run_idx[s,:,h] = np.array(r_idx, dtype=int)
             C_full = subj_dict[contrast][r_idx,:]   
         # mask ROI
         C = np.squeeze(C_full[:, wang_hmt_vertices] )         # (n_runs, n_masked)
@@ -219,7 +266,7 @@ for h, hemi in enumerate(hemis):
         for tract_idx in range(n_tracts):
 
             if verbose:
-                print(f" Tract {tract_idx+1}/{n_tracts}")
+                print(f" Tract {tract_idx+1}/{n_tracts} z-scored")
 
             # anatomical vector for this subject and tract (length = n_masked)
             # anat_vec = densities_masked[s, tract_idx, :]  # shape (n_masked,)
@@ -284,16 +331,14 @@ for h, hemi in enumerate(hemis):
             ridge.fit(X_train, y_train)
 
             trained_coefs[test_idx,:, s, h] = ridge.coef_.copy() #[0:n_tracts-1]
-            # linreg.intercept_
+            # ridge.intercept_
 
             X_test = zscored_densities.T
             y_pred_std = ridge.predict(X_test)
             y_pred = (y_pred_std*np.std(C[test_idx,:]) + np.mean(C[test_idx,:])).ravel()
 
-            predicted[s, test_idx, :] = y_pred_std
+            predicted[s, test_idx, :] = y_pred
             
-
-
             # Evaluate this test_run if verbose
             if verbose:
                 y_run_true = np.squeeze(C[test_idx, :])
@@ -318,14 +363,16 @@ for h, hemi in enumerate(hemis):
                 continue
 
             r_r, _ = pearsonr(y_true, y_pred)
-            mse_r = mean_squared_error(y_true, y_pred)
+            mse_r =  np.mean((y_true - y_pred)**2) #mean_squared_error(y_true, y_pred)
 
             rs[r, s, h] = r_r
             mses[r, s, h] = mse_r
+            rsquared[r, s, h] = r2_score(y_true, y_pred)
+            noise_norm_r[r,s,h]= noise_normalized_r(y_true, y_pred, split_half_reliability_bootstrap(C))
+            print(f" r2={rsquared[r, s, h]:.4f}")
 
     predicted_maps[hemi] = predicted
     print(f"\nFinished hemisphere {hemi}")
-
 
 
 
@@ -644,18 +691,13 @@ rows = []
 for h in range(2):     # left/right hemispheres
     for s, participant in enumerate(participants):
         gp = "EB" if "EB" in participant else "NS"
-                # # Determine allowed runs based on group
-        # if "NS" in gp:        # NS → only 3 runs
-        valid_runs = range(3)      # 0,1,2
-        # else:                          # EB → all 6 runs
-        #     valid_runs = range(6)
-        pearson = rs[0:len(valid_runs):, s, h]
+        pearson = rs[:, s, h]
 
         rows.append({
             "Subject": s,
             "Hemisphere": hemi_labels[h],
             "Group": gp,
-            "Correlation": pearson.mean() #r_all[s, h] #
+            "Correlation": noise_norm_r[:,s,h].mean() #r_all[s, h] #
         })
 
 df = pd.DataFrame(rows)
@@ -723,7 +765,7 @@ for ax, hemi in zip(axes, hemi_labels):
     ax.axhline(0, color='gray', linestyle='--', linewidth=1)
     ax.set_xticklabels(["EB", "NS"], fontsize=13)
 
-axes[0].set_ylabel("Mean Pearson's r", fontsize=14)
+axes[0].set_ylabel("Mean Noise-Normalized Pearson's r", fontsize=14)
 # axes[1].get_legend().remove()   # remove duplicated legend
 sns.despine()
 plt.tight_layout()
@@ -731,7 +773,7 @@ plt.tight_layout()
 # Saving
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "pearson_mean_ridgereg_loro_combined_tracts_new.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "noise_norm_p_mean_ridgereg_loro_combined_tracts.png"), dpi=300, bbox_inches='tight')
 
 plt.show()
 
@@ -915,3 +957,375 @@ for s, participant in enumerate(participants):
         )
         plt.savefig(out_png, dpi=300, bbox_inches="tight")
         plt.close(fig)
+
+#-----------------
+# Plot MSE
+#-----------------
+
+# =====================================
+# SCATTER + JITTER PLOT BY GROUP × HEMI × TRACT
+# =====================================
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import sem
+
+# --------------------------------------
+# Build long-format dataframe
+# r_all shape should be (n_subj, 2 hemis)
+# --------------------------------------
+
+hemi_labels = ["L", "R"]
+rows = []
+
+for h in range(2):     # left/right hemispheres
+    for s, participant in enumerate(participants):
+        gp = "EB" if "EB" in participant else "NS"
+        mse_runs = mses[:, s, h]
+
+        rows.append({
+            "Subject": s,
+            "Hemisphere": hemi_labels[h],
+            "Group": gp,
+            "meanMSE": mse_runs.mean() #r_all[s, h] #
+        })
+
+df = pd.DataFrame(rows)
+
+# ------------------------------------------------
+# Compute SEM per Group × Hemisphere
+# ------------------------------------------------
+sem_df = (
+    df.groupby(["Group", "Hemisphere"])["meanMSE"]
+      .agg(["mean", sem])
+      .reset_index()
+      .rename(columns={"mean": "Mean", "sem": "SEM"})
+)
+
+# ------------------------------------------------
+# Color palette: EB = blue, NS = orange
+# ------------------------------------------------
+palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
+
+# ------------------------------------------------
+# Create 2 subplots — one per hemisphere
+# ------------------------------------------------
+fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+
+for ax, hemi in zip(axes, hemi_labels):
+
+    df_h = df[df["Hemisphere"] == hemi]
+    sem_h = sem_df[sem_df["Hemisphere"] == hemi]
+
+    # Jittered dots
+    sns.stripplot(
+        data=df_h,
+        x="Group",
+        y="meanMSE",
+        hue="Group",
+        dodge=False,
+        jitter=0.15,
+        alpha=0.7,
+        palette=palette,
+        ax=ax
+    )
+
+    # ---- Mean ± SEM ----
+    for _, row in sem_h.iterrows():
+        group = row["Group"]
+        mean = row["Mean"]
+        se = row["SEM"]
+
+        x_loc = 0 if group == "EB" else 1
+
+        ax.errorbar(
+            x=x_loc,
+            y=mean,
+            yerr=se,
+            fmt="o",
+            color="black",
+            markersize=8,
+            capsize=3,
+            linewidth=2
+        )
+
+    # Formatting
+    ax.set_title(f"{hemi}-Hemisphere", fontsize=16)
+    ax.set_xlabel("Group", fontsize=14)
+    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
+    ax.set_xticklabels(["EB", "NS"], fontsize=13)
+
+axes[0].set_ylabel("Mean MSE", fontsize=14)
+# axes[1].get_legend().remove()   # remove duplicated legend
+sns.despine()
+plt.tight_layout()
+
+# Saving
+saveDir = op.join(bids_path, "analysis", "plots")
+os.makedirs(saveDir, exist_ok=True)
+plt.savefig(op.join(saveDir, "mse_mean_ridgereg_loro_combined_tracts.png"), dpi=300, bbox_inches='tight')
+
+plt.show()
+
+#--------------
+#Plot Rsquared
+#--------------
+# =====================================
+# SCATTER + JITTER PLOT BY GROUP × HEMI × TRACT
+# =====================================
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import sem
+
+# --------------------------------------
+# Build long-format dataframe
+# r_all shape should be (n_subj, 2 hemis)
+# --------------------------------------
+
+hemi_labels = ["L", "R"]
+rows = []
+
+for h in range(2):     # left/right hemispheres
+    for s, participant in enumerate(participants):
+        gp = "EB" if "EB" in participant else "NS"
+        mse_runs = mses[:, s, h]
+
+        rows.append({
+            "Subject": s,
+            "Hemisphere": hemi_labels[h],
+            "Group": gp,
+            "meanR2": rsquared[:,s,h].mean() #r_all[s, h] #
+        })
+
+df = pd.DataFrame(rows)
+
+# ------------------------------------------------
+# Compute SEM per Group × Hemisphere
+# ------------------------------------------------
+sem_df = (
+    df.groupby(["Group", "Hemisphere"])["meanR2"]
+      .agg(["mean", sem])
+      .reset_index()
+      .rename(columns={"mean": "Mean", "sem": "SEM"})
+)
+
+# ------------------------------------------------
+# Color palette: EB = blue, NS = orange
+# ------------------------------------------------
+palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
+
+# ------------------------------------------------
+# Create 2 subplots — one per hemisphere
+# ------------------------------------------------
+fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+
+for ax, hemi in zip(axes, hemi_labels):
+
+    df_h = df[df["Hemisphere"] == hemi]
+    sem_h = sem_df[sem_df["Hemisphere"] == hemi]
+
+    # Jittered dots
+    sns.stripplot(
+        data=df_h,
+        x="Group",
+        y="meanR2",
+        hue="Group",
+        dodge=False,
+        jitter=0.15,
+        alpha=0.7,
+        palette=palette,
+        ax=ax
+    )
+
+    # ---- Mean ± SEM ----
+    for _, row in sem_h.iterrows():
+        group = row["Group"]
+        mean = row["Mean"]
+        se = row["SEM"]
+
+        x_loc = 0 if group == "EB" else 1
+
+        ax.errorbar(
+            x=x_loc,
+            y=mean,
+            yerr=se,
+            fmt="o",
+            color="black",
+            markersize=8,
+            capsize=3,
+            linewidth=2
+        )
+
+    # Formatting
+    ax.set_title(f"{hemi}-Hemisphere", fontsize=16)
+    ax.set_xlabel("Group", fontsize=14)
+    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
+    ax.set_xticklabels(["EB", "NS"], fontsize=13)
+
+axes[0].set_ylabel("Mean R2", fontsize=14)
+# axes[1].get_legend().remove()   # remove duplicated legend
+sns.despine()
+plt.tight_layout()
+
+# Saving
+saveDir = op.join(bids_path, "analysis", "plots")
+os.makedirs(saveDir, exist_ok=True)
+plt.savefig(op.join(saveDir, "r2_mean_ridgereg_loro_combined_tracts.png"), dpi=300, bbox_inches='tight')
+
+plt.show()
+
+
+#-------- Correlations from training with Wang MT, within func MT only
+
+rs   = np.full((3, n_subj, len(hemis)), np.nan)
+for h, hemi in enumerate(hemis):
+    #Load Wang MT
+    wang_hmt_path = op.join(
+        '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
+        f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+    )
+    surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+    wang_hmt_vertices = np.where(surf_roi > 0)[0]
+
+    #Prepare predicted array
+    predicted_full = np.full((n_subj, n_runs, n_vertices), np.nan)
+    predicted_full[:, :, wang_hmt_vertices] = predicted_maps[hemi]
+
+    for s, participant in enumerate(participants):
+        #Load Func MT
+        label_file = op.join( bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi', participant,
+            f"{participant}_hemi-{hemi}_space-fsaverage_label-MT_mask.label")
+
+        func_mt_vertices = read_label(label_file)
+        #Prepare true array
+        subj_dict = subj_contrasts[s]
+        C_full = subj_dict[contrast][np.astype(rnd_run_idx[s,:,h],int),:]  
+
+        #Get predicted func MT
+        predicted_funcMT = predicted_full[s,:, func_mt_vertices]
+        #get true func MT
+        C_funcMT = C_full[:, func_mt_vertices]
+
+        #Calculate correlation for a given run
+        for r in range(n_runs):
+
+            y_true = C_funcMT[r, :].reshape(-1)
+            if np.isnan(y_true).all():
+                print(f"True Contrast Map: NaN, run {r}, participant: {participant}, hemisphere: {hemi}")
+            y_pred = predicted_funcMT[:,r].reshape(-1)
+            if np.isnan(y_pred).all():
+                print(f"Predicted Contrast Map: NaN, run {r}, participant: {participant}, hemisphere: {hemi}")
+            r_r, _ = pearsonr(y_true[~np.isnan(y_pred)], y_pred[~np.isnan(y_pred)])
+            if np.isnan(r_r).all():
+                print(f"Correlation: NaN, run {r}, participant: {participant}, hemisphere: {hemi}")
+            rs[r, s, h] = r_r
+            
+
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import sem
+
+# --------------------------------------
+# Build long-format dataframe
+# r_all shape should be (n_subj, 2 hemis)
+# --------------------------------------
+
+hemi_labels = ["L", "R"]
+rows = []
+
+for h in range(2):     # left/right hemispheres
+    for s, participant in enumerate(participants):
+        gp = "EB" if "EB" in participant else "NS"
+        pearson = rs[:, s, h]
+
+        rows.append({
+            "Subject": s,
+            "Hemisphere": hemi_labels[h],
+            "Group": gp,
+            "Correlation": pearson.mean() #r_all[s, h] #
+        })
+
+df = pd.DataFrame(rows)
+
+# ------------------------------------------------
+# Compute SEM per Group × Hemisphere
+# ------------------------------------------------
+sem_df = (
+    df.groupby(["Group", "Hemisphere"])["Correlation"]
+      .agg(["mean", sem])
+      .reset_index()
+      .rename(columns={"mean": "Mean", "sem": "SEM"})
+)
+
+# ------------------------------------------------
+# Color palette: EB = blue, NS = orange
+# ------------------------------------------------
+palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
+
+# ------------------------------------------------
+# Create 2 subplots — one per hemisphere
+# ------------------------------------------------
+fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+
+for ax, hemi in zip(axes, hemi_labels):
+
+    df_h = df[df["Hemisphere"] == hemi]
+    sem_h = sem_df[sem_df["Hemisphere"] == hemi]
+
+    # Jittered dots
+    sns.stripplot(
+        data=df_h,
+        x="Group",
+        y="Correlation",
+        hue="Group",
+        dodge=False,
+        jitter=0.15,
+        alpha=0.7,
+        palette=palette,
+        ax=ax
+    )
+
+    # ---- Mean ± SEM ----
+    for _, row in sem_h.iterrows():
+        group = row["Group"]
+        mean = row["Mean"]
+        se = row["SEM"]
+
+        x_loc = 0 if group == "EB" else 1
+
+        ax.errorbar(
+            x=x_loc,
+            y=mean,
+            yerr=se,
+            fmt="o",
+            color="black",
+            markersize=8,
+            capsize=3,
+            linewidth=2
+        )
+
+    # Formatting
+    ax.set_title(f"{hemi}-Hemisphere", fontsize=16)
+    ax.set_xlabel("Group", fontsize=14)
+    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
+    ax.set_xticklabels(["EB", "NS"], fontsize=13)
+
+axes[0].set_ylabel("Mean Pearson's r", fontsize=14)
+# axes[1].get_legend().remove()   # remove duplicated legend
+sns.despine()
+plt.tight_layout()
+
+# Saving
+saveDir = op.join(bids_path, "analysis", "plots")
+os.makedirs(saveDir, exist_ok=True)
+plt.savefig(op.join(saveDir, "funcMT_pearson_mean_ridgereg_loro_combined_tracts.png"), dpi=300, bbox_inches='tight')
+
+plt.show()

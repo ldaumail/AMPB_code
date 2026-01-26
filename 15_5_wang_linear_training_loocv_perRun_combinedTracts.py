@@ -135,6 +135,14 @@ for participant in participants:
         contrast_data[hemi].append(subj_final)
 #contrast_data[hemi][0][contrast][0].shape #dim 1 = hemisphere initial, dim 2 = participant number, dim 3 = contrast type, dim 4: run number of each contrast map
 
+def ols_aic(y_true, y_pred, k):
+    """
+    y_true, y_pred : (n_samples,)
+    k              : number of predictors
+    """
+    n = y_true.size
+    rss = np.sum((y_true - y_pred) ** 2)
+    return n * np.log(rss / n) + 2 * k
 
 #---------------------------
 ## Fit linear model to data
@@ -152,6 +160,9 @@ mses = np.full((3, n_subj, len(hemis)), np.nan)
 r_all = np.full(( n_subj, len(hemis)), np.nan)
 rnd_run_idx = np.full((n_subj, 3), np.nan)
 trained_coefs = np.zeros((3, n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
+aic_full_all=  np.full((3, n_subj, len(hemis)), np.nan)
+delta_aic = np.full((n_tracts, 3, n_subj, len(hemis)), np.nan)
+mean_delta_aic = np.full((n_tracts, n_subj, len(hemis)), np.nan)
 for h, hemi in enumerate(hemis):
 
     _, _, n_vertices  = density_data[hemi].shape
@@ -231,10 +242,13 @@ for h, hemi in enumerate(hemis):
             if len(train_idx) < 1:
                 # cannot train with zero samples -> skip
                 continue
-            X_train = np.vstack([zscored_densities for _r in train_idx]).reshape(len(train_idx)*n_masked, n_tracts) # (n_train*n_masked, n_tracts)
-            y_train = np.squeeze(zscored_C[train_idx, :]).reshape(-1, 1)  # (n_train*n_masked,)
+            # X_train = np.vstack([zscored_densities for _r in train_idx]).reshape(len(train_idx)*n_masked, n_tracts) # (n_train*n_masked, n_tracts)
+            # y_train = np.squeeze(zscored_C[train_idx, :]).reshape(-1, 1)  # (n_train*n_masked,)
 
-
+            X_train = np.vstack([zscored_densities for _r in train_idx]).reshape(n_tracts, len(train_idx), n_masked).transpose(1,2,0) #.reshape(len(train_idx)*n_masked, n_tracts) # (n_train*n_masked, n_tracts)
+            X_train = X_train.reshape(len(train_idx)*n_masked, n_tracts)
+            y_train = np.squeeze(zscored_C[train_idx, :]).reshape(-1, 1)
+            
             # Train linear model (multi-output regression)
             linreg = LinearRegression()
             linreg.fit(X_train, y_train)
@@ -244,9 +258,32 @@ for h, hemi in enumerate(hemis):
 
             X_test = zscored_densities.T
             y_pred_std = linreg.predict(X_test)
+
             y_pred = (y_pred_std*np.std(C[test_idx,:]) + np.mean(C[test_idx,:])).ravel()
 
             predicted[s, test_idx, :] = y_pred
+
+            k_full = n_tracts
+            y_train_pred = linreg.predict(X_train).ravel()
+            aic_full = ols_aic(y_train.ravel(), y_train_pred, k_full)
+            aic_full_all[test_idx, s, h] = aic_full
+
+            for t in range(n_tracts):
+
+                X_train_red = np.delete(X_train, t, axis=1)
+
+                linreg_red = LinearRegression()
+                linreg_red.fit(X_train_red, y_train)
+
+                y_train_pred_red = linreg_red.predict(X_train_red).ravel()
+
+                aic_red = ols_aic(
+                    y_train.ravel(),
+                    y_train_pred_red,
+                    k=n_tracts - 1
+                )
+
+                delta_aic[test_idx,t, s, h] = aic_red - aic_full
 
 
             # Evaluate this test_run if verbose
@@ -255,6 +292,8 @@ for h, hemi in enumerate(hemis):
                 r_run, p_run = pearsonr(np.squeeze(y_run_true), y_pred)
                 mse_run = mean_squared_error(np.squeeze(y_run_true), y_pred)
                 print(f"   run r={r_run:.4f}, MSE={mse_run:.4e}, p={p_run:.4e}")
+
+        mean_delta_aic[:,s,h] = np.mean(delta_aic[:,:,s,h], axis =0)
 
         #------------------
         #Performance metrics
@@ -602,6 +641,122 @@ plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
 
-plt.savefig(op.join(saveDir, "betas_linreg_loro_combined_tracts_LGN-STS1-PT.png"),
+# plt.savefig(op.join(saveDir, "betas_linreg_loro_combined_tracts_LGN-STS1-PT.png"),
+#             dpi=300, bbox_inches='tight')
+plt.show()
+
+#--------------
+#Plot Delta AIC
+#--------------
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import sem
+
+# --------------------------------------
+# Convert trained_coefs into long format
+# trained_coefs shape = (6 runs, n_tracts, n_subj, 2 hemis)
+# Requires subject_group: list of "EB" or "NS"
+# --------------------------------------
+
+runs, n_tracts, n_subj, n_hemi = trained_coefs.shape
+hemi_labels = ["L", "R"]
+
+rows = []
+for h in range(n_hemi):
+    for t in range(n_tracts):
+        for s, participant in enumerate(participants):
+            gp = "EB" if "EB" in participant else "NS"
+            meandeltas = mean_delta_aic[t, s, h]   # shape (6,)
+            
+            rows.append({
+                "Tract": tract_order[t],
+                "Subject": s,
+                "Hemisphere": hemi_labels[h],
+                "Group": gp,    # EB or NS
+                "MeanDeltaAIC": meandeltas
+            })
+
+df = pd.DataFrame(rows)
+
+
+# ------------------------------------------------
+# Compute SEM per tract × hemisphere × group (EB/NS)
+# ------------------------------------------------
+sem_df = (
+    df.groupby(["Group", "Tract", "Hemisphere"])["MeanDeltaAIC"]
+      .agg(["mean", sem])
+      .reset_index()
+      .rename(columns={"mean": "Mean", "sem": "SEM"})
+)
+
+# ------------------------------------------
+# Create 2 subplots — one for each hemisphere
+# ------------------------------------------
+fig, axes = plt.subplots(1, 2, figsize=(18, 6), sharey=True)
+group_labels = ["EB", "NS"]
+group_offset = {"EB": -0.2, "NS": 0.2}   # shift inside each tract
+
+for ax, hemi in zip(axes, hemi_labels):
+
+    # Filter for hemisphere
+    df_h = df[df["Hemisphere"] == hemi]
+    sem_h = sem_df[sem_df["Hemisphere"] == hemi]
+
+    # Jitter dots per group (EB vs NS)
+    sns.stripplot(
+        data=df_h,
+        x="Tract",
+        y="MeanDeltaAIC",
+        hue="Group",
+        dodge=True,
+        jitter=0.15,
+        alpha=0.7,
+        ax=ax
+    )
+
+    # ---------------------------------------
+    # Plot Mean ± SEM for EB and NS separately
+    # ---------------------------------------
+    for _, row in sem_h.iterrows():
+
+        tract = row["Tract"]
+        mean  = row["Mean"]
+        se    = row["SEM"]
+        group = row["Group"]
+
+        # shift within tract index to match stripplot's dodge layout
+        x_loc = tract_order.index(tract)  + group_offset[group]
+
+        # Mean point
+        ax.plot(x_loc, mean, "o", color="black", markersize=7)
+
+        # SEM bar
+        ax.errorbar(
+            x=x_loc,
+            y=mean,
+            yerr=se,
+            color="black",
+            capsize=3,
+            linewidth=2
+        )
+
+    # ------------------ Ax formatting ------------------
+    ax.set_title(f"{hemi}-Hemisphere delta AIC (Mean ± SEM within EB / NS)",fontsize=16)
+    ax.set_xlabel("Tract",fontsize=14)
+    ax.tick_params(axis="x", rotation=90)
+    ax.set_xticks(np.arange(len(tract_order)))
+    ax.set_xticklabels(tract_order, rotation=30, ha="right",fontsize=12)
+    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
+axes[0].set_ylabel("Mean delta AIC", fontsize=14)
+axes[1].legend(title="Group", labels=group_labels)
+sns.despine()
+plt.tight_layout()
+saveDir = op.join(bids_path, 'analysis', 'plots')
+os.makedirs(saveDir, exist_ok=True)
+
+plt.savefig(op.join(saveDir, "delta_aic_linreg_loro_combined_tracts_LGN-STS1-PT.png"),
             dpi=300, bbox_inches='tight')
 plt.show()
