@@ -146,32 +146,33 @@ def r2_score(y_t, y_p):
     ss_tot = np.sum((y_t - np.mean(y_t))**2)
     return 1 - ss_res / ss_tot
 
-def split_half_reliability(C):
+
+def vertex_bootstrap_reliability(C, n_boot=1000, frac=1):
     """
     C: array (n_runs, n_vertices)
-    Returns split-half reliability r
+    n_boot: number of bootstrap samples
+    frac: fraction of vertices sampled per bootstrap
+    Returns mean bootstrap reliability
     """
-    n_runs = C.shape[0]
-    if n_runs < 2:
-        return np.nan
+    n_runs, n_vertices = C.shape
 
-    # random split of runs
-    perm = np.random.permutation(n_runs)
-    half = n_runs // 2
-
-    A = C[perm[:half]].mean(axis=0)
-    B = C[perm[half:]].mean(axis=0)
-
-    r, _ = pearsonr(A, B)
-    return r
-
-def split_half_reliability_bootstrap(C, n_boot=100):
+    n_sample = int(frac * n_vertices)
     rs = []
+
     for _ in range(n_boot):
-        r = split_half_reliability(C)
+        verts = np.random.choice(n_vertices, n_sample, replace=True)
+
+        # split runs as before (fixed run split)
+        half = n_runs // 2
+        A = C[:half, verts].mean(axis=0)
+        B = C[half:, verts].mean(axis=0)
+
+        r, _ = pearsonr(A, B)
         if not np.isnan(r):
             rs.append(r)
+
     return np.mean(rs)
+
 
 def noise_normalized_r(y_true, y_pred, reliability):
     """
@@ -201,8 +202,9 @@ n_subj, n_tracts, _  = density_data["L"].shape
 rs   = np.full((3, n_subj, len(hemis)), np.nan)
 mses = np.full((3, n_subj, len(hemis)), np.nan) #
 rsquared = np.full((3, n_subj, len(hemis)), np.nan) #goodness of fit
-noise_norm_r = np.full((3, n_subj, len(hemis)), np.nan)
-r_all = np.full(( n_subj, len(hemis)), np.nan)
+# noise_norm_r = np.full((3, n_subj, len(hemis)), np.nan)
+reliability = np.full((n_subj, len(hemis)), np.nan)
+r_all = np.full((n_subj, len(hemis)), np.nan)
 rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan)
 trained_coefs = np.zeros((3, n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
 predicted_maps = {hemi: [] for hemi in hemis}
@@ -351,7 +353,7 @@ for h, hemi in enumerate(hemis):
         #------------------
         #overall correlation across all runs (concatenated)
         r_all[s, h], _ = pearsonr(C.reshape(-1), predicted[s, :n_runs, :].reshape(-1))
-
+        reliability[s, h] = vertex_bootstrap_reliability(C)
         #Calculate correlation for a given run
         for r in range(n_runs):
 
@@ -368,7 +370,7 @@ for h, hemi in enumerate(hemis):
             rs[r, s, h] = r_r
             mses[r, s, h] = mse_r
             rsquared[r, s, h] = r2_score(y_true, y_pred)
-            noise_norm_r[r,s,h]= noise_normalized_r(y_true, y_pred, split_half_reliability_bootstrap(C))
+            # noise_norm_r[r,s,h]= noise_normalized_r(y_true, y_pred, split_half_reliability_bootstrap(C))
             print(f" r2={rsquared[r, s, h]:.4f}")
 
     predicted_maps[hemi] = predicted
@@ -636,40 +638,7 @@ for h, hemi in enumerate(hemis):
         plt.close(display.figure)
 
 #--------------------------------------------------------------
-
-#Plotting results
-import matplotlib.pyplot as plt
-# ============================
-# HEATMAP OF PEARSON r
-# ============================
-
-for h, hemi in enumerate(hemis):
-
-    plt.figure(figsize=(10, 6))
-    plt.imshow(rs[:, :, h], aspect='auto', interpolation='nearest')
-    plt.colorbar(label='Pearson r')
-
-    plt.xlabel("Tracts")
-    plt.ylabel("Participants")
-    plt.title(f"Correlation Between Predicted and True Maps\n Hemisphere: {hemi}")
-
-    # Tract labels
-    plt.xticks(np.arange(n_tracts), tract_order, rotation=45)
-
-    # Participant labels
-    plt.yticks(np.arange(n_subj), participants)
-
-    plt.tight_layout()
-
-    saveDir = op.join(bids_path, 'analysis', 'plots')
-    os.makedirs(saveDir, exist_ok=True)
-
-    plt.savefig(op.join(saveDir, f"hemi-{hemi}_pearsonrs_linearcv_perrun_heatmap.png"),
-                dpi=300, bbox_inches='tight')
-    plt.show()
-
-
-
+#Pearson's r
 # =====================================
 # SCATTER + JITTER PLOT BY GROUP × HEMI × TRACT
 # =====================================
@@ -680,9 +649,33 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import sem
 
+#First compute noise ceiling 95% CI
+hemi_labels = ["L", "R"]
+nc_rows = []
+
+for h in range(2):     # left/right hemispheres
+    for s, participant in enumerate(participants):
+        gp = "EB" if "EB" in participant else "NS"
+
+        nc_rows.append({
+            "Subject": s,
+            "Hemisphere": hemi_labels[h],
+            "Group": gp,
+            "Correlation": reliability[s,h] #r_all[s, h] #
+        })
+
+nc_df = pd.DataFrame(nc_rows)
+nc_sem_df = (
+    nc_df.groupby(["Group", "Hemisphere"])["Correlation"]
+      .agg(["mean", sem])
+      .reset_index()
+      .rename(columns={"mean": "Mean", "sem": "SEM"})
+)
+nc_sem_df["CI95_upper"] = nc_sem_df["Mean"] + 1.96 * nc_sem_df["SEM"]
+nc_sem_df["CI95_lower"] = nc_sem_df["Mean"] - 1.96 * nc_sem_df["SEM"]
+
 # --------------------------------------
-# Build long-format dataframe
-# r_all shape should be (n_subj, 2 hemis)
+# Second, organize Pearson's in table
 # --------------------------------------
 
 hemi_labels = ["L", "R"]
@@ -697,7 +690,7 @@ for h in range(2):     # left/right hemispheres
             "Subject": s,
             "Hemisphere": hemi_labels[h],
             "Group": gp,
-            "Correlation": noise_norm_r[:,s,h].mean() #r_all[s, h] #
+            "Correlation": pearson.mean() #r_all[s, h] #
         })
 
 df = pd.DataFrame(rows)
@@ -723,6 +716,8 @@ palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
 fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
 
 for ax, hemi in zip(axes, hemi_labels):
+    # ---- Noise ceiling 95% CI upper bound ----
+    nc_h = nc_sem_df[nc_sem_df["Hemisphere"] == hemi]
 
     df_h = df[df["Hemisphere"] == hemi]
     sem_h = sem_df[sem_df["Hemisphere"] == hemi]
@@ -740,7 +735,7 @@ for ax, hemi in zip(axes, hemi_labels):
         ax=ax
     )
 
-    # ---- Mean ± SEM ----
+    # ---- Mean ± SEM (model performance) ----
     for _, row in sem_h.iterrows():
         group = row["Group"]
         mean = row["Mean"]
@@ -759,13 +754,40 @@ for ax, hemi in zip(axes, hemi_labels):
             linewidth=2
         )
 
+    # ---- Noise ceiling 95% CI upper/lower bound/mean ----
+    for _, row in nc_h.iterrows():
+        group = row["Group"]
+        up_ci = row["CI95_upper"]
+        low_ci = row["CI95_lower"]
+        mean = row["Mean"]
+
+        x_center = 0 if group == "EB" else 1
+
+        ax.hlines(
+            y=[low_ci, up_ci, mean],
+            xmin=x_center - 0.25,
+            xmax=x_center + 0.25,
+            colors="gray",
+            linestyles=["--","--", ":"],
+            linewidth=3,
+            alpha=0.9
+        )
+        ax.fill_between(
+        [x_center - 0.25, x_center + 0.25],
+        low_ci,
+        up_ci,
+        color="pink",
+        alpha=0.2,
+        linewidth=0
+        )
+
     # Formatting
     ax.set_title(f"{hemi}-Hemisphere", fontsize=16)
     ax.set_xlabel("Group", fontsize=14)
     ax.axhline(0, color='gray', linestyle='--', linewidth=1)
     ax.set_xticklabels(["EB", "NS"], fontsize=13)
 
-axes[0].set_ylabel("Mean Noise-Normalized Pearson's r", fontsize=14)
+axes[0].set_ylabel("Mean Pearson's r", fontsize=14)
 # axes[1].get_legend().remove()   # remove duplicated legend
 sns.despine()
 plt.tight_layout()
@@ -773,7 +795,7 @@ plt.tight_layout()
 # Saving
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "noise_norm_p_mean_ridgereg_loro_combined_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "pearson_mean_ridgereg_loro_combined_tracts.png"), dpi=300, bbox_inches='tight')
 
 plt.show()
 
@@ -806,11 +828,11 @@ for h in range(n_hemi):
             
             rows.append({
                 "Tract": tract_order[t],
-                "Subject": s,
+                "Participant": participant,
                 "Hemisphere": hemi_labels[h],
                 "Group": gp,    # EB or NS
                 "MeanBeta": np.nanmean(betas)
-            })
+            }) # "Subject": s,
 
 df = pd.DataFrame(rows)
 
@@ -1179,6 +1201,110 @@ plt.savefig(op.join(saveDir, "r2_mean_ridgereg_loro_combined_tracts.png"), dpi=3
 
 plt.show()
 
+#--------- Noise ceiling -----------------------------------------
+
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import sem
+
+# --------------------------------------
+# Build long-format dataframe
+# r_all shape should be (n_subj, 2 hemis)
+# --------------------------------------
+
+hemi_labels = ["L", "R"]
+rows = []
+
+for h in range(2):     # left/right hemispheres
+    for s, participant in enumerate(participants):
+        gp = "EB" if "EB" in participant else "NS"
+
+        rows.append({
+            "Subject": s,
+            "Hemisphere": hemi_labels[h],
+            "Group": gp,
+            "noiseThr": reliability[s,h] 
+        })
+
+df = pd.DataFrame(rows)
+
+# ------------------------------------------------
+# Compute SEM per Group × Hemisphere
+# ------------------------------------------------
+sem_df = (
+    df.groupby(["Group", "Hemisphere"])["noiseThr"]
+      .agg(["mean", sem])
+      .reset_index()
+      .rename(columns={"mean": "Mean", "sem": "SEM"})
+)
+
+# ------------------------------------------------
+# Color palette: EB = blue, NS = orange
+# ------------------------------------------------
+palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
+
+# ------------------------------------------------
+# Create 2 subplots — one per hemisphere
+# ------------------------------------------------
+fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+
+for ax, hemi in zip(axes, hemi_labels):
+
+    df_h = df[df["Hemisphere"] == hemi]
+    sem_h = sem_df[sem_df["Hemisphere"] == hemi]
+
+    # Jittered dots
+    sns.stripplot(
+        data=df_h,
+        x="Group",
+        y="noiseThr",
+        hue="Group",
+        dodge=False,
+        jitter=0.15,
+        alpha=0.7,
+        palette=palette,
+        ax=ax
+    )
+
+    # ---- Mean ± SEM ----
+    for _, row in sem_h.iterrows():
+        group = row["Group"]
+        mean = row["Mean"]
+        se = row["SEM"]
+
+        x_loc = 0 if group == "EB" else 1
+
+        ax.errorbar(
+            x=x_loc,
+            y=mean,
+            yerr=se,
+            fmt="o",
+            color="black",
+            markersize=8,
+            capsize=3,
+            linewidth=2
+        )
+
+    # Formatting
+    ax.set_title(f"{hemi}-Hemisphere", fontsize=16)
+    ax.set_xlabel("Group", fontsize=14)
+    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
+    ax.set_xticklabels(["EB", "NS"], fontsize=13)
+
+axes[0].set_ylabel("Noise ceiling", fontsize=14)
+# axes[1].get_legend().remove()   # remove duplicated legend
+sns.despine()
+plt.tight_layout()
+
+# Saving
+saveDir = op.join(bids_path, "analysis", "plots")
+os.makedirs(saveDir, exist_ok=True)
+plt.savefig(op.join(saveDir, "noise_ceiling_ridgereg_loro_combined_tracts.png"), dpi=300, bbox_inches='tight')
+
+plt.show()
 
 #-------- Correlations from training with Wang MT, within func MT only
 
