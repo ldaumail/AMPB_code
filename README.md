@@ -7,6 +7,17 @@ This script is ran with the list of participants you want to convert the data in
 
 2: 2_apptainer_qsiprep_requeue.sbatch: this script launches batch jobs in parallel on the PACE clusters. The BIDS data from each individual is preprocessed using qsiprep. when logged in on PACE, just use the command line : "sbatch 2_apptainer_qsiprep_requeue.sbatch"
 
-3: 3_make_masks_julich.py: here, we imported probabilistic ROIs from the Julich brain atlas ( https://search.kg.ebrains.eu/instances/f1fe19e8-99bd-44bc-9616-a52850680777 ) and convert them into binary masks. The script also registers and resamples them into individual diffusion space using antspyx.
+3: 3_concat_diffusion_data.py: concatenate diffusion data from 3 different sessions to improve data analysis quality = more signal
 
-4: 4_* scripts: convert the label functional MT ROI files obtained from our own experiments into volumetric binary masks resampled into individual diffusion space.
+4: 4_create_wm_masks.py: make WM mask for each subject, can be useful to some versions of pyAFQ, though more recent versions generate them automatically.
+
+5: 5_* scripts: here, we imported probabilistic ROIs from the Julich brain atlas ( https://search.kg.ebrains.eu/instances/f1fe19e8-99bd-44bc-9616-a52850680777 ) and convert them into binary masks. The script also registers and resamples them into individual diffusion space using antspyx.
+
+6: 6_generate_wang_hmtplus.py: here, we used Wang 2015 functional atlas (Probabilistic maps of visual topography in human cortex, L. Wang, R. E. Mruczek, M. J. Arcaro and S. Kastner, Cerebral cortex 2015 Vol. 25 Issue 10 Pages 3911-3931) to generate a combined ROI mask of hMT + MST.
+
+7: 7_resample_masks.py: resample all masks created to the diffusion data resolution. This will avoid trouble with pyAFQ that tends to apply unnecessary transforms when resolutions differ across masks and data files.
+
+9: 9_* scripts: run pyAFQ and visualize outputs.
+
+convert the label functional MT ROI files obtained from our own experiments into volumetric binary masks resampled into individual diffusion space.
+
