@@ -30,32 +30,42 @@ hemispheres = ['L', 'R']
 all_rows = []
 
 # ==== MAIN LOOP ====
-for participant in participants:
-    print(f"\n=== Processing {participant} ===")
-    for hemi in hemispheres:
-        hemi_fs = 'lh' if hemi == 'L' else 'rh'
+for hemi in hemispheres:
+    hemi_fs = 'lh' if hemi == 'L' else 'rh'
+    #Load Wang MT ROI vertices:
+    wang_hmt_path = op.join('/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
+    f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh")
+    surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+    wang_hmt_vertices = np.where(surf_roi > 0)[0]
+    for participant in participants:
+        print(f"\n=== Processing {participant} ===")
 
-        # Load MT ROI vertices
-        label_file = op.join(analysis_path, 'ROIs', 'func_roi','functional_surf_roi', participant, f"{participant}_hemi-{hemi}_space-fsnative_label-MT_mask.label")
-        label_vertices = read_label(label_file)
+        #Load func MT ROI vertices
+        label_file = op.join(analysis_path, 'ROIs', 'func_roi','functional_surf_roi', participant, f"{participant}_hemi-{hemi}_space-fsaverage_label-MT_mask.label")
+        func_hmt_vertices = read_label(label_file)
+
+        #Func_MT and Wang MT vertices overlap
+        overlap_mask = np.isin(wang_hmt_vertices, func_hmt_vertices)
+        overlap_vertices = wang_hmt_vertices[overlap_mask]
+
 
         # Loop over tracts
         for tract in tract_list:
 
             density_map_file = op.join(proj_density_path,participant, 'wang_MT',
-                f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract}_desc-fsprojdensity0mm2.mgh")
+                f"{participant}_hemi-{hemi_fs}_space-fsaverage_label-wang{tract}_desc-fsprojdensity0mm2.mgh")
 
             density_map = nib.load(density_map_file).get_fdata().squeeze()
 
             # Extract density values at ROI vertices
-            roi_values = density_map[label_vertices]
+            roi_values = density_map[overlap_vertices]
             
             # Compute stats
             nonzero_count = np.count_nonzero(roi_values)
             total_count = len(roi_values)
             # proportion = nonzero_count / total_count if total_count > 0 else np.nan
              #Dice similarity coefficient (DSC)
-            DSC =  2*np.sum((roi_values) > 0) / (np.sum(density_map >0)+ np.sum(label_vertices > 0))
+            DSC =  2*np.sum((roi_values) > 0) / (np.sum(density_map >0)+ np.sum(overlap_vertices > 0))
             all_rows.append({
                 "participant": participant,
                 "hemisphere": hemi,

@@ -28,16 +28,23 @@ n_tract = len(tracts)
 # Labels
 y = np.array([1 if "EB" in p else 0 for p in participants])
 
-def get_feature_matrix(df, hemi):
+def get_feature_matrix(df, hemi,selected_tracts):
     """
     Returns X: (n_subjects, n_tracts)
     """
+    # X = (
+    #     df[df["Hemisphere"] == hemi]
+    #     .pivot_table(index="Participant", columns="Tract", values="MeanBeta")
+    #     .loc[participants]  # ensure same order
+    #     .to_numpy()
+    # )
     X = (
-        df[df["Hemisphere"] == hemi]
+        df[(df["Hemisphere"] == hemi) & (df["Tract"].isin(selected_tracts))]
         .pivot_table(index="Participant", columns="Tract", values="MeanBeta")
-        .loc[participants]  # ensure same order
+        .loc[participants, selected_tracts]
         .to_numpy()
-    )
+        )
+
     return X
 
 
@@ -92,10 +99,11 @@ results = {}
 
 #train model per hemisphere
 # df_no_mtfef = df[df["Tract"] != "MTxFEF"].copy()
+selected_tracts = tracts[:3]  # or explicit list
 for hemi in hemis:
     print(f"\n=== Hemisphere {hemi} ===")
 
-    X = get_feature_matrix(df, hemi)
+    X = get_feature_matrix(df, hemi, selected_tracts)
     Cs = np.logspace(-2.3, 1, 10)
     for c, C in enumerate(Cs):
         res = loso_evaluate(X, y, C)
@@ -163,7 +171,7 @@ def compute_global_limits(df, participants, selected_tracts):
         #     .loc[participants, selected_tracts]
         #     .to_numpy()
         # )
-        X = get_feature_matrix(df, hemi)
+        X = get_feature_matrix(df, hemi, selected_tracts)
         mins.append(X.min(axis=0))
         maxs.append(X.max(axis=0))
 
@@ -179,13 +187,7 @@ def plot_3d_both_hemispheres(df, participants, y, selected_tracts):
     for i, hemi in enumerate(["L", "R"]):
         ax = fig.add_subplot(1, 2, i + 1, projection="3d")
 
-        # X = (
-        #     df[(df["Hemisphere"] == hemi) & (df["Tract"].isin(selected_tracts))]
-        #     .pivot_table(index="Participant", columns="Tract", values="MeanBeta")
-        #     .loc[participants, selected_tracts]
-        #     .to_numpy()
-        # )
-        X = get_feature_matrix(df, hemi)
+        X = get_feature_matrix(df, hemi, selected_tracts)
 
         # EB
         ax.scatter(
@@ -245,6 +247,8 @@ def plot_3d_both_hemispheres(df, participants, y, selected_tracts):
 
 
 selected_tracts = tracts[:3]  # or explicit list
+# Labels
+y = np.array([1 if "EB" in p else 0 for p in participants])
 plot_3d_both_hemispheres(df, participants, y, selected_tracts)
 
 
@@ -281,7 +285,7 @@ def plot_3d_with_plane(
         # Feature matrix
         # ------------------------
 
-        X = get_feature_matrix(df, hemi)
+        X = get_feature_matrix(df, hemi, selected_tracts)
         C = C #0.5#10**(-2.3)
         clf = fit_final_model(X, y,C)
         w, b = get_decision_plane_raw(clf)
@@ -353,9 +357,9 @@ plot_3d_with_plane(
     y=y,
     hemis=["L", "R"],
     tracts=selected_tracts,
-    C = 0.05,
-    elev=10,
-    azim=120
+    C = 0.5,
+    elev=15,
+    azim=-45
 )
 
 
@@ -388,15 +392,21 @@ n_tract = len(tracts)
 # Labels
 y = np.array([1 if "EB" in p else 0 for p in participants])
 
-def get_feature_matrix(df, hemi):
+def get_feature_matrix(df, hemi, selected_tracts):
     """
     Returns X: (n_subjects, n_tracts)
     """
+    # X = (
+    #     df[df["Hemisphere"] == hemi]
+    #     .pivot_table(index="Participant", columns="Tract", values="MeanBeta")
+    #     .loc[participants]  # ensure same order
+    #     .to_numpy()
+    # )
     X = (
-        df[df["Hemisphere"] == hemi]
-        .pivot_table(index="Participant", columns="Tract", values="MeanBeta")
-        .loc[participants]  # ensure same order
-        .to_numpy()
+    df[(df["Hemisphere"] == hemi) & (df["Tract"].isin(selected_tracts))]
+    .pivot_table(index="Participant", columns="Tract", values="MeanBeta")
+    .loc[participants, selected_tracts]
+    .to_numpy()
     )
     return X
 
@@ -452,10 +462,11 @@ results = {}
 
 #train model per hemisphere
 # df_no_mtfef = df[df["Tract"] != "MTxFEF"].copy()
+selected_tracts = tracts[:3]  # or explicit list
 for hemi in hemis:
     print(f"\n=== Hemisphere {hemi} ===")
 
-    X = get_feature_matrix(df, hemi)
+    X = get_feature_matrix(df, hemi, selected_tracts)
     Cs = np.logspace(-2.3, 1, 10)
     for c, C in enumerate(Cs):
         res = loso_evaluate(X, y, C)
@@ -534,7 +545,7 @@ def plot_3d_svm_surface(df, participants, y, hemis, tracts, C=1, elev=20, azim=3
     assert len(tracts) == 3, "Need exactly 3 features for 3D"
     fig = plt.figure(figsize=(14, 6))
     for i, hemi in enumerate(hemis):
-        X = get_feature_matrix(df, hemi)
+        X = get_feature_matrix(df, hemi, selected_tracts)
         # Train RBF SVM
         clf = make_classifier(C=C)
         clf.fit(X, y)
@@ -579,13 +590,13 @@ def plot_3d_svm_surface(df, participants, y, hemis, tracts, C=1, elev=20, azim=3
 
         saveDir = op.join(bids_path, "analysis", "plots")
         os.makedirs(saveDir, exist_ok=True)
-    #     plt.savefig(op.join(
-    #         saveDir,
-    #         "beta_weights_3d_ridgereg_loro_combined_tracts_rbf_boundary.png"
-    #     ),
-    #     dpi=300,
-    #     bbox_inches="tight"
-    # )
+        plt.savefig(op.join(
+            saveDir,
+            "beta_weights_3d_ridgereg_loro_combined_tracts_rbf_boundary.png"
+        ),
+        dpi=300,
+        bbox_inches="tight"
+    )
     plt.show()
 
 selected_tracts = tracts[:3]  # exactly 3 features
@@ -629,15 +640,21 @@ n_tract = len(tracts)
 # Labels
 y = np.array([1 if "EB" in p else 0 for p in participants])
 
-def get_feature_matrix(df, hemi):
+def get_feature_matrix(df, hemi, selected_tracts):
     """
     Returns X: (n_subjects, n_tracts)
     """
+    # X = (
+    #     df[df["Hemisphere"] == hemi]
+    #     .pivot_table(index="Participant", columns="Tract", values="MeanBeta")
+    #     .loc[participants]  # ensure same order
+    #     .to_numpy()
+    # )
     X = (
-        df[df["Hemisphere"] == hemi]
-        .pivot_table(index="Participant", columns="Tract", values="MeanBeta")
-        .loc[participants]  # ensure same order
-        .to_numpy()
+    df[(df["Hemisphere"] == hemi) & (df["Tract"].isin(selected_tracts))]
+    .pivot_table(index="Participant", columns="Tract", values="MeanBeta")
+    .loc[participants, selected_tracts]
+    .to_numpy()
     )
     return X
 
@@ -680,11 +697,12 @@ def loso_evaluate(X, y, C):
     }
 
 #test model performance
+selected_tracts = tracts[:3]  # or explicit list
 results = {}
 for hemi in hemis:
     print(f"\n=== Hemisphere {hemi} ===")
 
-    X = get_feature_matrix(df, hemi)
+    X = get_feature_matrix(df, hemi, selected_tracts)
     Cs = np.logspace(-2.3, 1, 10)
     for c, C in enumerate(Cs):
         res = loso_evaluate(X, y, C)
@@ -744,7 +762,7 @@ def plot_3d_logistic_surface(
     fig = plt.figure(figsize=(14, 6))
 
     for i, hemi in enumerate(hemis):
-        X = get_feature_matrix(df, hemi)
+        X = get_feature_matrix(df, hemi, selected_tracts)
 
         clf = make_classifier(C=C)
         clf.fit(X, y)
