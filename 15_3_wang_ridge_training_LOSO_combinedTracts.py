@@ -259,15 +259,15 @@ hemis = ["L", "R"]
 contrast = contrast_order[0]   # e.g. "motionXstationary"
 
 # get n_subj, n_tracts
-n_subj, n_tracts, _  = density_data["L"].shape
-rs   = np.full((3, n_subj, len(hemis)), np.nan)
-mses = np.full((3, n_subj, len(hemis)), np.nan) #
-rsquared = np.full((3, n_subj, len(hemis)), np.nan) #goodness of fit
-# noise_norm_r = np.full((3, n_subj, len(hemis)), np.nan)
+n_subj = len(participants)
+n_tracts = len(tract_order)
+rs   = np.full((n_subj, len(hemis)), np.nan)
+mses = np.full((n_subj, len(hemis)), np.nan) #
+rsquared = np.full(( n_subj, len(hemis)), np.nan) #goodness of fit
 reliability = np.full((n_subj, len(hemis)), np.nan)
 r_all = np.full((n_subj, len(hemis)), np.nan)
 rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan)
-trained_coefs = np.zeros((3, n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
+trained_coefs = np.zeros((n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
 predicted_maps = {hemi: [] for hemi in hemis}
 for h, hemi in enumerate(hemis):
         #h = 0
@@ -288,125 +288,125 @@ for h, hemi in enumerate(hemis):
     n_masked = len(wang_hmt_vertices)
 
     # Predicted and coef storage preallocation
-    predicted = np.full((n_subj, 3, n_masked), np.nan)  # predicted maps per run
+    predicted = np.full((n_subj, n_masked), np.nan)  # predicted maps per run
     _, _, n_vertices  = density_data[hemi].shape #get total number of vertices within fsaverage hemisphere
-    # -------------------------
-    # main loop: subject -> tract -> run-LOOCV
-    # -------------------------
+    
+    n_target_runs = 3
+    all_C = []              # will store (n_subj, 3, n_vertices)
+    rnd_run_idx = np.full((n_subj, n_target_runs, len(hemis)), np.nan)
     for s, participant in enumerate(participants):
+
+        C_full = norm_contrast_data[hemi][s][contrast]   # (n_runs_available, n_vertices)
+        n_runs_available = C_full.shape[0]
+
+        # ---- choose runs ----
+        if "NS" in participant:
+            run_idx = np.arange(3)
+        elif "EB" in participant:
+            run_idx = np.random.choice(
+                n_runs_available, size=3, replace=False
+            )
+
+        rnd_run_idx[s, :, h] = run_idx
+
+        # ---- extract runs ----
+        C_sel = C_full[run_idx, :]     # (3, n_vertices)
+        all_C.append(C_sel)
+    all_C = np.stack(all_C, axis=0)
+    C_mean = all_C.mean(axis=1)
+
+
+    # -------------------------
+    # main loop
+    # -------------------------
+    for test_idx in range(n_subj):
         #Prepare subject's Y = functional maps
         # get this subject's run maps of the chosen contrast
-        subj_dict =  norm_contrast_data[hemi][s] 
-        if contrast not in subj_dict:
-            print(f"Subject {s} missing contrast {contrast} for hemi {hemi}, skipping")
-            continue
-
-        if "NS" in participant:
-            C = subj_dict[contrast]              # (n_runs, n_vertices_fullspace)
-            rnd_run_idx[s,:,h] = [0, 1, 2]
-        elif "EB" in participant: #need to randomize across runs selected for EB as they have 6 runs, while NS only has 3 runs
-            r_idx = random.sample(range(6), 3)
-            rnd_run_idx[s,:,h] = np.array(r_idx, dtype=int)
-            C = subj_dict[contrast][r_idx,:]   
-
-        n_runs = C.shape[0]
+        
+        # training participants indices
+        train_idx = [i for i in range(n_subj) if i != test_idx]   
 
         if verbose:
-            print(f"\nSubject {s+1}: {n_runs} runs (hemi {hemi})")
+            print(f" Left out participant {participants[test_idx]}")
+        
+        X_train = np.vstack([norm_density_data[hemi][i][contrast].T for i in train_idx])   # (n_train*n_masked, n_tracts)
+        y_train = np.hstack([C_mean[i,:] for i in train_idx])  # (n_train*n_masked,)
 
-        for test_idx in range(n_runs):
 
-            if verbose:
-                print(f" Left out run {test_idx+1}/{n_runs}")
+        # Save X_train maps
+        # ref_img_for_save = nib.load(wang_hmt_path)
+        # ref_affine = ref_img_for_save.affine
+        # ref_header = ref_img_for_save.header
+        # map_dir = op.join(bids_path, 'analysis', 'example_maps', 'density_maps', participant)
+        # os.makedirs(map_dir, exist_ok=True)
+        # dens_maps_all = np.vstack([zscored_densities for _r in train_idx]).reshape(n_tracts, len(train_idx), n_masked).transpose(2, 0, 1)
+        # idx = 0
+        # for tr in range(len(train_idx)):
+        #     for t, tract in enumerate(tract_order):
+        #         dens_map = dens_maps_all[:,t, tr] #dens_maps_all[idx, :]
+        #         idx += 1 #
+        #         dens_full = np.full((n_vertices), np.nan)
+        #         dens_full[wang_hmt_vertices] = dens_map
+        #         dens_map = dens_full.reshape((1, 1, n_vertices)).astype(np.float32)
+        #         dens_out = op.join(map_dir, f"{participant}_hemi-{hemi}_label-{tract}_trrun-{tr+1}_desc-training_density.mgz")
+        #         nib.save(nib.MGHImage(dens_map, ref_affine, ref_header), dens_out)
+        # Save y_train maps
+        # ref_img_for_save = nib.load(wang_hmt_path)
+        # ref_affine = ref_img_for_save.affine
+        # ref_header = ref_img_for_save.header
+        # map_dir = op.join(bids_path, 'analysis', 'example_maps', 'beta_maps', participant)
+        # os.makedirs(map_dir, exist_ok=True)
+        # beta_maps_all = np.squeeze(zscored_C[train_idx, :]).transpose(1,0)
+        # idx = 0
+        # for tr in range(len(train_idx)):
+        #     dens_map = beta_maps_all[:, tr] #dens_maps_all[idx, :]
+        #     idx += 1 #
+        #     dens_full = np.full((n_vertices), np.nan)
+        #     dens_full[wang_hmt_vertices] = dens_map
+        #     dens_map = dens_full.reshape((1, 1, n_vertices)).astype(np.float32)
+        #     dens_out = op.join(map_dir, f"{participant}_hemi-{hemi}_trrun-{tr+1}_desc-training_beta.mgz")
+        #     nib.save(nib.MGHImage(dens_map, ref_affine, ref_header), dens_out)
 
-            # training run indices
-            train_idx = [r for r in range(n_runs) if r != test_idx]
-            if len(train_idx) < 1:
-                # cannot train with zero samples -> skip
-                continue
-            X_train = np.vstack([norm_density_data[hemi][s][contrast] for _r in train_idx]).reshape(n_tracts, len(train_idx), n_masked).transpose(1,2,0) # (n_train*n_masked, n_tracts)
-            X_train = X_train.reshape(len(train_idx)*n_masked, n_tracts)
-            y_train = np.squeeze(C[train_idx, :]).reshape(-1, 1)  # (n_train*n_masked,)
-            
-            # Save X_train maps
-            # ref_img_for_save = nib.load(wang_hmt_path)
-            # ref_affine = ref_img_for_save.affine
-            # ref_header = ref_img_for_save.header
-            # map_dir = op.join(bids_path, 'analysis', 'example_maps', 'density_maps', participant)
-            # os.makedirs(map_dir, exist_ok=True)
-            # dens_maps_all = np.vstack([zscored_densities for _r in train_idx]).reshape(n_tracts, len(train_idx), n_masked).transpose(2, 0, 1)
-            # idx = 0
-            # for tr in range(len(train_idx)):
-            #     for t, tract in enumerate(tract_order):
-            #         dens_map = dens_maps_all[:,t, tr] #dens_maps_all[idx, :]
-            #         idx += 1 #
-            #         dens_full = np.full((n_vertices), np.nan)
-            #         dens_full[wang_hmt_vertices] = dens_map
-            #         dens_map = dens_full.reshape((1, 1, n_vertices)).astype(np.float32)
-            #         dens_out = op.join(map_dir, f"{participant}_hemi-{hemi}_label-{tract}_trrun-{tr+1}_desc-training_density.mgz")
-            #         nib.save(nib.MGHImage(dens_map, ref_affine, ref_header), dens_out)
-            # Save y_train maps
-            # ref_img_for_save = nib.load(wang_hmt_path)
-            # ref_affine = ref_img_for_save.affine
-            # ref_header = ref_img_for_save.header
-            # map_dir = op.join(bids_path, 'analysis', 'example_maps', 'beta_maps', participant)
-            # os.makedirs(map_dir, exist_ok=True)
-            # beta_maps_all = np.squeeze(zscored_C[train_idx, :]).transpose(1,0)
-            # idx = 0
-            # for tr in range(len(train_idx)):
-            #     dens_map = beta_maps_all[:, tr] #dens_maps_all[idx, :]
-            #     idx += 1 #
-            #     dens_full = np.full((n_vertices), np.nan)
-            #     dens_full[wang_hmt_vertices] = dens_map
-            #     dens_map = dens_full.reshape((1, 1, n_vertices)).astype(np.float32)
-            #     dens_out = op.join(map_dir, f"{participant}_hemi-{hemi}_trrun-{tr+1}_desc-training_beta.mgz")
-            #     nib.save(nib.MGHImage(dens_map, ref_affine, ref_header), dens_out)
- 
 
-            # Train linear model (multi-output regression)
-            ridge = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error", cv=inner_cv)
-            ridge.fit(X_train, y_train)
+        # Train linear model (multi-output regression)
+        ridge = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error", cv=inner_cv)
+        ridge.fit(X_train, y_train)
 
-            trained_coefs[test_idx,:, s, h] = ridge.coef_.copy() #[0:n_tracts-1]
-            # ridge.intercept_
+        trained_coefs[:, test_idx, h] = ridge.coef_.copy() #[0:n_tracts-1]
+        # ridge.intercept_
 
-            X_test = norm_density_data[hemi][s][contrast].T #zscored_densities.T
-            y_pred_std = ridge.predict(X_test)
-            # y_pred = (y_pred_std*np.std(C[test_idx,:]) + np.mean(C[test_idx,:])).ravel()
+        X_test = norm_density_data[hemi][test_idx][contrast].T 
+        y_pred_std = ridge.predict(X_test)
+        # y_pred = (y_pred_std*np.std(C[test_idx,:]) + np.mean(C[test_idx,:])).ravel()
 
-            predicted[s, test_idx, :] = y_pred_std
-            
-            # Evaluate this test_run if verbose
-            if verbose:
-                y_run_true = np.squeeze(C[test_idx, :])
-                r_run, p_run = pearsonr(np.squeeze(y_run_true), y_pred_std)
-                mse_run = mean_squared_error(np.squeeze(y_run_true), y_pred_std)
-                print(f"   run r={r_run:.4f}, MSE={mse_run:.4e}, p={p_run:.4e}")
+        predicted[test_idx, :] = y_pred_std
+        reliability[test_idx, h] = vertex_bootstrap_reliability(all_C[test_idx,:,:])
 
-        #------------------
-        #Performance metrics
-        #------------------
-        #overall correlation across all runs (concatenated)
-        r_all[s, h], _ = pearsonr(C.reshape(-1), predicted[s, :n_runs, :].reshape(-1))
-        reliability[s, h] = vertex_bootstrap_reliability(C)
-        #Calculate correlation for a given run
-        for r in range(n_runs):
+        # Evaluate this test_participant if verbose
+        if verbose:
+            y_participant_true = np.squeeze(C_mean[test_idx, :])
+            r_participant, p_participant = pearsonr(np.squeeze(y_participant_true), y_pred_std)
+            rs[test_idx,h] = r_participant
+            mse_participant = mean_squared_error(np.squeeze(y_participant_true), y_pred_std)
+            print(f"Participant r:{r_participant:.4f}, MSE={mse_participant:.4e}, p={p_participant:.4e}")
 
-            y_true = C[r, :].reshape(-1)
-            y_pred = predicted[s, r, :].reshape(-1)
+    #------------------
+    #Performance metrics
+    #------------------
+    #overall correlation across all participants (concatenated)
+    predicted_full = np.full((n_subj, n_vertices), np.nan)
+    predicted_full[:, wang_hmt_vertices] = predicted
 
-            # Skip if prediction missing
-            if np.isnan(y_pred).all():
-                continue
+    true_full = np.full((n_subj, n_vertices), np.nan)
+    true_full[:, wang_hmt_vertices] = C_mean
 
-            r_r, _ = pearsonr(y_true, y_pred)
-            mse_r =  np.mean((y_true - y_pred)**2) #mean_squared_error(y_true, y_pred)
+    # Coefficients already organized: (n_subj, n_tracts)
+    coefs_arr = trained_coefs.copy()
 
-            rs[r, s, h] = r_r
-            mses[r, s, h] = mse_r
-            rsquared[r, s, h] = r2_score(y_true, y_pred)
-            # noise_norm_r[r,s,h]= noise_normalized_r(y_true, y_pred, split_half_reliability_bootstrap(C))
-            print(f" r2={rsquared[r, s, h]:.4f}")
+    # Mean coefficient per tract
+    mean_coefs = np.mean(coefs_arr, axis=0)
+
+    print("\nDone.")
 
     predicted_maps[hemi] = predicted
     print(f"\nFinished hemisphere {hemi}")
@@ -710,7 +710,7 @@ nc_sem_df["CI95_upper"] = nc_sem_df["Mean"] + 1.96 * nc_sem_df["SEM"]
 nc_sem_df["CI95_lower"] = nc_sem_df["Mean"] - 1.96 * nc_sem_df["SEM"]
 
 # --------------------------------------
-# Second, organize Pearson's in table
+# Organize Pearson's r in table
 # --------------------------------------
 
 hemi_labels = ["L", "R"]
@@ -719,13 +719,13 @@ rows = []
 for h in range(2):     # left/right hemispheres
     for s, participant in enumerate(participants):
         gp = "EB" if "EB" in participant else "NS"
-        pearson = rs[:, s, h]
+        # pearson = rs[:, s, h]
 
         rows.append({
             "Subject": s,
             "Hemisphere": hemi_labels[h],
             "Group": gp,
-            "Correlation": pearson.mean() #r_all[s, h] #
+            "Correlation": rs[s,h] #r_all[s, h] #
         })
 
 df = pd.DataFrame(rows)
@@ -788,7 +788,6 @@ for ax, hemi in zip(axes, hemi_labels):
             capsize=3,
             linewidth=2
         )
-
     # ---- Noise ceiling 95% CI upper/lower bound/mean ----
     for _, row in nc_h.iterrows():
         group = row["Group"]
@@ -827,10 +826,10 @@ axes[0].set_ylabel("Mean Pearson's r", fontsize=14)
 sns.despine()
 plt.tight_layout()
 
-# Saving
-# saveDir = op.join(bids_path, "analysis", "plots")
-# os.makedirs(saveDir, exist_ok=True)
-# plt.savefig(op.join(saveDir, "pearson_mean_ridgereg_loro_combined_tracts.png"), dpi=300, bbox_inches='tight')
+#Saving
+saveDir = op.join(bids_path, "analysis", "plots")
+os.makedirs(saveDir, exist_ok=True)
+plt.savefig(op.join(saveDir, "pearson_mean_ridgereg_loso_combined_tracts.png"), dpi=300, bbox_inches='tight')
 
 plt.show()
 
@@ -857,7 +856,7 @@ for h in range(n_hemi):
     for t in range(n_tracts):
         for s, participant in enumerate(participants):
             gp = "EB" if "EB" in participant else "NS"
-            betas = trained_coefs[:, t, s, h]   # shape (6,)
+            betas = trained_coefs[t, s, h]   # shape (6,)
             if np.isnan(betas).all():
                 continue
             
@@ -944,10 +943,10 @@ axes[0].set_ylabel("Mean Beta", fontsize=14)
 axes[1].legend(title="Group", labels=group_labels)
 sns.despine()
 plt.tight_layout()
-# saveDir = op.join(bids_path, 'analysis', 'plots')
-# os.makedirs(saveDir, exist_ok=True)
-# plt.savefig(op.join(saveDir, "betas_ridgereg_loro_combined_tracts_new.png"),
-#             dpi=300, bbox_inches='tight')
+saveDir = op.join(bids_path, 'analysis', 'plots')
+os.makedirs(saveDir, exist_ok=True)
+plt.savefig(op.join(saveDir, "betas_ridgereg_loso_combined_tracts_new.png"),
+            dpi=300, bbox_inches='tight')
 plt.show()
 
 
