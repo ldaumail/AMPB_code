@@ -28,7 +28,7 @@ fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
-tract_order = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] #'MTxPT', 'MTxPU' 'MTxFEF','MTxhIP','MTxV1'
+tract_order = ['MTxLGNxPU', 'MTxPTxSTS1'] #'MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
 
@@ -142,7 +142,8 @@ for participant in participants:
 #================== Prepare and Normalize X and Y data for model fit =============
 hemis = ["L", "R"]
 contrast = contrast_order[0]   # e.g. "motionXstationary"
-n_subj, n_tracts, _  = density_data["L"].shape
+n_subj = len(participants)
+n_tracts = len(tract_order)
 norm_density_data = {hemi: {} for hemi in hemis}
 norm_contrast_data = {hemi: {} for hemi in hemis}
 for h, hemi in enumerate(hemis):
@@ -159,7 +160,11 @@ for h, hemi in enumerate(hemis):
     wang_hmt_vertices = np.where(surf_roi > 0)[0]
     print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
     # Densities within Wang MT only (subj, tract, masked_vertices)
-    densities_masked = densities[:, :, wang_hmt_vertices]
+    if n_tracts == 1:
+        densities_masked = densities[:, wang_hmt_vertices]
+    else:
+        densities_masked = densities[:, :, wang_hmt_vertices]
+
     n_masked = len(wang_hmt_vertices)
 
     for s, participant in enumerate(participants):
@@ -191,10 +196,17 @@ for h, hemi in enumerate(hemis):
             # anatomical vector for this subject and tract (length = n_masked)
             # anat_vec = densities_masked[s, tract_idx, :]  # shape (n_masked,)
             #Zscore the density data of the tract of this participant
-            if np.std(densities_masked[s, tract_idx, :]) == 0:
-                zscored_densities[tract_idx,:] = 0
+            if n_tracts == 1:
+                if np.std(densities_masked[s, :]) == 0:
+                    zscored_densities[tract_idx,:] = 0
+                else:
+                    zscored_densities[tract_idx,:] = (densities_masked[s, :] - np.mean(densities_masked[s, :]))/np.std(densities_masked[s, :])
             else:
-                zscored_densities[tract_idx,:] = (densities_masked[s, tract_idx, :] - np.mean(densities_masked[s, tract_idx, :]))/np.std(densities_masked[s, tract_idx, :])
+                if np.std(densities_masked[s, tract_idx, :]) == 0:
+                    zscored_densities[tract_idx,:] = 0
+                else:
+                    zscored_densities[tract_idx,:] = (densities_masked[s, tract_idx, :] - np.mean(densities_masked[s, tract_idx, :]))/np.std(densities_masked[s, tract_idx, :])
+
 
         norm_density_data[hemi].setdefault(s, {})
         norm_density_data[hemi][s][contrast] = zscored_densities
@@ -289,7 +301,7 @@ for h, hemi in enumerate(hemis):
 
     # Predicted and coef storage preallocation
     predicted = np.full((n_subj, n_masked), np.nan)  # predicted maps per run
-    _, _, n_vertices  = density_data[hemi].shape #get total number of vertices within fsaverage hemisphere
+    n_vertices  = len(surf_roi)#density_data[hemi].shape #get total number of vertices within fsaverage hemisphere
     
     n_target_runs = 3
     all_C = []              # will store (n_subj, 3, n_vertices)
@@ -830,8 +842,7 @@ plt.tight_layout()
 #Saving
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "pearson_mean_ridgereg_loso_combined_tracts.png"), dpi=300, bbox_inches='tight')
-
+plt.savefig(op.join(saveDir, "pearson_mean_ridgereg_loso_combined_tracts_MT-PTxSTS1_LGNxPU.png"), dpi=300, bbox_inches='tight')
 plt.show()
 
 #----------------------------
@@ -946,7 +957,7 @@ sns.despine()
 plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "betas_ridgereg_loso_combined_tracts_new.png"),
+plt.savefig(op.join(saveDir, "betas_ridgereg_loso_combined_tracts_MT-PTxSTS1_LGNxPU.png"),
             dpi=300, bbox_inches='tight')
 plt.show()
 

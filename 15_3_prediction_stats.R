@@ -222,7 +222,7 @@ result[[6]] =t.test(data$Correlation[data$Tract == "MTxFEF" & data$Hemisphere ==
 ## 2: Look at cross validations with combined tracts for model fitting
 #--------------------------------------------------------------------
 ## BETAS ###
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/ridgecv_loro_predicted_maps/combined/betas_contrast-motionXstationary_combined_tracts.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/ridgecv_loso_predicted_maps/combined/betas_contrast-motionXstationary_combined_tracts.csv'
 file = file.path(path)
 data = read.csv(file) #
 
@@ -230,10 +230,10 @@ library(rstatix) #Anova test within subjects
 ###---------------------
 ## Test each hemisphere separately
 ###---------------------
-res.aov <- anova_test(data = data[data$Hemisphere == "L",], dv = MeanBeta, wid = Subject, within = c(Tract ), between = Group)
+res.aov <- anova_test(data = data[data$Hemisphere == "L",], dv = MeanBeta, wid = Participant, within = c(Tract ), between = Group)
 get_anova_table(res.aov, correction = "none")
 
-res.aov <- anova_test(data = data[data$Hemisphere == "R",], dv = MeanBeta, wid = Subject, within = c(Tract ), between = Group)
+res.aov <- anova_test(data = data[data$Hemisphere == "R",], dv = MeanBeta, wid = Participant, within = c(Tract ), between = Group)
 get_anova_table(res.aov, correction = "none")
 
 #T-test against 0
@@ -256,10 +256,29 @@ df_ttests <- data %>%
   ) %>%
   select(Group, Hemisphere, Tract, n, t_value, p_value)
 
+#T-tests
+result <- vector("list",6)
+result[[1]] =t.test(data$MeanBeta[data$Tract == "MTxLGNxPU" & data$Hemisphere == "L" & data$Group == "EB"], data$MeanBeta[data$Tract == "MTxLGNxPU" & data$Hemisphere == "L" & data$Group == "NS"],
+                    alternative = "two.sided", mu = 0, paired = FALSE, conf.level = 0.90)
+
+result[[2]] =t.test(data$MeanBeta[data$Tract == "MTxPTxSTS1" & data$Hemisphere == "L" & data$Group == "EB"], data$MeanBeta[data$Tract == "MTxPTxSTS1" & data$Hemisphere == "L" & data$Group == "NS"],
+                    alternative = "two.sided", mu = 0, paired = FALSE, conf.level = 0.90)
+
+result[[3]] =t.test(data$MeanBeta[data$Tract == "MTxFEF" & data$Hemisphere == "L" & data$Group == "EB"], data$MeanBeta[data$Tract == "MTxFEF" & data$Hemisphere == "L" & data$Group == "NS"],
+                    alternative = "two.sided", mu = 0, paired = FALSE, conf.level = 0.90)
+
+result[[4]] =t.test(data$MeanBeta[data$Tract == "MTxLGNxPU" & data$Hemisphere == "R" & data$Group == "EB"], data$MeanBeta[data$Tract == "MTxLGNxPU" & data$Hemisphere == "R" & data$Group == "NS"],
+                    alternative = "two.sided", mu = 0, paired = FALSE, conf.level = 0.90)
+
+result[[5]] =t.test(data$MeanBeta[data$Tract == "MTxPTxSTS1" & data$Hemisphere == "R" & data$Group == "EB"], data$MeanBeta[data$Tract == "MTxPTxSTS1" & data$Hemisphere == "R" & data$Group == "NS"],
+                    alternative = "two.sided", mu = 0, paired = FALSE, conf.level = 0.90)
+
+result[[6]] =t.test(data$MeanBeta[data$Tract == "MTxFEF" & data$Hemisphere == "R" & data$Group == "EB"], data$MeanBeta[data$Tract == "MTxFEF" & data$Hemisphere == "R" & data$Group == "NS"],
+                    alternative = "two.sided", mu = 0, paired = FALSE, conf.level = 0.90)
 #---------------
 # Pearson's R
 #---------------
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/ridgecv_loro_predicted_maps/combined/mean_pearsonsR_contrast-motionXstationary_combined_tracts.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/ridgecv_loso_predicted_maps/combined/mean_pearsonsR_contrast-motionXstationary_combined_tracts.csv'
 file = file.path(path)
 data = read.csv(file) #
 
