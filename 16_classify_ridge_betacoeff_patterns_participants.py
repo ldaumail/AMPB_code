@@ -15,7 +15,7 @@ from sklearn.model_selection import permutation_test_score
 
 #Load beta coeffs
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
-df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits','ridgecv_loso_predicted_maps', 'combined', 'betas_contrast-motionXstationary_combined_tracts.csv'))
+df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits','participants_betas', 'combined', 'participant_betas_contrast-motionXstationary_combined_tracts.csv'))
 
 
 participants = df["Participant"].unique()
@@ -34,7 +34,7 @@ def get_feature_matrix(df, hemi,selected_tracts):
     """
     X = (
         df[(df["Hemisphere"] == hemi) & (df["Tract"].isin(selected_tracts))]
-        .pivot_table(index="Participant", columns="Tract", values="MeanBeta")
+        .pivot_table(index="Participant", columns="Tract", values="Beta")
         .loc[participants, selected_tracts]
         .to_numpy()
         )
@@ -93,7 +93,7 @@ results = {}
 
 #train model per hemisphere
 # df_no_mtfef = df[df["Tract"] != "MTxFEF"].copy()
-selected_tracts = tracts[:2]  # or explicit list
+selected_tracts = tracts[:3]  # or explicit list
 for hemi in hemis:
     print(f"\n=== Hemisphere {hemi} ===")
 
@@ -150,7 +150,6 @@ for hemi in hemis:
 
 
 #==================== Visualize ===================#
-
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
@@ -235,7 +234,7 @@ def plot_3d_both_hemispheres(df, participants, y, selected_tracts):
     # Saving
     saveDir = op.join(bids_path, "analysis", "plots")
     os.makedirs(saveDir, exist_ok=True)
-    plt.savefig(op.join(saveDir, "beta_weights_3d_ridgereg_loso_combined_tracts_angle.png"), dpi=300, bbox_inches='tight')
+    plt.savefig(op.join(saveDir, "beta_weights_3d_ridgereg_participants_combined_tracts_angle.png"), dpi=300, bbox_inches='tight')
 
     plt.show()
 
@@ -338,7 +337,7 @@ def plot_3d_with_plane(
     plt.savefig(
         op.join(
             saveDir,
-            "beta_weights_3d_ridgereg_loso_combined_tracts_planes_LR_MT-LGNxPU_PTxSTS1.png"
+            "beta_weights_3d_ridgereg_participants_combined_tracts_plane.png"
         ),
         dpi=300,
         bbox_inches="tight"
@@ -354,7 +353,7 @@ plot_3d_with_plane(
     y=y,
     hemis=["L", "R"],
     tracts=selected_tracts,
-    C = 0.063,
+    C = 0.027,
     elev=15,
     azim=-45
 )

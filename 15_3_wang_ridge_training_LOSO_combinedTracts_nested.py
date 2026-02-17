@@ -4,7 +4,6 @@
 
 import numpy as np
 from sklearn.linear_model import RidgeCV
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from scipy.stats import pearsonr
 import random
@@ -28,7 +27,7 @@ fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
-tract_order = ['MTxLGNxPU', 'MTxPTxSTS1'] #'MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'
+tract_order = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] #'MTxLGNxPU', 'MTxPTxSTS1', 
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
 
@@ -263,6 +262,7 @@ def noise_normalized_r(y_true, y_pred, reliability):
 #---------------------------
 ## Fit linear model to data
 #---------------------------
+# Cross validation params
 alphas = np.logspace(-4, 4, 25)      # Ridge alpha grid (adjust if needed)
 inner_cv = 5                         # internal CV to choose alpha (could use LeaveOneOut if many subjects)
 verbose = True
@@ -395,12 +395,12 @@ for h, hemi in enumerate(hemis):
         reliability[test_idx, h] = vertex_bootstrap_reliability(all_C[test_idx,:,:])
 
         # Evaluate this test_participant if verbose
-        if verbose:
-            y_participant_true = np.squeeze(C_mean[test_idx, :])
-            r_participant, p_participant = pearsonr(np.squeeze(y_participant_true), y_pred_std)
-            rs[test_idx,h] = r_participant
-            mse_participant = mean_squared_error(np.squeeze(y_participant_true), y_pred_std)
-            print(f"Participant r:{r_participant:.4f}, MSE={mse_participant:.4e}, p={p_participant:.4e}")
+        y_participant_true = np.squeeze(C_mean[test_idx, :])
+        r_participant, p_participant = pearsonr(np.squeeze(y_participant_true), y_pred_std)
+        rs[test_idx,h] = r_participant
+        mse_participant = mean_squared_error(np.squeeze(y_participant_true), y_pred_std)
+        print(f"Participant r:{r_participant:.4f}, MSE={mse_participant:.4e}, p={p_participant:.4e}")
+
 
     #------------------
     #Performance metrics

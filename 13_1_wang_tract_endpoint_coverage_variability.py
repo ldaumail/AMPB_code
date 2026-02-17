@@ -58,14 +58,15 @@ for hemi in hemispheres:
             density_map = nib.load(density_map_file).get_fdata().squeeze()
 
             # Extract density values at ROI vertices
-            roi_values = density_map[overlap_vertices]
+            roi_density_values = density_map[overlap_vertices]
             
             # Compute stats
-            nonzero_count = np.count_nonzero(roi_values)
-            total_count = len(roi_values)
+            nonzero_count = np.count_nonzero(roi_density_values)
+            total_count = len(roi_density_values)
             # proportion = nonzero_count / total_count if total_count > 0 else np.nan
-             #Dice similarity coefficient (DSC)
-            DSC =  2*np.sum((roi_values) > 0) / (np.sum(density_map >0)+ np.sum(overlap_vertices > 0))
+             #Dice similarity coefficient (DSC) = 2x number of vertices with non zero density within func MT / (number of vertices with density values+ number of func MT vertices)
+            density_thresh = 9
+            DSC =  2*np.sum((roi_density_values) > density_thresh) / (np.sum(density_map > density_thresh)+ np.sum(overlap_vertices > 0))
             all_rows.append({
                 "participant": participant,
                 "hemisphere": hemi,
@@ -224,6 +225,8 @@ legend_handles = [
 ]
 fig.legend(handles=legend_handles, loc="upper center", ncol=2, frameon=False)
 plt.tight_layout(rect=[0, 0, 1, 0.95])
+saveDir = op.join(bids_path, "analysis", "plots")
+plt.savefig(op.join(saveDir, "dice_tracts_thresh_9.png"), dpi=300, bbox_inches='tight')
 plt.show()
 
 

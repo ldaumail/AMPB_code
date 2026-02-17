@@ -4,7 +4,6 @@
 
 import numpy as np
 from sklearn.linear_model import RidgeCV
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from scipy.stats import pearsonr
 import random
@@ -28,7 +27,7 @@ fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
-tract_order = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] #'MTxPT', 'MTxPU' 'MTxFEF','MTxhIP','MTxV1'
+tract_order = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] #'MTxLGNxPU', 'MTxPTxSTS1', 
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
 
@@ -142,7 +141,8 @@ for participant in participants:
 #================== Prepare and Normalize X and Y data for model fit =============
 hemis = ["L", "R"]
 contrast = contrast_order[0]   # e.g. "motionXstationary"
-n_subj, n_tracts, _  = density_data["L"].shape
+n_subj = len(participants)
+n_tracts = len(tract_order)
 norm_density_data = {hemi: {} for hemi in hemis}
 norm_contrast_data = {hemi: {} for hemi in hemis}
 for h, hemi in enumerate(hemis):
@@ -159,7 +159,11 @@ for h, hemi in enumerate(hemis):
     wang_hmt_vertices = np.where(surf_roi > 0)[0]
     print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
     # Densities within Wang MT only (subj, tract, masked_vertices)
-    densities_masked = densities[:, :, wang_hmt_vertices]
+    if n_tracts == 1:
+        densities_masked = densities[:, wang_hmt_vertices]
+    else:
+        densities_masked = densities[:, :, wang_hmt_vertices]
+
     n_masked = len(wang_hmt_vertices)
 
     for s, participant in enumerate(participants):
@@ -191,13 +195,20 @@ for h, hemi in enumerate(hemis):
             # anatomical vector for this subject and tract (length = n_masked)
             # anat_vec = densities_masked[s, tract_idx, :]  # shape (n_masked,)
             #Zscore the density data of the tract of this participant
-            if np.std(densities_masked[s, tract_idx, :]) == 0:
-                zscored_densities[tract_idx,:] = 0
+            if n_tracts == 1:
+                if np.std(densities_masked[s, :]) == 0:
+                    zscored_densities[tract_idx,:] = 0
+                else:
+                    zscored_densities[tract_idx,:] = (densities_masked[s, :] - np.mean(densities_masked[s, :]))/np.std(densities_masked[s, :])
             else:
-                zscored_densities[tract_idx,:] = (densities_masked[s, tract_idx, :] - np.mean(densities_masked[s, tract_idx, :]))/np.std(densities_masked[s, tract_idx, :])
+                if np.std(densities_masked[s, tract_idx, :]) == 0:
+                    zscored_densities[tract_idx,:] = 0
+                else:
+                    zscored_densities[tract_idx,:] = (densities_masked[s, tract_idx, :] - np.mean(densities_masked[s, tract_idx, :]))/np.std(densities_masked[s, tract_idx, :])
+
 
         norm_density_data[hemi].setdefault(s, {})
-        norm_density_data[hemi][s][contrast] = zscored_densities
+        norm_density_data[hemi][s] = zscored_densities
 
 #================Useful functions ============
 #Define a goodness of fit function
@@ -206,7 +217,7 @@ def r2_score(y_t, y_p):
     ss_tot = np.sum((y_t - np.mean(y_t))**2)
     return 1 - ss_res / ss_tot
 
-
+#Noise ceiling
 def vertex_bootstrap_reliability(C, n_boot=1000, frac=1):
     """
     C: array (n_runs, n_vertices)
@@ -251,24 +262,33 @@ def noise_normalized_r(y_true, y_pred, reliability):
 #---------------------------
 ## Fit linear model to data
 #---------------------------
+# Cross validation params
 alphas = np.logspace(-4, 4, 25)      # Ridge alpha grid (adjust if needed)
 inner_cv = 5                         # internal CV to choose alpha (could use LeaveOneOut if many subjects)
 verbose = True
 
 hemis = ["L", "R"]
+groups = ["EB", "NS"]
 contrast = contrast_order[0]   # e.g. "motionXstationary"
 
 # get n_subj, n_tracts
 n_subj = len(participants)
 n_tracts = len(tract_order)
+
+rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan)
+
+#Performance metrics
 rs   = np.full((n_subj, len(hemis)), np.nan)
-mses = np.full((n_subj, len(hemis)), np.nan) #
 rsquared = np.full(( n_subj, len(hemis)), np.nan) #goodness of fit
 reliability = np.full((n_subj, len(hemis)), np.nan)
-r_all = np.full((n_subj, len(hemis)), np.nan)
-rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan)
-trained_coefs = np.zeros((n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
+noise_norm_r = np.full((n_subj, len(hemis)), np.nan)
+mses = np.full((n_subj, len(hemis)), np.nan) #
+delta_mse = np.full((n_tracts, n_subj, len(hemis)), np.nan) #
+
+#Model outputs
 predicted_maps = {hemi: [] for hemi in hemis}
+trained_coefs = np.zeros((n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
+
 for h, hemi in enumerate(hemis):
         #h = 0
         #hemi = "L"
@@ -286,10 +306,10 @@ for h, hemi in enumerate(hemis):
     wang_hmt_vertices = np.where(surf_roi > 0)[0]
     print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
     n_masked = len(wang_hmt_vertices)
-
+    
     # Predicted and coef storage preallocation
     predicted = np.full((n_subj, n_masked), np.nan)  # predicted maps per run
-    _, _, n_vertices  = density_data[hemi].shape #get total number of vertices within fsaverage hemisphere
+    n_vertices  = len(surf_roi)#density_data[hemi].shape #get total number of vertices within fsaverage hemisphere
     
     n_target_runs = 3
     all_C = []              # will store (n_subj, 3, n_vertices)
@@ -315,80 +335,106 @@ for h, hemi in enumerate(hemis):
     all_C = np.stack(all_C, axis=0)
     C_mean = all_C.mean(axis=1)
 
-
-    # -------------------------
-    # main loop
-    # -------------------------
-    for test_idx in range(n_subj):
-        #Prepare subject's Y = functional maps
-        # get this subject's run maps of the chosen contrast
+    for g, group in enumerate(groups):
+        participants_group = [p for p in participants if group in p]
+        n_g_subj = len(participants_group)
+        #Define X and Y of the given group
+        group_norm_density = [norm_density_data[hemi][p] for p in range(n_subj) if participants[p] in participants_group]
+        group_C_mean = [C_mean[p,:] for p in range(n_subj) if participants[p] in participants_group]
         
-        # training participants indices
-        train_idx = [i for i in range(n_subj) if i != test_idx]   
-
         if verbose:
-            print(f" Left out participant {participants[test_idx]}")
-        
-        X_train = np.vstack([norm_density_data[hemi][i][contrast].T for i in train_idx])   # (n_train*n_masked, n_tracts)
-        y_train = np.hstack([C_mean[i,:] for i in train_idx])  # (n_train*n_masked,)
+                print(f" Cross-validating {group} group")
+        # -------------------------
+        # main loop
+        # -------------------------
+        for test_idx in range(n_g_subj):
+            #Prepare subject's Y = functional maps
+            # get this subject's run maps of the chosen contrast
+            
+            # training participants indices
+            train_idx = [i for i in range(n_g_subj) if i != test_idx]   
+
+            if verbose:
+                print(f" Left out participant {participants_group[test_idx]}")
 
 
-        # Save X_train maps
-        # ref_img_for_save = nib.load(wang_hmt_path)
-        # ref_affine = ref_img_for_save.affine
-        # ref_header = ref_img_for_save.header
-        # map_dir = op.join(bids_path, 'analysis', 'example_maps', 'density_maps', participant)
-        # os.makedirs(map_dir, exist_ok=True)
-        # dens_maps_all = np.vstack([zscored_densities for _r in train_idx]).reshape(n_tracts, len(train_idx), n_masked).transpose(2, 0, 1)
-        # idx = 0
-        # for tr in range(len(train_idx)):
-        #     for t, tract in enumerate(tract_order):
-        #         dens_map = dens_maps_all[:,t, tr] #dens_maps_all[idx, :]
-        #         idx += 1 #
-        #         dens_full = np.full((n_vertices), np.nan)
-        #         dens_full[wang_hmt_vertices] = dens_map
-        #         dens_map = dens_full.reshape((1, 1, n_vertices)).astype(np.float32)
-        #         dens_out = op.join(map_dir, f"{participant}_hemi-{hemi}_label-{tract}_trrun-{tr+1}_desc-training_density.mgz")
-        #         nib.save(nib.MGHImage(dens_map, ref_affine, ref_header), dens_out)
-        # Save y_train maps
-        # ref_img_for_save = nib.load(wang_hmt_path)
-        # ref_affine = ref_img_for_save.affine
-        # ref_header = ref_img_for_save.header
-        # map_dir = op.join(bids_path, 'analysis', 'example_maps', 'beta_maps', participant)
-        # os.makedirs(map_dir, exist_ok=True)
-        # beta_maps_all = np.squeeze(zscored_C[train_idx, :]).transpose(1,0)
-        # idx = 0
-        # for tr in range(len(train_idx)):
-        #     dens_map = beta_maps_all[:, tr] #dens_maps_all[idx, :]
-        #     idx += 1 #
-        #     dens_full = np.full((n_vertices), np.nan)
-        #     dens_full[wang_hmt_vertices] = dens_map
-        #     dens_map = dens_full.reshape((1, 1, n_vertices)).astype(np.float32)
-        #     dens_out = op.join(map_dir, f"{participant}_hemi-{hemi}_trrun-{tr+1}_desc-training_beta.mgz")
-        #     nib.save(nib.MGHImage(dens_map, ref_affine, ref_header), dens_out)
+            X_train = np.vstack([group_norm_density[i].T for i in train_idx])   # (n_train*n_masked, n_tracts)
+            y_train = np.hstack([group_C_mean[i] for i in train_idx])  # (n_train*n_masked,)
 
 
-        # Train linear model (multi-output regression)
-        ridge = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error", cv=inner_cv)
-        ridge.fit(X_train, y_train)
+            # Save X_train maps
+            # ref_img_for_save = nib.load(wang_hmt_path)
+            # ref_affine = ref_img_for_save.affine
+            # ref_header = ref_img_for_save.header
+            # map_dir = op.join(bids_path, 'analysis', 'example_maps', 'density_maps', participant)
+            # os.makedirs(map_dir, exist_ok=True)
+            # dens_maps_all = np.vstack([zscored_densities for _r in train_idx]).reshape(n_tracts, len(train_idx), n_masked).transpose(2, 0, 1)
+            # idx = 0
+            # for tr in range(len(train_idx)):
+            #     for t, tract in enumerate(tract_order):
+            #         dens_map = dens_maps_all[:,t, tr] #dens_maps_all[idx, :]
+            #         idx += 1 #
+            #         dens_full = np.full((n_vertices), np.nan)
+            #         dens_full[wang_hmt_vertices] = dens_map
+            #         dens_map = dens_full.reshape((1, 1, n_vertices)).astype(np.float32)
+            #         dens_out = op.join(map_dir, f"{participant}_hemi-{hemi}_label-{tract}_trrun-{tr+1}_desc-training_density.mgz")
+            #         nib.save(nib.MGHImage(dens_map, ref_affine, ref_header), dens_out)
+            # Save y_train maps
+            # ref_img_for_save = nib.load(wang_hmt_path)
+            # ref_affine = ref_img_for_save.affine
+            # ref_header = ref_img_for_save.header
+            # map_dir = op.join(bids_path, 'analysis', 'example_maps', 'beta_maps', participant)
+            # os.makedirs(map_dir, exist_ok=True)
+            # beta_maps_all = np.squeeze(zscored_C[train_idx, :]).transpose(1,0)
+            # idx = 0
+            # for tr in range(len(train_idx)):
+            #     dens_map = beta_maps_all[:, tr] #dens_maps_all[idx, :]
+            #     idx += 1 #
+            #     dens_full = np.full((n_vertices), np.nan)
+            #     dens_full[wang_hmt_vertices] = dens_map
+            #     dens_map = dens_full.reshape((1, 1, n_vertices)).astype(np.float32)
+            #     dens_out = op.join(map_dir, f"{participant}_hemi-{hemi}_trrun-{tr+1}_desc-training_beta.mgz")
+            #     nib.save(nib.MGHImage(dens_map, ref_affine, ref_header), dens_out)
 
-        trained_coefs[:, test_idx, h] = ridge.coef_.copy() #[0:n_tracts-1]
-        # ridge.intercept_
 
-        X_test = norm_density_data[hemi][test_idx][contrast].T 
-        y_pred_std = ridge.predict(X_test)
-        # y_pred = (y_pred_std*np.std(C[test_idx,:]) + np.mean(C[test_idx,:])).ravel()
+            # Train linear model (multi-output regression)
+            ridge = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error", cv=inner_cv)
+            ridge.fit(X_train, y_train)
 
-        predicted[test_idx, :] = y_pred_std
-        reliability[test_idx, h] = vertex_bootstrap_reliability(all_C[test_idx,:,:])
+            
+            all_test_idx = test_idx if group == "EB" else test_idx+7
+            trained_coefs[:, all_test_idx,h] = ridge.coef_.copy() #[0:n_tracts-1]
+            # ridge.intercept_
 
-        # Evaluate this test_participant if verbose
-        if verbose:
-            y_participant_true = np.squeeze(C_mean[test_idx, :])
+            X_test = group_norm_density[test_idx].T 
+            y_pred_std = ridge.predict(X_test)
+            # y_pred = (y_pred_std*np.std(C[test_idx,:]) + np.mean(C[test_idx,:])).ravel()
+
+            predicted[all_test_idx, :] = y_pred_std
+            reliability[all_test_idx, h] = vertex_bootstrap_reliability(all_C[all_test_idx,:,:])
+
+            # Evaluate this test_participant if verbose
+            y_participant_true = np.squeeze(group_C_mean[test_idx])
             r_participant, p_participant = pearsonr(np.squeeze(y_participant_true), y_pred_std)
-            rs[test_idx,h] = r_participant
-            mse_participant = mean_squared_error(np.squeeze(y_participant_true), y_pred_std)
-            print(f"Participant r:{r_participant:.4f}, MSE={mse_participant:.4e}, p={p_participant:.4e}")
+            rs[all_test_idx,h] = r_participant
+            noise_norm_r[all_test_idx,h] = noise_normalized_r(np.squeeze(y_participant_true), y_pred_std,reliability[all_test_idx, h])
+            mse_participant_full = mean_squared_error(np.squeeze(y_participant_true), y_pred_std)
+            rsquared[all_test_idx,h] = r2_score(np.squeeze(y_participant_true), y_pred_std)
+
+            print(f"Participant r:{r_participant:.4f}, MSE={mse_participant_full:.4e}, p={p_participant:.4e}")
+
+            # Nested models ridge regression
+            for t in range(n_tracts):
+
+                X_train_red = np.delete(X_train, t, axis=1)
+                ridgereg_red = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error", cv=inner_cv)
+                ridgereg_red.fit(X_train_red, y_train)
+
+                X_test_red = np.delete(X_test, t, axis=1)
+                y_test_pred_red = ridgereg_red.predict(X_test_red).ravel()
+                mse_red = mean_squared_error(y_participant_true, y_test_pred_red)
+                delta_mse[t, all_test_idx, h] = mse_red - mse_participant_full
+
 
     #------------------
     #Performance metrics
@@ -411,7 +457,9 @@ for h, hemi in enumerate(hemis):
     predicted_maps[hemi] = predicted
     print(f"\nFinished hemisphere {hemi}")
 
-
+#------------------------------------------------------------------------
+# Full Model plots
+#------------------------------------------------------------------------
 
     # Optionally save predicted maps per subject using a reference image
 # ----------------------------------------------------------
@@ -516,22 +564,22 @@ for h, hemi in enumerate(hemis):
         # ----------------------------
         # Predicted Map visualization
         # ----------------------------
-        img_out_dir = op.join(bids_path, "analysis", "plots")
+        img_out_dir = op.join(bids_path, "analysis", "surface_pngs", participant)
         os.makedirs(img_out_dir, exist_ok=True)
 
-        vmin, vmax = -1, 1
+        vmin, vmax = -1.0, 1.0
         # -------------------------------------------------
         # Compute average functional map across runs FIRST
         # -------------------------------------------------
 
         # Build full-surface vector 
         surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
-        surf_map[wang_hmt_vertices] = predicted_maps[hemi][s, :]
+        surf_map[wang_hmt_vertices] = np.nanmean(predicted_maps[hemi][s, :, :], axis=0)
 
         # Output filename (no run index)
         out_png = op.join(
             img_out_dir,
-            f"{participant}_hemi-{hemi}_desc-pred-loso-motionXstationary_mean_inflated.png"
+            f"{participant}_hemi-{hemi}_desc-pred-motionXstationary_mean_inflated.png"
         )
 
         # -------------------------------------------------
@@ -618,15 +666,17 @@ for h, hemi in enumerate(hemis):
         # ----------------------------
         # Functional Contrast Map visualization
         # ----------------------------
-        img_out_dir = op.join(bids_path, "analysis", "plots")
+        img_out_dir = op.join(bids_path, "analysis", "surface_pngs", "mean")
         os.makedirs(img_out_dir, exist_ok=True)
 
         vmin, vmax = -.5, 0.5
         # -------------------------------------------------
         # Compute average functional map across runs FIRST
         # -------------------------------------------------
-        mean_vals = np.nanmean(predicted_maps[hemi], axis=0)
-                
+        hemi_maps = predicted_maps[hemi]
+        sub_mean_maps = np.nanmean(hemi_maps[[group in p for p in participants],:,:], axis = 1)
+        mean_vals = np.nanmean(sub_mean_maps, axis=0)
+
         # Build full-surface vector once
         surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
         surf_map[wang_hmt_vertices] = mean_vals
@@ -634,7 +684,7 @@ for h, hemi in enumerate(hemis):
         # Output filename (no run index)
         out_png = op.join(
             img_out_dir,
-            f"{group}-mean_hemi-{hemi}_desc-loso-pred-motionXstationary_mean_inflated.png"
+            f"{group}-mean_hemi-{hemi}_desc-pred-motionXstationary_mean_inflated.png"
         )
 
         # -------------------------------------------------
@@ -829,7 +879,6 @@ plt.tight_layout()
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
 plt.savefig(op.join(saveDir, "pearson_mean_ridgereg_loso_combined_tracts.png"), dpi=300, bbox_inches='tight')
-
 plt.show()
 
 #----------------------------
@@ -873,11 +922,11 @@ df = pd.DataFrame(rows)
 # ------------------------------------------------
 # Compute SEM per tract × hemisphere × group (EB/NS)
 # ------------------------------------------------
-std_df = (
+sem_df = (
     df.groupby(["Group", "Tract", "Hemisphere"])["Beta"]
-      .agg(["mean", "std"])
+      .agg(["mean", sem])
       .reset_index()
-      .rename(columns={"mean": "Mean", "std": "STD"})
+      .rename(columns={"mean": "Mean", "sem": "SEM"})
 )
 
 # ------------------------------------------
@@ -891,7 +940,7 @@ for ax, hemi in zip(axes, hemi_labels):
 
     # Filter for hemisphere
     df_h = df[df["Hemisphere"] == hemi]
-    std_h = std_df[std_df["Hemisphere"] == hemi]
+    sem_h = sem_df[sem_df["Hemisphere"] == hemi]
 
     # Jitter dots per group (EB vs NS)
     sns.stripplot(
@@ -908,11 +957,11 @@ for ax, hemi in zip(axes, hemi_labels):
     # ---------------------------------------
     # Plot Mean ± SEM for EB and NS separately
     # ---------------------------------------
-    for _, row in std_h.iterrows():
+    for _, row in sem_h.iterrows():
 
         tract = row["Tract"]
         mean  = row["Mean"]
-        se    = row["STD"]
+        se    = row["SEM"]
         group = row["Group"]
 
         # shift within tract index to match stripplot's dodge layout
@@ -932,7 +981,7 @@ for ax, hemi in zip(axes, hemi_labels):
         )
 
     # ------------------ Ax formatting ------------------
-    ax.set_title(f"{hemi}-Hemisphere β-coefficients (Mean ± SD within EB / NS)",fontsize=16)
+    ax.set_title(f"{hemi}-Hemisphere β-coefficients (Mean ± SEM within EB / NS)",fontsize=16)
     ax.set_xlabel("Tract",fontsize=14)
     ax.tick_params(axis="x", rotation=90)
     ax.set_xticks(np.arange(len(tract_order)))
@@ -944,7 +993,7 @@ sns.despine()
 plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "betas_ridgereg_loso_combined_tracts_new.png"),
+plt.savefig(op.join(saveDir, "betas_ridgereg_group_loso_combined_tracts.png"),
             dpi=300, bbox_inches='tight')
 plt.show()
 
@@ -1123,6 +1172,7 @@ plt.savefig(op.join(saveDir, "mse_mean_ridgereg_loro_combined_tracts.png"), dpi=
 
 plt.show()
 
+
 #--------------
 #Plot Rsquared
 #--------------
@@ -1147,13 +1197,12 @@ rows = []
 for h in range(2):     # left/right hemispheres
     for s, participant in enumerate(participants):
         gp = "EB" if "EB" in participant else "NS"
-        mse_runs = mses[:, s, h]
 
         rows.append({
             "Subject": s,
             "Hemisphere": hemi_labels[h],
             "Group": gp,
-            "meanR2": rsquared[:,s,h].mean() #r_all[s, h] #
+            "meanR2": rsquared[s,h]#r_all[s, h] #
         })
 
 df = pd.DataFrame(rows)
@@ -1221,7 +1270,7 @@ for ax, hemi in zip(axes, hemi_labels):
     ax.axhline(0, color='gray', linestyle='--', linewidth=1)
     ax.set_xticklabels(["EB", "NS"], fontsize=13)
 
-axes[0].set_ylabel("Mean R2", fontsize=14)
+axes[0].set_ylabel("R2", fontsize=14)
 # axes[1].get_legend().remove()   # remove duplicated legend
 sns.despine()
 plt.tight_layout()
@@ -1229,11 +1278,11 @@ plt.tight_layout()
 # Saving
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "r2_mean_ridgereg_loro_combined_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "r2_ridgereg_loso_combined_tracts.png"), dpi=300, bbox_inches='tight')
 
 plt.show()
 
-#--------- Noise ceiling -----------------------------------------
+#--------- Noise normalized R -----------------------------------------
 
 
 import numpy as np
@@ -1258,7 +1307,7 @@ for h in range(2):     # left/right hemispheres
             "Subject": s,
             "Hemisphere": hemi_labels[h],
             "Group": gp,
-            "noiseThr": reliability[s,h] 
+            "noiseNormR": noise_norm_r[s,h]#reliability[s,h] 
         })
 
 df = pd.DataFrame(rows)
@@ -1266,9 +1315,13 @@ df = pd.DataFrame(rows)
 # ------------------------------------------------
 # Compute SEM per Group × Hemisphere
 # ------------------------------------------------
+
 sem_df = (
-    df.groupby(["Group", "Hemisphere"])["noiseThr"]
-      .agg(["mean", sem])
+    df.groupby(["Group", "Hemisphere"])["noiseNormR"]
+      .agg(
+          Mean="mean",
+          SEM=lambda x: sem(x, nan_policy="omit")
+      )
       .reset_index()
       .rename(columns={"mean": "Mean", "sem": "SEM"})
 )
@@ -1292,7 +1345,7 @@ for ax, hemi in zip(axes, hemi_labels):
     sns.stripplot(
         data=df_h,
         x="Group",
-        y="noiseThr",
+        y="noiseNormR",
         hue="Group",
         dodge=False,
         jitter=0.15,
@@ -1326,7 +1379,7 @@ for ax, hemi in zip(axes, hemi_labels):
     ax.axhline(0, color='gray', linestyle='--', linewidth=1)
     ax.set_xticklabels(["EB", "NS"], fontsize=13)
 
-axes[0].set_ylabel("Noise ceiling", fontsize=14)
+axes[0].set_ylabel("Noise Normalized r", fontsize=14)
 # axes[1].get_legend().remove()   # remove duplicated legend
 sns.despine()
 plt.tight_layout()
@@ -1334,8 +1387,127 @@ plt.tight_layout()
 # Saving
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "noise_ceiling_ridgereg_loro_combined_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "noise_norm_r_ridgereg_group_loso_combined_tracts.png"), dpi=300, bbox_inches='tight')
 
+plt.show()
+
+#--------------------------------------------------------------------
+# Nested Models
+#--------------------------------------------------------------------
+
+
+#--------------------------------------------------------------
+# Delta MSE
+#----------------------------
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import sem
+
+# --------------------------------------
+# Convert trained_coefs into long format
+# trained_coefs shape = (6 runs, n_tracts, n_subj, 2 hemis)
+# Requires subject_group: list of "EB" or "NS"
+# --------------------------------------
+
+n_tracts, n_subj, n_hemi = trained_coefs.shape
+hemi_labels = ["L", "R"]
+
+rows = []
+for h in range(n_hemi):
+    for t in range(n_tracts):
+        for s, participant in enumerate(participants):
+            gp = "EB" if "EB" in participant else "NS"
+            
+            rows.append({
+                "Tract": tract_order[t],
+                "Participant": participant,
+                "Hemisphere": hemi_labels[h],
+                "Group": gp,    # EB or NS
+                "dMSE": delta_mse[t, s, h]
+            }) # "Subject": s,
+
+df = pd.DataFrame(rows)
+
+
+# ------------------------------------------------
+# Compute SEM per tract × hemisphere × group (EB/NS)
+# ------------------------------------------------
+std_df = (
+    df.groupby(["Group", "Tract", "Hemisphere"])["dMSE"]
+      .agg(["mean", "sem"])
+      .reset_index()
+      .rename(columns={"mean": "Mean", "sem": "SEM"})
+)
+
+# ------------------------------------------
+# Create 2 subplots — one for each hemisphere
+# ------------------------------------------
+fig, axes = plt.subplots(1, 2, figsize=(18, 6), sharey=True)
+group_labels = ["EB", "NS"]
+group_offset = {"EB": -0.2, "NS": 0.2}   # shift inside each tract
+
+for ax, hemi in zip(axes, hemi_labels):
+
+    # Filter for hemisphere
+    df_h = df[df["Hemisphere"] == hemi]
+    std_h = std_df[std_df["Hemisphere"] == hemi]
+
+    # Jitter dots per group (EB vs NS)
+    sns.stripplot(
+        data=df_h,
+        x="Tract",
+        y="dMSE",
+        hue="Group",
+        dodge=True,
+        jitter=0.15,
+        alpha=0.7,
+        ax=ax
+    )
+
+    # ---------------------------------------
+    # Plot Mean ± SEM for EB and NS separately
+    # ---------------------------------------
+    for _, row in std_h.iterrows():
+
+        tract = row["Tract"]
+        mean  = row["Mean"]
+        se    = row["SEM"]
+        group = row["Group"]
+
+        # shift within tract index to match stripplot's dodge layout
+        x_loc = tract_order.index(tract)  + group_offset[group]
+
+        # Mean point
+        ax.plot(x_loc, mean, "o", color="black", markersize=7)
+
+        # SEM bar
+        ax.errorbar(
+            x=x_loc,
+            y=mean,
+            yerr=se,
+            color="black",
+            capsize=3,
+            linewidth=2
+        )
+
+    # ------------------ Ax formatting ------------------
+    ax.set_title(f"{hemi}-Hemisphere delta-MSE (Mean ± SEM within EB / NS)",fontsize=16)
+    ax.set_xlabel("Tract",fontsize=14)
+    ax.tick_params(axis="x", rotation=90)
+    ax.set_xticks(np.arange(len(tract_order)))
+    ax.set_xticklabels(tract_order, rotation=30, ha="right",fontsize=12)
+    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
+axes[0].set_ylabel("delta-MSE", fontsize=14)
+axes[1].legend(title="Group", labels=group_labels)
+sns.despine()
+plt.tight_layout()
+saveDir = op.join(bids_path, 'analysis', 'plots')
+os.makedirs(saveDir, exist_ok=True)
+plt.savefig(op.join(saveDir, "dMSE_ridgereg_group_LOSO_combined_tracts_nested.png"),
+            dpi=300, bbox_inches='tight')
 plt.show()
 
 #-------- Correlations from training with Wang MT, within func MT only
@@ -1487,6 +1659,3 @@ os.makedirs(saveDir, exist_ok=True)
 plt.savefig(op.join(saveDir, "funcMT_pearson_mean_ridgereg_loro_combined_tracts.png"), dpi=300, bbox_inches='tight')
 
 plt.show()
-
-
-

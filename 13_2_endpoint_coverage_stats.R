@@ -1,7 +1,8 @@
 
 ##### Percent endpoint coverage stats #######
 
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/tdi_maps/dipy_wmgmi_tdi_maps/surface_density_dice_wang.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/tdi_maps/dipy_wmgmi_tdi_maps/surface_density_dice_thresh9_wang.csv'
+      #/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/tdi_maps/dipy_wmgmi_tdi_maps/surface_density_dice_thresh4_wang.csv
 file = file.path(path)
 data = read.csv(file) #
 
