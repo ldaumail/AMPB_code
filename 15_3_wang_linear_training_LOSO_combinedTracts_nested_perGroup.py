@@ -3,7 +3,7 @@
 #Trains a linear regression to predict functional activation based on tract end point densitiess
 
 import numpy as np
-from sklearn.linear_model import RidgeCV
+from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 from scipy.stats import pearsonr
 import random
@@ -263,8 +263,6 @@ def noise_normalized_r(y_true, y_pred, reliability):
 ## Fit linear model to data
 #---------------------------
 # Cross validation params
-alphas = np.logspace(-4, 4, 25)      # Ridge alpha grid (adjust if needed)
-inner_cv = 5                         # internal CV to choose alpha (could use LeaveOneOut if many subjects)
 verbose = True
 
 hemis = ["L", "R"]
@@ -398,16 +396,17 @@ for h, hemi in enumerate(hemis):
 
 
             # Train linear model (multi-output regression)
-            ridge = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error", cv=inner_cv)
-            ridge.fit(X_train, y_train)
+
+            linreg = LinearRegression()
+            linreg.fit(X_train, y_train)
 
             
             all_test_idx = test_idx if group == "EB" else test_idx+7
-            trained_coefs[:, all_test_idx,h] = ridge.coef_.copy() #[0:n_tracts-1]
+            trained_coefs[:, all_test_idx,h] = linreg.coef_.copy() #[0:n_tracts-1]
             # ridge.intercept_
 
             X_test = group_norm_density[test_idx].T 
-            y_pred_std = ridge.predict(X_test)
+            y_pred_std = linreg.predict(X_test)
             # y_pred = (y_pred_std*np.std(C[test_idx,:]) + np.mean(C[test_idx,:])).ravel()
 
             predicted[all_test_idx, :] = y_pred_std
@@ -427,11 +426,11 @@ for h, hemi in enumerate(hemis):
             for t in range(n_tracts):
 
                 X_train_red = np.delete(X_train, t, axis=1)
-                ridgereg_red = RidgeCV(alphas=alphas, scoring="neg_mean_squared_error", cv=inner_cv)
-                ridgereg_red.fit(X_train_red, y_train)
+                linreg_red = LinearRegression()
+                linreg_red.fit(X_train_red, y_train)
 
                 X_test_red = np.delete(X_test, t, axis=1)
-                y_test_pred_red = ridgereg_red.predict(X_test_red).ravel()
+                y_test_pred_red = linreg_red.predict(X_test_red).ravel()
                 mse_red = mean_squared_error(y_participant_true, y_test_pred_red)
                 delta_mse[t, all_test_idx, h] = mse_red - mse_participant_full
 
@@ -878,7 +877,7 @@ plt.tight_layout()
 #Saving
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "pearson_mean_ridgereg_loso_combined_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "pearson_mean_linearreg_loso_combined_tracts.png"), dpi=300, bbox_inches='tight')
 plt.show()
 
 #----------------------------
@@ -993,7 +992,7 @@ sns.despine()
 plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "betas_ridgereg_group_loso_combined_tracts.png"),
+plt.savefig(op.join(saveDir, "betas_linearreg_group_loso_combined_tracts.png"),
             dpi=300, bbox_inches='tight')
 plt.show()
 
@@ -1278,7 +1277,7 @@ plt.tight_layout()
 # Saving
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "r2_ridgereg_loso_combined_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "r2_linearreg_loso_combined_tracts.png"), dpi=300, bbox_inches='tight')
 
 plt.show()
 
@@ -1387,7 +1386,7 @@ plt.tight_layout()
 # Saving
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "noise_norm_r_ridgereg_group_loso_combined_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "noise_norm_r_linearreg_group_loso_combined_tracts.png"), dpi=300, bbox_inches='tight')
 
 plt.show()
 
@@ -1506,7 +1505,7 @@ sns.despine()
 plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "dMSE_ridgereg_group_LOSO_combined_tracts_nested.png"),
+plt.savefig(op.join(saveDir, "dMSE_linearreg_group_LOSO_combined_tracts_nested.png"),
             dpi=300, bbox_inches='tight')
 plt.show()
 

@@ -420,9 +420,9 @@ df = pd.DataFrame(rows)
 # ------------------------------------------------
 std_df = (
     df.groupby(["Group", "Tract", "Hemisphere"])["Beta"]
-      .agg(["mean", "std"])
+      .agg(["mean", "sem"])
       .reset_index()
-      .rename(columns={"mean": "Mean", "std": "STD"})
+      .rename(columns={"mean": "Mean", "sem": "SEM"})
 )
 
 # ------------------------------------------
@@ -457,7 +457,7 @@ for ax, hemi in zip(axes, hemi_labels):
 
         tract = row["Tract"]
         mean  = row["Mean"]
-        se    = row["STD"]
+        se    = row["SEM"]
         group = row["Group"]
 
         # shift within tract index to match stripplot's dodge layout
@@ -477,7 +477,7 @@ for ax, hemi in zip(axes, hemi_labels):
         )
 
     # ------------------ Ax formatting ------------------
-    ax.set_title(f"{hemi}-Hemisphere β-coefficients (Mean ± SD within EB / NS)",fontsize=16)
+    ax.set_title(f"{hemi}-Hemisphere β-coefficients (Mean ± SEM within EB / NS)",fontsize=16)
     ax.set_xlabel("Tract",fontsize=14)
     ax.tick_params(axis="x", rotation=90)
     ax.set_xticks(np.arange(len(tract_order)))

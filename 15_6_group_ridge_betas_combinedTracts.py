@@ -1,4 +1,3 @@
-
 import numpy as np
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_squared_error
@@ -207,14 +206,6 @@ for h, hemi in enumerate(hemis):
         norm_density_data[hemi].setdefault(s, {})
         norm_density_data[hemi][s] = zscored_densities
 
-#================Useful functions ============
-#Define a goodness of fit function
-def r2_score(y_t, y_p):
-    ss_res = np.sum((y_t - y_p)**2)
-    ss_tot = np.sum((y_t - np.mean(y_t))**2)
-    return 1 - ss_res / ss_tot
-
-
 def vertex_bootstrap_reliability(C, n_boot=1000, frac=1):
     """
     C: array (n_runs, n_vertices)
@@ -241,38 +232,28 @@ def vertex_bootstrap_reliability(C, n_boot=1000, frac=1):
 
     return np.mean(rs)
 
-
-def noise_normalized_r(y_true, y_pred, reliability):
-    """
-    y_true: (n_vertices,)
-    y_pred: (n_vertices,)
-    reliability: split-half reliability of y_true
-
-    Returns noise-normalized r
-    """
-    if reliability <= 0 or np.isnan(reliability):
-        return np.nan
-
-    r, _ = pearsonr(y_true, y_pred)
-    return r / np.sqrt(reliability)
-
-## Fit Regression Models to each participant
-alpha = 1.0  # choose fixed regularization strength
+## Fit Regression Models to each group
 verbose = True
+alpha = 1.0  # choose fixed regularization strength
 
 hemis = ["L", "R"]
+groups = ["EB", "NS"]
 contrast = contrast_order[0]   # e.g. "motionXstationary"
 
 # get n_subj, n_tracts
 n_subj = len(participants)
 n_tracts = len(tract_order)
+n_groups = len(groups)
 rs   = np.full((n_subj, len(hemis)), np.nan)
 rsquared = np.full(( n_subj, len(hemis)), np.nan) #goodness of fit
 reliability = np.full((n_subj, len(hemis)), np.nan)
 r_all = np.full((n_subj, len(hemis)), np.nan)
 rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan)
-trained_coefs = np.zeros((n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
-delta_mse = np.full((n_tracts, n_subj, len(hemis)), np.nan) #
+trained_coefs = np.zeros((n_tracts, n_groups, len(hemis)))  # scalar summary per tract/run
+
+n_boot = 1000
+trained_coefs_null = np.zeros((n_tracts, n_boot, n_groups, len(hemis)))
+
 predicted_maps = {hemi: [] for hemi in hemis}
 for h, hemi in enumerate(hemis):
         #h = 0
@@ -325,165 +306,113 @@ for h, hemi in enumerate(hemis):
     # main loop
     # -------------------------
 
-    for s, participant in enumerate(participants):
+    for g, group in enumerate(groups):
+        
+        participants_group = [p for p in participants if group in p]
+        n_g_subj = len(participants_group)
+        #Define X and Y of the given group
+        group_norm_density = np.stack([norm_density_data[hemi][p] for p in range(n_subj) if participants[p] in participants_group], axis = 0)
+        group_C_mean = np.stack([C_mean[p,:] for p in range(n_subj) if participants[p] in participants_group], axis = 0)
 
         if verbose:
-            print(f"Fitting participant {participant}")
+            print(f"Fitting group {group}")
 
         # X: density maps for this participant
         # shape: (n_vertices_masked, n_tracts)
-        X = norm_density_data[hemi][s].T
+        X = group_norm_density.transpose(0,2,1).reshape(-1,3)#norm_density_data[hemi][s].T
 
         # y: functional contrast map
         # shape: (n_vertices_masked,)
-        y = C_mean[s, :]
+        y = group_C_mean.reshape(-1,1) #C_mean[s, :]
 
         # Fit regression
         ridge = Ridge(alpha=alpha)
         ridge.fit(X, y)
 
         # Store coefficients
-        trained_coefs[:, s, h] = ridge.coef_.copy()
+        trained_coefs[:, g, h] = ridge.coef_.copy()
 
-        # Predict (optional)
-        y_pred = ridge.predict(X)
-        predicted[s, :] = y_pred
+        # # Predict (optional)
+        # y_pred = ridge.predict(X)
+        # predicted[s, :] = y_pred
 
         # Reliability (if needed)
-        reliability[s, h] = vertex_bootstrap_reliability(all_C[s,:,:])
-
-        # Optional evaluation
-        if verbose:
-            r, p = pearsonr(y, y_pred)
-            mse_full = mean_squared_error(y, y_pred)
-            print(f"r={r:.4f}, MSE={mse_full:.4e}, p={p:.4e}")
+        # reliability[s, h] = vertex_bootstrap_reliability(all_C[s,:,:])
 
 
-        for t in range(n_tracts):
+    #Null beta distributions
+    for n in range(n_boot):
+        participants1 = np.random.choice(n_subj, 7, replace=False)
+        participants2 = [p for p in range(n_subj) if p not in participants1]
 
-            X_red = np.delete(X, t, axis=1)
-            ridgereg_red = Ridge(alpha=alpha)
-            ridgereg_red.fit(X_red, y)
+        group_norm_density1 = np.stack([norm_density_data[hemi][p] for p in participants1], axis = 0)
+        group_C_mean1 = np.stack([C_mean[p,:] for p in participants1], axis = 0)
+        X1 = group_norm_density1.transpose(0,2,1).reshape(-1,3)
+        y1 = group_C_mean1.reshape(-1,1)
 
-            y_train_pred_red = ridgereg_red.predict(X_red).ravel()
-            mse_red = mean_squared_error(y, y_train_pred_red)
-            delta_mse[t, s, h] = mse_red - mse_full
+        ridge1 = Ridge(alpha=alpha)
+        ridge1.fit(X1, y1)
+
+        group_norm_density2 = np.stack([norm_density_data[hemi][p] for p in participants2], axis = 0)
+        group_C_mean2 = np.stack([C_mean[p,:] for p in participants2], axis = 0)
+        X2 = group_norm_density2.transpose(0,2,1).reshape(-1,3)
+        y2 = group_C_mean2.reshape(-1,1)
+
+        ridge2 = Ridge(alpha=alpha)
+        ridge2.fit(X2, y2)
+
+        trained_coefs_null[:,n, 0, h] = ridge1.coef_.copy()
+        trained_coefs_null[:,n, 1, h] = ridge2.coef_.copy()
 
 
-#--------------------------------------------------------------
-# FIGURES
-#--------------------------------------------------------------
+null_dist_diff = trained_coefs_null[:,:,0,:] - trained_coefs_null[:,:,1,:]
+sample_diff = trained_coefs[:,0,:] - trained_coefs[:,1,:]
 
-#--------------------------------------------------------------
-# Delta MSE
-#----------------------------
+#Plot
 
 import numpy as np
-import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy.stats import sem
 
-# --------------------------------------
-# Convert trained_coefs into long format
-# trained_coefs shape = (6 runs, n_tracts, n_subj, 2 hemis)
-# Requires subject_group: list of "EB" or "NS"
-# --------------------------------------
+n_tracts = null_dist_diff.shape[0]
+n_hemi = null_dist_diff.shape[2]
 
-n_tracts, n_subj, n_hemi = trained_coefs.shape
-hemi_labels = ["L", "R"]
+fig, axes = plt.subplots(n_tracts, 2, figsize=(10, 4 * n_tracts))
 
-rows = []
-for h in range(n_hemi):
-    for t in range(n_tracts):
-        for s, participant in enumerate(participants):
-            gp = "EB" if "EB" in participant else "NS"
-            
-            rows.append({
-                "Tract": tract_order[t],
-                "Participant": participant,
-                "Hemisphere": hemi_labels[h],
-                "Group": gp,    # EB or NS
-                "dMSE": delta_mse[t, s, h]
-            }) # "Subject": s,
+# Ensure axes is always 2D
+if n_tracts == 1:
+    axes = np.array([axes])
 
-df = pd.DataFrame(rows)
+for t in range(n_tracts):
+    for h in range(n_hemi):
 
+        ax = axes[t, h]
 
-# ------------------------------------------------
-# Compute SEM per tract × hemisphere × group (EB/NS)
-# ------------------------------------------------
-std_df = (
-    df.groupby(["Group", "Tract", "Hemisphere"])["dMSE"]
-      .agg(["mean", "sem"])
-      .reset_index()
-      .rename(columns={"mean": "Mean", "sem": "SEM"})
-)
+        # Null distribution for this tract & hemisphere
+        null_vals = null_dist_diff[t, :, h]
 
-# ------------------------------------------
-# Create 2 subplots — one for each hemisphere
-# ------------------------------------------
-fig, axes = plt.subplots(1, 2, figsize=(18, 6), sharey=True)
-group_labels = ["EB", "NS"]
-group_offset = {"EB": -0.2, "NS": 0.2}   # shift inside each tract
+        # Density histogram
+        ax.hist(null_vals, bins=40, density=True)
 
-for ax, hemi in zip(axes, hemi_labels):
+        # 95% interval
+        lower = np.percentile(null_vals, 2.5)
+        upper = np.percentile(null_vals, 97.5)
 
-    # Filter for hemisphere
-    df_h = df[df["Hemisphere"] == hemi]
-    std_h = std_df[std_df["Hemisphere"] == hemi]
+        ax.axvline(lower,color="black")
+        ax.axvline(upper,color="black")
 
-    # Jitter dots per group (EB vs NS)
-    sns.stripplot(
-        data=df_h,
-        x="Tract",
-        y="dMSE",
-        hue="Group",
-        dodge=True,
-        jitter=0.15,
-        alpha=0.7,
-        ax=ax
-    )
+        # Observed value
+        observed = sample_diff[t, h]
+        ax.axvline(observed, color="red")
 
-    # ---------------------------------------
-    # Plot Mean ± SEM for EB and NS separately
-    # ---------------------------------------
-    for _, row in std_h.iterrows():
+        hemi_label = "Left" if h == 0 else "Right"
 
-        tract = row["Tract"]
-        mean  = row["Mean"]
-        se    = row["SEM"]
-        group = row["Group"]
-
-        # shift within tract index to match stripplot's dodge layout
-        x_loc = tract_order.index(tract)  + group_offset[group]
-
-        # Mean point
-        ax.plot(x_loc, mean, "o", color="black", markersize=7)
-
-        # SEM bar
-        ax.errorbar(
-            x=x_loc,
-            y=mean,
-            yerr=se,
-            color="black",
-            capsize=3,
-            linewidth=2
-        )
-
-    # ------------------ Ax formatting ------------------
-    ax.set_title(f"{hemi}-Hemisphere delta-MSE (Mean ± SEM within EB / NS)",fontsize=16)
-    ax.set_xlabel("Tract",fontsize=14)
-    ax.tick_params(axis="x", rotation=90)
-    ax.set_xticks(np.arange(len(tract_order)))
-    ax.set_xticklabels(tract_order, rotation=30, ha="right",fontsize=12)
-    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
-axes[0].set_ylabel("delta-MSE", fontsize=14)
-axes[1].legend(title="Group", labels=group_labels)
-sns.despine()
-plt.tight_layout()
+        ax.set_title(f"Tract {tract_order[t]} - {hemi_label}")
+        ax.set_xlabel("Difference")
+        ax.set_ylabel("Density")
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "participants_dMSE_ridgereg_combined_tracts_nested.png"),
+plt.savefig(op.join(saveDir, "permutation_group_diff_betas_combined_tracts.png"),
             dpi=300, bbox_inches='tight')
+
+plt.tight_layout()
 plt.show()

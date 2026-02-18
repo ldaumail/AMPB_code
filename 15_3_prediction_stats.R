@@ -224,7 +224,9 @@ result[[6]] =t.test(data$Correlation[data$Tract == "MTxFEF" & data$Hemisphere ==
 ## BETAS ###
 #path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/ridgecv_loso_predicted_maps/combined/betas_contrast-motionXstationary_combined_tracts.csv'
 #path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/participants_betas/combined/participant_betas_contrast-motionXstationary_combined_tracts.csv'
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/ridgecv_group_loso_predicted_maps/combined/betas_contrast-motionXstationary_combined_tracts.csv'
+#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/ridgecv_group_loso_predicted_maps/combined/betas_contrast-motionXstationary_combined_tracts.csv'
+#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/linearcv_group_loso_predicted_maps/combined/betas_contrast-motionXstationary_combined_tracts.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/participants_linearcv/combined/participant_betas_contrast-motionXstationary_combined_tracts.csv'
 file = file.path(path)
 data = read.csv(file) #
 
@@ -281,6 +283,8 @@ result[[6]] =t.test(data$Beta[data$Tract == "MTxFEF" & data$Hemisphere == "R" & 
 # Pearson's R
 #---------------
 path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/ridgecv_loso_predicted_maps/combined/mean_pearsonsR_contrast-motionXstationary_combined_tracts.csv'
+#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/linearcv_group_loso_predicted_maps/combined/pearsons_contrast-motionXstationary_combined_tracts.csv'
+#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/ridgecv_group_loso_predicted_maps/combined/pearson_r_contrast-motionXstationary_combined_tracts.csv'
 file = file.path(path)
 data = read.csv(file) #
 
@@ -304,6 +308,20 @@ result[[2]] =t.test(data$Correlation[data$Hemisphere == "R" & data$Group == "EB"
                     alternative = "two.sided", mu = 0, paired = FALSE, conf.level = 0.90)
 
 
+#test against 0
+
+df_ttests <- data %>%
+  group_by(Group, Hemisphere) %>%
+  summarise(
+    n = n(),
+    ttest = list(t.test(Correlation, mu = 0)),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    t_value = map_dbl(ttest, ~ .x$statistic),
+    p_value = map_dbl(ttest, ~ .x$p.value)
+  ) %>%
+  select(Group, Hemisphere, n, t_value, p_value)
 
 # 
 # # LOSO approach
