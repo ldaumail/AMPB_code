@@ -5,7 +5,7 @@ import pandas as pd
 import os.path as op
 import os
 
-from sklearn.svm import SVC
+# from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import LeaveOneOut
@@ -42,15 +42,22 @@ def get_feature_matrix(df, hemi,selected_tracts):
     return X
 
 
+# def make_classifier(C=1):
+#     return Pipeline([
+#         ("scaler", StandardScaler()),
+#         ("svm", SVC(
+#             kernel="linear",
+#             C=C,
+#             probability=True,
+#             class_weight="balanced"
+#         ))
+#     ])
+from sklearn.svm import LinearSVC
+
 def make_classifier(C=1):
     return Pipeline([
         ("scaler", StandardScaler()),
-        ("svm", SVC(
-            kernel="linear",
-            C=C,
-            probability=True,
-            class_weight="balanced"
-        ))
+        ("svm", LinearSVC(penalty="l2", loss="squared_hinge", dual=False, tol=1e-3, C=C))
     ])
 
 
@@ -60,7 +67,7 @@ def loso_evaluate(X, y, C):
 
     y_true = []
     y_pred = []
-    y_prob = []
+    # y_prob = []
     scores = []
 
     for train_idx, test_idx in loo.split(X):
@@ -68,8 +75,9 @@ def loso_evaluate(X, y, C):
 
         y_true.append(y[test_idx][0])
         y_pred.append(clf.predict(X[test_idx])[0])
-        y_prob.append(clf.predict_proba(X[test_idx])[0, 1])
-        scores.append(clf.decision_function(X[test_idx]))
+        # y_prob.append(clf.predict_proba(X[test_idx])[0, 1])
+        # scores.append(clf.decision_function(X[test_idx]))
+        scores.append(clf.decision_function(X[test_idx])[0])
 
 
         # scores = clf.decision_function(X[test_idx])
@@ -77,7 +85,7 @@ def loso_evaluate(X, y, C):
 
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
-    y_prob = np.array(y_prob)
+    # y_prob = np.array(y_prob)
     scores = np.array(scores)
 
     results = {
@@ -150,6 +158,122 @@ for hemi in hemis:
 
 
 #==================== Visualize ===================#
+
+## Add decision boundary plane
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+def fit_final_model(X, y, C):
+    clf = make_classifier(C)
+    clf.fit(X, y)
+    return clf
+
+def get_decision_plane_raw(clf):
+    scaler = clf.named_steps["scaler"]
+    svm = clf.named_steps["svm"]
+
+    w_scaled = svm.coef_[0]
+    b_scaled = svm.intercept_[0]
+
+    # Undo scaling
+    w = w_scaled / scaler.scale_
+    b = b_scaled - np.sum(w_scaled * scaler.mean_ / scaler.scale_)
+
+    return w, b
+
+def plot_3d_with_plane(
+    df, participants, y, hemis, tracts, C, elev=10, azim=20
+):
+    assert len(tracts) == 3, "Decision plane only works for 3 features"
+
+    fig = plt.figure(figsize=(14, 6))
+
+    for i, hemi in enumerate(hemis):
+
+        # ------------------------
+        # Feature matrix
+        # ------------------------
+
+        X = get_feature_matrix(df, hemi, selected_tracts)
+        C = C #0.5#10**(-2.3)
+        clf = fit_final_model(X, y,C)
+        w, b = get_decision_plane_raw(clf)
+
+        ax = fig.add_subplot(1, 2, i + 1, projection="3d")
+
+        # ---- Scatter points ----
+        ax.scatter(
+            X[y == 1, 0], X[y == 1, 1], X[y == 1, 2],
+            c="blue", marker="s", s=60, label="EB"
+        )
+        ax.scatter(
+            X[y == 0, 0], X[y == 0, 1], X[y == 0, 2],
+            c="red", marker="o", s=60, label="NS"
+        )
+
+        # ---- Decision plane ----
+        xx, yy = np.meshgrid(
+            np.linspace(X[:, 0].min(), X[:, 0].max(), 20),
+            np.linspace(X[:, 1].min(), X[:, 1].max(), 20)
+        )
+
+        zz = (-w[0] * xx - w[1] * yy - b) / w[2]
+
+        ax.plot_surface(
+            xx, yy, zz,
+            alpha=0.3,
+            color="gray",
+            edgecolor="none"
+        )
+
+        # ---- Labels & formatting ----
+        ax.set_xlabel(tracts[0])
+        ax.set_ylabel(tracts[1])
+        ax.set_zlabel(tracts[2])
+        ax.set_title(f"{hemi} Hemisphere")
+        # ax.set_zlim(-4, 3)
+        ax.view_init(elev=elev, azim=azim)
+
+        # Clean panes
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+
+        if i == 0:
+            ax.legend()
+
+    plt.suptitle("SVM decision planes per hemisphere", fontsize=16)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+    saveDir = op.join(bids_path, "analysis", "plots")
+    os.makedirs(saveDir, exist_ok=True)
+    plt.savefig(
+        op.join(
+            saveDir,
+            "beta_weights_3d_linearreg_participants_combined_tracts_plane.png"
+        ),
+        dpi=300,
+        bbox_inches="tight"
+    )
+
+    plt.show()
+
+selected_tracts = tracts[:3]  # example — must be exactly 3
+
+plot_3d_with_plane(
+    df=df,
+    participants=participants,
+    y=y,
+    hemis=["L", "R"],
+    tracts=selected_tracts,
+    C = 0.027,
+    elev=15,
+    azim=-45
+)
+
+## No plane , just the data
+
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
@@ -234,7 +358,7 @@ def plot_3d_both_hemispheres(df, participants, y, selected_tracts):
     # Saving
     saveDir = op.join(bids_path, "analysis", "plots")
     os.makedirs(saveDir, exist_ok=True)
-    plt.savefig(op.join(saveDir, "beta_weights_3d_ridgereg_participants_combined_tracts_angle.png"), dpi=300, bbox_inches='tight')
+    plt.savefig(op.join(saveDir, "beta_weights_3d_linearreg_combined_tracts.png"), dpi=300, bbox_inches='tight')
 
     plt.show()
 
@@ -243,121 +367,6 @@ selected_tracts = tracts[:3]  # or explicit list
 # Labels
 y = np.array([1 if "EB" in p else 0 for p in participants])
 plot_3d_both_hemispheres(df, participants, y, selected_tracts)
-
-
-## Add decision boundary plane
-
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
-
-def fit_final_model(X, y, C):
-    clf = make_classifier(C)
-    clf.fit(X, y)
-    return clf
-
-def get_decision_plane_raw(clf):
-    scaler = clf.named_steps["scaler"]
-    svm = clf.named_steps["svm"]
-
-    w_scaled = svm.coef_[0]
-    b_scaled = svm.intercept_[0]
-
-    # Undo scaling
-    w = w_scaled / scaler.scale_
-    b = b_scaled - np.sum(w_scaled * scaler.mean_ / scaler.scale_)
-
-    return w, b
-
-def plot_3d_with_plane(
-    df, participants, y, hemis, tracts, C, elev=10, azim=20
-):
-    assert len(tracts) == 3, "Decision plane only works for 3 features"
-
-    fig = plt.figure(figsize=(14, 6))
-
-    for i, hemi in enumerate(hemis):
-
-        # ------------------------
-        # Feature matrix
-        # ------------------------
-
-        X = get_feature_matrix(df, hemi, selected_tracts)
-        C = C #0.5#10**(-2.3)
-        clf = fit_final_model(X, y,C)
-        w, b = get_decision_plane_raw(clf)
-
-        ax = fig.add_subplot(1, 2, i + 1, projection="3d")
-
-        # ---- Scatter points ----
-        ax.scatter(
-            X[y == 1, 0], X[y == 1, 1], X[y == 1, 2],
-            c="blue", marker="s", s=60, label="EB"
-        )
-        ax.scatter(
-            X[y == 0, 0], X[y == 0, 1], X[y == 0, 2],
-            c="red", marker="o", s=60, label="NS"
-        )
-
-        # ---- Decision plane ----
-        xx, yy = np.meshgrid(
-            np.linspace(X[:, 0].min(), X[:, 0].max(), 20),
-            np.linspace(X[:, 1].min(), X[:, 1].max(), 20)
-        )
-
-        zz = (-w[0] * xx - w[1] * yy - b) / w[2]
-
-        ax.plot_surface(
-            xx, yy, zz,
-            alpha=0.3,
-            color="gray",
-            edgecolor="none"
-        )
-
-        # ---- Labels & formatting ----
-        ax.set_xlabel(tracts[0])
-        ax.set_ylabel(tracts[1])
-        ax.set_zlabel(tracts[2])
-        ax.set_title(f"{hemi} Hemisphere")
-
-        ax.view_init(elev=elev, azim=azim)
-
-        # Clean panes
-        ax.xaxis.pane.fill = False
-        ax.yaxis.pane.fill = False
-        ax.zaxis.pane.fill = False
-
-        if i == 0:
-            ax.legend()
-
-    plt.suptitle("SVM decision planes per hemisphere", fontsize=16)
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-
-    saveDir = op.join(bids_path, "analysis", "plots")
-    os.makedirs(saveDir, exist_ok=True)
-    plt.savefig(
-        op.join(
-            saveDir,
-            "beta_weights_3d_linearreg_participants_combined_tracts_plane.png"
-        ),
-        dpi=300,
-        bbox_inches="tight"
-    )
-
-    plt.show()
-
-selected_tracts = tracts[:3]  # example — must be exactly 3
-
-plot_3d_with_plane(
-    df=df,
-    participants=participants,
-    y=y,
-    hemis=["L", "R"],
-    tracts=selected_tracts,
-    C = 0.063,
-    elev=15,
-    azim=-45
-)
-
 
 # ====================== Use brf Kernel ====================#
 import numpy as np
@@ -819,3 +828,308 @@ plot_3d_logistic_surface(
     elev=25,
     azim=45
 )
+
+
+#=========================================================
+#---------------------------------------------------------
+## Other SVM cross validation implementation with inner cv
+#---------------------------------------------------------
+#=========================================================
+
+import numpy as np
+import pandas as pd
+import os.path as op
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import LinearSVC
+from sklearn.model_selection import LeaveOneOut, GridSearchCV
+from sklearn.metrics import (
+    balanced_accuracy_score,
+    accuracy_score,
+    roc_auc_score
+)
+from sklearn.model_selection import permutation_test_score
+
+# ----------------------------
+# CLASSIFIER PIPELINE
+# ----------------------------
+
+def make_pipeline():
+    return Pipeline([
+        ("scaler", StandardScaler()),
+        ("svm", LinearSVC(penalty="l2", loss="squared_hinge", dual=False, tol=1e-3, max_iter=10000))
+    ])
+
+
+# ----------------------------
+# NESTED LOOCV
+# ----------------------------
+def nested_loso(X, y):
+
+    outer_cv = LeaveOneOut()
+    inner_cv = LeaveOneOut()
+
+    param_grid = {
+        "svm__C": np.logspace(-2.3, 1, 10)
+    }
+
+    # Store fold-wise outputs
+    y_true_all = []
+    y_pred_all = []
+    decision_scores_all = []
+    best_Cs = []
+
+    for train_idx, test_idx in outer_cv.split(X):
+
+        X_train, X_test = X[train_idx], X[test_idx]
+        y_train, y_test = y[train_idx], y[test_idx]
+
+        grid = GridSearchCV(
+            make_pipeline(),
+            param_grid,
+            cv=inner_cv,
+            scoring="balanced_accuracy",
+            n_jobs=-1
+        )
+
+        grid.fit(X_train, y_train)
+
+        best_model = grid.best_estimator_
+        best_C = grid.best_params_["svm__C"]
+        best_Cs.append(best_C)
+
+        # Predictions
+        y_pred = best_model.predict(X_test)
+        decision_score = best_model.decision_function(X_test)
+
+        # Store
+        y_true_all.append(y_test[0])
+        y_pred_all.append(y_pred[0])
+        decision_scores_all.append(decision_score[0])
+
+    # Convert to arrays
+    y_true_all = np.array(y_true_all)
+    y_pred_all = np.array(y_pred_all)
+    decision_scores_all = np.array(decision_scores_all)
+
+    # Compute global metrics
+    balanced_acc = balanced_accuracy_score(y_true_all, y_pred_all)
+    acc = accuracy_score(y_true_all, y_pred_all)
+
+    roc_auc = roc_auc_score(y_true_all, decision_scores_all)
+    roc_auc_flipped = roc_auc_score(y_true_all, -decision_scores_all)
+
+    return {
+        "balanced_accuracy": balanced_acc,
+        "accuracy": acc,
+        "roc_auc": roc_auc,
+        "roc_auc_flipped": roc_auc_flipped,
+        "best_C_per_fold": best_Cs,
+        "mean_best_C": np.mean(best_Cs),
+        "sd_best_C": np.std(best_Cs),
+        "y_true_all": y_true_all,
+        "y_pred_all": y_pred_all
+    }
+
+
+
+
+#train model per hemisphere
+# df_no_mtfef = df[df["Tract"] != "MTxFEF"].copy()
+selected_tracts = tracts[:3]
+results = {}
+
+for hemi in hemis:
+    print(f"\n=== Hemisphere {hemi} ===")
+
+    X = get_feature_matrix(df, hemi, selected_tracts)
+
+    res = nested_loso(X, y)
+
+    print(f"Balanced accuracy:  {res['balanced_accuracy']:.3f}")
+    print(f"Accuracy:           {res['accuracy']:.3f}")
+    print(f"ROC AUC:            {res['roc_auc']:.3f}")
+    print(f"ROC AUC Flipped:    {res['roc_auc_flipped']:.3f}")
+    print(f"Mean best C:        {res['mean_best_C']:.4f}")
+    print(f"SD best C:        {res['sd_best_C']:.4f}")
+
+    results[hemi] = res
+
+#=================================
+# Visualize
+#=================================
+
+## Add decision boundary plane
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+def make_classifier(C=1):
+    return Pipeline([
+        ("scaler", StandardScaler()),
+        ("svm", LinearSVC(penalty="l2", loss="squared_hinge", dual=False, tol=1e-3, C=C))
+    ])
+def fit_final_model(X, y, C):
+    clf = make_classifier(C)
+    clf.fit(X, y)
+    return clf
+
+def get_decision_plane_raw(clf):
+    scaler = clf.named_steps["scaler"]
+    svm = clf.named_steps["svm"]
+
+    w_scaled = svm.coef_[0]
+    b_scaled = svm.intercept_[0]
+
+    # Undo scaling
+    w = w_scaled / scaler.scale_
+    b = b_scaled - np.sum(w_scaled * scaler.mean_ / scaler.scale_)
+
+    return w, b
+
+def plot_3d_with_plane(
+    df, participants, y, hemis, tracts, C, elev=10, azim=20
+):
+    assert len(tracts) == 3, "Decision plane only works for 3 features"
+
+    # fig = plt.figure(figsize=(14, 6))
+    fig = plt.figure(figsize=(14, 6), constrained_layout=True)
+
+    for i, hemi in enumerate(hemis):
+
+        # ------------------------
+        # Feature matrix
+        # ------------------------
+
+        X = get_feature_matrix(df, hemi, selected_tracts)
+        C_val = C[i]
+        clf = fit_final_model(X, y, C_val)
+        w, b = get_decision_plane_raw(clf)
+
+        ax = fig.add_subplot(1, 2, i + 1, projection="3d")
+
+        # ---- Scatter points ----
+        ax.scatter(
+            X[y == 1, 0], X[y == 1, 1], X[y == 1, 2],
+            c="blue", marker="s", s=60, label="EB"
+        )
+        ax.scatter(
+            X[y == 0, 0], X[y == 0, 1], X[y == 0, 2],
+            c="red", marker="o", s=60, label="NS"
+        )
+
+        # ---- Decision plane ----
+        xx, yy = np.meshgrid(
+            np.linspace(X[:, 0].min(), X[:, 0].max(), 20),
+            np.linspace(X[:, 1].min(), X[:, 1].max(), 20)
+        )
+
+        zz = (-w[0] * xx - w[1] * yy - b) / w[2]
+
+        ax.plot_surface(
+            xx, yy, zz,
+            alpha=0.3,
+            color="gray",
+            edgecolor="none"
+        )
+
+        # ---- Labels & formatting ----
+        ax.set_xlabel(tracts[0])
+        ax.set_ylabel(tracts[1])
+        ax.set_zlabel(tracts[2])
+        ax.set_title(f"{hemi} Hemisphere")
+        # ax.set_zlim(-4, 3)
+        ax.view_init(elev=elev, azim=azim)
+
+        # Clean panes
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+
+        if i == 0:
+            ax.legend()
+
+    plt.suptitle("SVM decision planes per hemisphere", fontsize=16)
+    # plt.tight_layout(rect=[0, 0, 1, 0.95])
+    # plt.subplots_adjust(wspace=0.3, top=0.88)
+
+    saveDir = op.join(bids_path, "analysis", "plots")
+    os.makedirs(saveDir, exist_ok=True)
+    plt.savefig(
+        op.join(
+            saveDir,
+            "beta_weights_3d_linearreg_participants_combined_tracts_innercv.png"
+        ),
+        dpi=300,
+        bbox_inches="tight"
+    )
+
+    plt.show()
+
+selected_tracts = tracts[:3]  # example — must be exactly 3
+
+plot_3d_with_plane(
+    df=df,
+    participants=participants,
+    y=y,
+    hemis=["L", "R"],
+    tracts=selected_tracts,
+    C = np.array([0.018, 1.714]),
+    elev=15,
+    azim=-45
+)
+
+#-------------------------------------------
+# Evaluate performance with average C values
+#-------------------------------------------
+
+
+def loso_evaluate(X, y, C):
+    loo = LeaveOneOut()
+    clf = make_classifier(C)
+
+    y_true = []
+    y_pred = []
+    scores = []
+
+    for train_idx, test_idx in loo.split(X):
+        clf.fit(X[train_idx], y[train_idx])
+
+        y_true.append(y[test_idx][0])
+        y_pred.append(clf.predict(X[test_idx])[0])
+        scores.append(clf.decision_function(X[test_idx])[0])
+
+
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    scores = np.array(scores)
+
+    results = {
+        "accuracy": accuracy_score(y_true, y_pred),
+        "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
+        "roc_auc": roc_auc_score(y_true, scores),
+        "auc_flipped": roc_auc_score(y_true, -scores),
+        "clf": clf
+    }
+    return results
+
+results = {}
+
+#train model per hemisphere
+# df_no_mtfef = df[df["Tract"] != "MTxFEF"].copy()
+selected_tracts = tracts[:3]  # or explicit list
+Cs = np.array([0.018, 1.714])
+for i, hemi in enumerate(hemis):
+    print(f"\n=== Hemisphere {hemi} ===")
+
+    X = get_feature_matrix(df, hemi, selected_tracts)
+    
+    res = loso_evaluate(X, y, Cs[i])
+    
+    print(f"Regularization parameter: {Cs[i]:.3f}")
+    print(f"Accuracy:           {res['accuracy']:.3f}")
+    print(f"Balanced accuracy:  {res['balanced_accuracy']:.3f}")
+    print(f"ROC AUC:            {res['roc_auc']:.3f}")
+    print(f"ROC AUC Flipped:    {res['auc_flipped']:.3f}")
+
+    results[hemi] = res

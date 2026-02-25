@@ -376,7 +376,7 @@ import matplotlib.pyplot as plt
 n_tracts = null_dist_diff.shape[0]
 n_hemi = null_dist_diff.shape[2]
 
-fig, axes = plt.subplots(n_tracts, 2, figsize=(10, 4 * n_tracts))
+fig, axes = plt.subplots(n_tracts, 2, figsize=(10, 5 * n_tracts))
 
 # Ensure axes is always 2D
 if n_tracts == 1:
@@ -393,21 +393,26 @@ for t in range(n_tracts):
         # Density histogram
         ax.hist(null_vals, bins=40, density=True)
 
+        # Observed value
+        observed = sample_diff[t, h]
+        ax.axvline(observed, color="red")
         # 95% interval
-        lower = np.percentile(null_vals, 2.5)
-        upper = np.percentile(null_vals, 97.5)
+        if observed > 0:
+            lower = np.percentile(null_vals, 0)
+            upper = np.percentile(null_vals, 95)
+        elif observed < 0:
+            lower = np.percentile(null_vals, 5)
+            upper = np.percentile(null_vals, 100)
 
         ax.axvline(lower,color="black")
         ax.axvline(upper,color="black")
 
-        # Observed value
-        observed = sample_diff[t, h]
-        ax.axvline(observed, color="red")
+
 
         hemi_label = "Left" if h == 0 else "Right"
 
         ax.set_title(f"Tract {tract_order[t]} - {hemi_label}")
-        ax.set_xlabel("Difference")
+        ax.set_xlabel("EB-NS betas Difference")
         ax.set_ylabel("Density")
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
@@ -415,4 +420,57 @@ plt.savefig(op.join(saveDir, "permutation_group_diff_betas_combined_tracts.png")
             dpi=300, bbox_inches='tight')
 
 plt.tight_layout()
+plt.show()
+
+
+
+
+## Check visually the group level regressions beta values
+import pandas as pd
+import seaborn as sns
+fig, axes = plt.subplots(1, 2, figsize=(18, 6), sharey=True)
+hemi_labels = ["L", "R"]
+rows = []
+for h in range(n_hemi):
+    for t in range(n_tracts):
+        for g, group in enumerate(groups):
+            rows.append({
+                "Tract": tract_order[t],
+                "Hemisphere": hemi_labels[h],
+                "Group": group,    # EB or NS
+                "Beta": trained_coefs[t, g, h]
+            }) # "Subject": s,
+
+df = pd.DataFrame(rows)
+
+for ax, hemi in zip(axes, hemi_labels):
+
+    # Filter for hemisphere
+    df_h = df[df["Hemisphere"] == hemi]
+
+    # Jitter dots per group (EB vs NS)
+    sns.stripplot(
+        data=df_h,
+        x="Tract",
+        y="Beta",
+        hue="Group",
+        dodge=True,
+        jitter=0.15,
+        alpha=0.7,
+        ax=ax
+    )
+
+
+    # ------------------ Ax formatting ------------------
+    ax.set_title(f"{hemi}-Hemisphere Beta ( within EB / NS)",fontsize=16)
+    ax.set_xlabel("Tract",fontsize=14)
+    ax.tick_params(axis="x", rotation=90)
+    ax.set_xticks(np.arange(len(tract_order)))
+    ax.set_xticklabels(tract_order, rotation=30, ha="right",fontsize=12)
+    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
+axes[0].set_ylabel("Beta", fontsize=14)
+axes[1].legend(title="Group", labels=groups)
+sns.despine()
+plt.tight_layout()
+
 plt.show()
