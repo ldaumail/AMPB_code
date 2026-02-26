@@ -15,8 +15,8 @@ from sklearn.model_selection import permutation_test_score
 
 #Load beta coeffs
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
-#df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits','participants_ridgecv', 'combined', 'participant_betas_contrast-motionXstationary_combined_tracts.csv'))
-df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits', 'participants_linearcv', 'combined','participant_betas_contrast-motionXstationary_combined_tracts.csv'))
+df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits','participants_ridgecv', 'combined', 'participant_betas_contrast-motionXstationary_combined_tracts.csv'))
+# df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits', 'participants_linearcv', 'combined','participant_betas_contrast-motionXstationary_combined_tracts.csv'))
 
 participants = df["Participant"].unique()
 hemis = ["L", "R"]
@@ -52,6 +52,10 @@ def get_feature_matrix(df, hemi,selected_tracts):
 #             class_weight="balanced"
 #         ))
 #     ])
+
+#==============================
+# OLD WAY to do cross validation here, better approach further down
+#==============================
 from sklearn.svm import LinearSVC
 
 def make_classifier(C=1):
@@ -832,7 +836,7 @@ plot_3d_logistic_surface(
 
 #=========================================================
 #---------------------------------------------------------
-## Other SVM cross validation implementation with inner cv
+## NEW WAY: SVM cross validation implementation with nested inner cv
 #---------------------------------------------------------
 #=========================================================
 
@@ -849,7 +853,33 @@ from sklearn.metrics import (
     roc_auc_score
 )
 from sklearn.model_selection import permutation_test_score
+#Load beta coeffs
+bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
+#df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits','participants_ridgecv', 'combined', 'participant_betas_contrast-motionXstationary_combined_tracts.csv'))
+df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits', 'participants_linearcv', 'combined','participant_betas_contrast-motionXstationary_combined_tracts.csv'))
 
+participants = df["Participant"].unique()
+hemis = ["L", "R"]
+tracts = df["Tract"].unique()
+
+n_subj = len(participants)
+n_tract = len(tracts)
+
+# Labels
+y = np.array([1 if "EB" in p else 0 for p in participants])
+
+def get_feature_matrix(df, hemi,selected_tracts):
+    """
+    Returns X: (n_subjects, n_tracts)
+    """
+    X = (
+        df[(df["Hemisphere"] == hemi) & (df["Tract"].isin(selected_tracts))]
+        .pivot_table(index="Participant", columns="Tract", values="Beta")
+        .loc[participants, selected_tracts]
+        .to_numpy()
+        )
+
+    return X
 # ----------------------------
 # CLASSIFIER PIPELINE
 # ----------------------------
@@ -935,7 +965,9 @@ def nested_loso(X, y):
 
 
 #train model per hemisphere
-# df_no_mtfef = df[df["Tract"] != "MTxFEF"].copy()
+#do this if you want to remove a tract:
+# df_no_mtptsts1 = df[df["Tract"] != "MTxPTxSTS1"].copy()
+# selected_tracts = tracts[[0,2]]
 selected_tracts = tracts[:3]
 results = {}
 
@@ -993,7 +1025,7 @@ def plot_3d_with_plane(
     assert len(tracts) == 3, "Decision plane only works for 3 features"
 
     # fig = plt.figure(figsize=(14, 6))
-    fig = plt.figure(figsize=(14, 6), constrained_layout=True)
+    fig = plt.figure(figsize=(14, 6))
 
     for i, hemi in enumerate(hemis):
 
@@ -1034,9 +1066,9 @@ def plot_3d_with_plane(
         )
 
         # ---- Labels & formatting ----
-        ax.set_xlabel(tracts[0])
-        ax.set_ylabel(tracts[1])
-        ax.set_zlabel(tracts[2])
+        ax.set_xlabel(tracts[0], labelpad=10, fontweight='bold')
+        ax.set_ylabel(tracts[1], labelpad=10, fontweight='bold')
+        ax.set_zlabel(tracts[2], labelpad=15, fontweight='bold')
         ax.set_title(f"{hemi} Hemisphere")
         # ax.set_zlim(-4, 3)
         ax.view_init(elev=elev, azim=azim)
@@ -1048,17 +1080,21 @@ def plot_3d_with_plane(
 
         if i == 0:
             ax.legend()
+        if i == 1:
+        # Sometimes the right plot needs more space on the right side
+            ax.set_zlabel(tracts[2], labelpad=0)
 
     plt.suptitle("SVM decision planes per hemisphere", fontsize=16)
     # plt.tight_layout(rect=[0, 0, 1, 0.95])
     # plt.subplots_adjust(wspace=0.3, top=0.88)
+    plt.subplots_adjust(wspace=0.1, right=0.9)
 
     saveDir = op.join(bids_path, "analysis", "plots")
     os.makedirs(saveDir, exist_ok=True)
     plt.savefig(
         op.join(
             saveDir,
-            "beta_weights_3d_linearreg_participants_combined_tracts_innercv.png"
+            "beta_weights_3d_linreg_participants_combined_tracts_innercv.png"
         ),
         dpi=300,
         bbox_inches="tight"
@@ -1074,8 +1110,8 @@ plot_3d_with_plane(
     y=y,
     hemis=["L", "R"],
     tracts=selected_tracts,
-    C = np.array([0.018, 1.714]),
-    elev=15,
+    C = np.array([0.0183, 1.7138]),
+    elev=15, #15
     azim=-45
 )
 
@@ -1116,8 +1152,8 @@ def loso_evaluate(X, y, C):
 results = {}
 
 #train model per hemisphere
-# df_no_mtfef = df[df["Tract"] != "MTxFEF"].copy()
-selected_tracts = tracts[:3]  # or explicit list
+df_no_mtfef = df[df["Tract"] != "MTxPTxSTS1"].copy()
+selected_tracts = tracts[[0,2]]
 Cs = np.array([0.018, 1.714])
 for i, hemi in enumerate(hemis):
     print(f"\n=== Hemisphere {hemi} ===")
@@ -1133,3 +1169,115 @@ for i, hemi in enumerate(hemis):
     print(f"ROC AUC Flipped:    {res['auc_flipped']:.3f}")
 
     results[hemi] = res
+
+
+#==============================================
+### Visualize boundary plane with only 2 tracts
+#==============================================
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+def make_classifier(C=1):
+    return Pipeline([
+        ("scaler", StandardScaler()),
+        ("svm", LinearSVC(penalty="l2", loss="squared_hinge", dual=False, tol=1e-3, C=C))
+    ])
+def fit_final_model(X, y, C):
+    clf = make_classifier(C)
+    clf.fit(X, y)
+    return clf
+
+def get_decision_plane_raw(clf):
+    scaler = clf.named_steps["scaler"]
+    svm = clf.named_steps["svm"]
+
+    w_scaled = svm.coef_[0]
+    b_scaled = svm.intercept_[0]
+
+    # Undo scaling
+    w = w_scaled / scaler.scale_
+    b = b_scaled - np.sum(w_scaled * scaler.mean_ / scaler.scale_)
+
+    return w, b
+
+def plot_2d_with_plane(
+    df, participants, y, hemis, tracts, C
+):
+    assert len(tracts) == 2, "Decision boundary requires exactly 2 features"
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6), constrained_layout=True)
+
+    for i, hemi in enumerate(hemis):
+
+        # ------------------------
+        # Feature matrix
+        # ------------------------
+        X = get_feature_matrix(df, hemi, tracts)
+        C_val = C[i]
+        clf = fit_final_model(X, y, C_val)
+        w, b = get_decision_plane_raw(clf)
+
+        ax = axes[i]
+
+        # ---- Scatter points ----
+        ax.scatter(
+            X[y == 1, 0], X[y == 1, 1],
+            c="blue", marker="s", s=60, label="EB"
+        )
+        ax.scatter(
+            X[y == 0, 0], X[y == 0, 1],
+            c="red", marker="o", s=60, label="NS"
+        )
+
+        # ---- Decision boundary ----
+        x_vals = np.linspace(X[:, 0].min(), X[:, 0].max(), 200)
+        y_vals = (-w[0] * x_vals - b) / w[1]
+
+        ax.plot(
+            x_vals,
+            y_vals,
+            color="black",
+            linewidth=2,
+            label="Decision boundary"
+        )
+
+        # ---- Optional: margin lines ----
+        margin = 1 / np.linalg.norm(w)
+        y_margin_up = (-w[0] * x_vals - b + 1) / w[1]
+        y_margin_down = (-w[0] * x_vals - b - 1) / w[1]
+
+        ax.plot(x_vals, y_margin_up, "k--", linewidth=1)
+        ax.plot(x_vals, y_margin_down, "k--", linewidth=1)
+
+        # ---- Formatting ----
+        ax.set_xlabel(tracts[0])
+        ax.set_ylabel(tracts[1])
+        ax.set_title(f"{hemi} Hemisphere")
+        ax.legend()
+
+    plt.suptitle("Linear SVM decision boundaries", fontsize=16)
+
+    saveDir = op.join(bids_path, "analysis", "plots")
+    os.makedirs(saveDir, exist_ok=True)
+    plt.savefig(
+        op.join(
+            saveDir,
+            "beta_weights_2d_linear_svm_innercv.png"
+        ),
+        dpi=300,
+        bbox_inches="tight"
+    )
+
+    plt.show()
+
+selected_tracts = tracts[[0,2]]  # example — must be exactly 3
+
+plot_2d_with_plane(
+    df=df,
+    participants=participants,
+    y=y,
+    hemis=["L", "R"],
+    tracts=selected_tracts,
+    C = np.array([0.0089, 0.0331])
+)

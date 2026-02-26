@@ -1,21 +1,11 @@
-#Goal of this script: 1. perform a ridge regression on each group data.
-# 2. build some null distributions of betas for each tract
-#by randomly shuffling participants data across groups before 
-# performing the regression on each randomized group. 
-# 3. compare the original betas from each group to the null beta distribution for each tract
-
-import numpy as np
-from sklearn.linear_model import Ridge
-from sklearn.metrics import mean_squared_error
-from scipy.stats import pearsonr
-import random
-import nibabel as nib
 import os
 import os.path as op
-from nibabel.freesurfer import read_label
-from nilearn import plotting
-import matplotlib.pyplot as plt
-
+import pandas as pd
+import numpy as np
+import nibabel as nib
+from scipy.stats import pearsonr
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
 # ----------------------------
 # Inputs preparation
 # ----------------------------
@@ -212,6 +202,14 @@ for h, hemi in enumerate(hemis):
         norm_density_data[hemi].setdefault(s, {})
         norm_density_data[hemi][s] = zscored_densities
 
+#================Useful functions ============
+#Define a goodness of fit function
+def r2_score(y_t, y_p):
+    ss_res = np.sum((y_t - y_p)**2)
+    ss_tot = np.sum((y_t - np.mean(y_t))**2)
+    return 1 - ss_res / ss_tot
+
+
 def vertex_bootstrap_reliability(C, n_boot=1000, frac=1):
     """
     C: array (n_runs, n_vertices)
@@ -238,28 +236,56 @@ def vertex_bootstrap_reliability(C, n_boot=1000, frac=1):
 
     return np.mean(rs)
 
-## Fit Regression Models to each group
-verbose = True
-alpha = 1.0  # choose fixed regularization strength
 
+def noise_normalized_r(y_true, y_pred, reliability):
+    """
+    y_true: (n_vertices,)
+    y_pred: (n_vertices,)
+    reliability: split-half reliability of y_true
+
+    Returns noise-normalized r
+    """
+    if reliability <= 0 or np.isnan(reliability):
+        return np.nan
+
+    r, _ = pearsonr(y_true, y_pred)
+    return r / np.sqrt(reliability)
+
+def null_pearson_r2(y_true, y_pred, frac=1):
+    """
+    y_pred: array (n_runs, n_vertices)
+    frac: fraction of vertices sampled per bootstrap
+    Returns pearon's r between random map and true map
+    """
+    n_vertices, = y_pred.shape
+
+    n_sample = int(frac * n_vertices)
+
+    verts = np.random.choice(n_vertices, n_sample, replace=True)
+
+    A = y_pred[verts]
+    B = y_true
+    r, _ = pearsonr(A, B)
+    r2 = r2_score(A, B)
+    return r, r2
+
+## Fit Regression Models to each participant
 hemis = ["L", "R"]
-groups = ["EB", "NS"]
 contrast = contrast_order[0]   # e.g. "motionXstationary"
 
 # get n_subj, n_tracts
+n_bootstrap = 1000
 n_subj = len(participants)
 n_tracts = len(tract_order)
-n_groups = len(groups)
 rs   = np.full((n_subj, len(hemis)), np.nan)
 rsquared = np.full(( n_subj, len(hemis)), np.nan) #goodness of fit
 reliability = np.full((n_subj, len(hemis)), np.nan)
 r_all = np.full((n_subj, len(hemis)), np.nan)
+r_rand = np.full((n_bootstrap, n_subj, len(hemis)), np.nan)
+r2_rand = np.full((n_bootstrap, n_subj, len(hemis)), np.nan)
 rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan)
-trained_coefs = np.zeros((n_tracts, n_groups, len(hemis)))  # scalar summary per tract/run
-
-n_boot = 1000
-trained_coefs_null = np.zeros((n_tracts, n_boot, n_groups, len(hemis)))
-
+trained_coefs = np.zeros((n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
+delta_mse = np.full((n_tracts, n_subj, len(hemis)), np.nan) #
 predicted_maps = {hemi: [] for hemi in hemis}
 for h, hemi in enumerate(hemis):
         #h = 0
@@ -312,171 +338,137 @@ for h, hemi in enumerate(hemis):
     # main loop
     # -------------------------
 
-    for g, group in enumerate(groups):
-        
-        participants_group = [p for p in participants if group in p]
-        n_g_subj = len(participants_group)
-        #Define X and Y of the given group
-        group_norm_density = np.stack([norm_density_data[hemi][p] for p in range(n_subj) if participants[p] in participants_group], axis = 0)
-        group_C_mean = np.stack([C_mean[p,:] for p in range(n_subj) if participants[p] in participants_group], axis = 0)
+    for s, participant in enumerate(participants):
 
-        if verbose:
-            print(f"Fitting group {group}")
+        print(f"Fitting participant {participant}")
 
         # X: density maps for this participant
         # shape: (n_vertices_masked, n_tracts)
-        X = group_norm_density.transpose(0,2,1).reshape(-1,3)#norm_density_data[hemi][s].T
+        X = norm_density_data[hemi][s].T
 
         # y: functional contrast map
         # shape: (n_vertices_masked,)
-        y = group_C_mean.reshape(-1,1) #C_mean[s, :]
+        y = C_mean[s, :]
 
         # Fit regression
-        ridge = Ridge(alpha=alpha)
-        ridge.fit(X, y)
+        linreg = LinearRegression()
+        linreg.fit(X, y)
 
         # Store coefficients
-        trained_coefs[:, g, h] = ridge.coef_.copy()
+        trained_coefs[:, s, h] = linreg.coef_.copy()
 
-        # # Predict (optional)
-        # y_pred = ridge.predict(X)
-        # predicted[s, :] = y_pred
+        # Predict (optional)
+        y_pred = linreg.predict(X)
+        predicted[s, :] = y_pred
 
         # Reliability (if needed)
-        # reliability[s, h] = vertex_bootstrap_reliability(all_C[s,:,:])
+        reliability[s, h] = vertex_bootstrap_reliability(all_C[s,:,:])
+
+        # Optional evaluation
+        r, p = pearsonr(y, y_pred)
+        rs[s,h] = r 
+
+        rsquared[s,h] = r2_score(y, y_pred)
+
+        mse_full = mean_squared_error(y, y_pred)
+        print(f"r={r:.4f}, MSE={mse_full:.4e}, p={p:.4e}")
 
 
-    #Null beta distributions
-    for n in range(n_boot):
-        participants1 = np.random.choice(n_subj, 7, replace=False)
-        participants2 = [p for p in range(n_subj) if p not in participants1]
-
-        group_norm_density1 = np.stack([norm_density_data[hemi][p] for p in participants1], axis = 0)
-        group_C_mean1 = np.stack([C_mean[p,:] for p in participants1], axis = 0)
-        X1 = group_norm_density1.transpose(0,2,1).reshape(-1,3)
-        y1 = group_C_mean1.reshape(-1,1)
-
-        ridge1 = Ridge(alpha=alpha)
-        ridge1.fit(X1, y1)
-
-        group_norm_density2 = np.stack([norm_density_data[hemi][p] for p in participants2], axis = 0)
-        group_C_mean2 = np.stack([C_mean[p,:] for p in participants2], axis = 0)
-        X2 = group_norm_density2.transpose(0,2,1).reshape(-1,3)
-        y2 = group_C_mean2.reshape(-1,1)
-
-        ridge2 = Ridge(alpha=alpha)
-        ridge2.fit(X2, y2)
-
-        trained_coefs_null[:,n, 0, h] = ridge1.coef_.copy()
-        trained_coefs_null[:,n, 1, h] = ridge2.coef_.copy()
-
-
-null_dist_diff = trained_coefs_null[:,:,0,:] - trained_coefs_null[:,:,1,:]
-sample_diff = trained_coefs[:,0,:] - trained_coefs[:,1,:]
+        for i in range(n_bootstrap):
+            r_rand[i,s,h], r2_rand[i,s,h] = null_pearson_r2(y, y_pred)
 
 #Plot
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
 
-n_tracts = null_dist_diff.shape[0]
-n_hemi = null_dist_diff.shape[2]
+def plot_null_vs_actual(
+    rs, rsquared,
+    r_rand, r2_rand,
+    hemis
+):
+    n_subj = rs.shape[0]
+    n_hemis = len(hemis)
 
-fig, axes = plt.subplots(n_tracts, 2, figsize=(10, 5 * n_tracts))
-
-# Ensure axes is always 2D
-if n_tracts == 1:
-    axes = np.array([axes])
-
-for t in range(n_tracts):
-    for h in range(n_hemi):
-
-        ax = axes[t, h]
-
-        # Null distribution for this tract & hemisphere
-        null_vals = null_dist_diff[t, :, h]
-
-        # Density histogram
-        ax.hist(null_vals, bins=40, density=True)
-
-        # Observed value
-        observed = sample_diff[t, h]
-        ax.axvline(observed, color="red")
-        # 95% interval
-        if observed > 0:
-            lower = np.percentile(null_vals, 0)
-            upper = np.percentile(null_vals, 95)
-        elif observed < 0:
-            lower = np.percentile(null_vals, 5)
-            upper = np.percentile(null_vals, 100)
-
-        ax.axvline(lower,color="black")
-        ax.axvline(upper,color="black")
-
-
-
-        hemi_label = "Left" if h == 0 else "Right"
-
-        ax.set_title(f"Tract {tract_order[t]} - {hemi_label}")
-        ax.set_xlabel("EB-NS betas Difference")
-        ax.set_ylabel("Density")
-saveDir = op.join(bids_path, 'analysis', 'plots')
-os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "permutation_group_diff_betas_combined_tracts.png"),
-            dpi=300, bbox_inches='tight')
-
-plt.tight_layout()
-plt.show()
-
-
-
-
-## Check visually the group level regressions beta values
-import pandas as pd
-import seaborn as sns
-fig, axes = plt.subplots(1, 2, figsize=(18, 6), sharey=True)
-hemi_labels = ["L", "R"]
-rows = []
-for h in range(n_hemi):
-    for t in range(n_tracts):
-        for g, group in enumerate(groups):
-            rows.append({
-                "Tract": tract_order[t],
-                "Hemisphere": hemi_labels[h],
-                "Group": group,    # EB or NS
-                "Beta": trained_coefs[t, g, h]
-            }) # "Subject": s,
-
-df = pd.DataFrame(rows)
-
-for ax, hemi in zip(axes, hemi_labels):
-
-    # Filter for hemisphere
-    df_h = df[df["Hemisphere"] == hemi]
-
-    # Jitter dots per group (EB vs NS)
-    sns.stripplot(
-        data=df_h,
-        x="Tract",
-        y="Beta",
-        hue="Group",
-        dodge=True,
-        jitter=0.15,
-        alpha=0.7,
-        ax=ax
+    fig, axes = plt.subplots(
+        2, n_hemis,
+        figsize=(6 * n_hemis, 8),
+        constrained_layout=True
     )
 
+    for h, hemi in enumerate(hemis):
 
-    # ------------------ Ax formatting ------------------
-    ax.set_title(f"{hemi}-Hemisphere Beta ( within EB / NS)",fontsize=16)
-    ax.set_xlabel("Tract",fontsize=14)
-    ax.tick_params(axis="x", rotation=90)
-    ax.set_xticks(np.arange(len(tract_order)))
-    ax.set_xticklabels(tract_order, rotation=30, ha="right",fontsize=12)
-    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
-axes[0].set_ylabel("Beta", fontsize=14)
-axes[1].legend(title="Group", labels=groups)
-sns.despine()
-plt.tight_layout()
+        # ======================================================
+        # ----------- PEARSON r (top row) ----------------------
+        # ======================================================
 
-plt.show()
+        ax = axes[0, h] if n_hemis > 1 else axes[0]
+
+        # Flatten null across bootstrap and subjects
+        null_r = r_rand[:, :, h].flatten()
+        actual_r = rs[:, h]
+
+        # KDE for null
+        kde = gaussian_kde(null_r)
+        x_vals = np.linspace(null_r.min(), null_r.max(), 500)
+        ax.plot(x_vals, kde(x_vals), label="Null", linewidth=2)
+
+        # 95% CI
+        ci_low, ci_high = np.percentile(null_r, [2.5, 97.5])
+        ax.axvline(ci_low, linestyle="--", alpha=0.7)
+        ax.axvline(ci_high, linestyle="--", alpha=0.7)
+
+        # Mean null
+        ax.axvline(null_r.mean(), linestyle=":", alpha=0.8, label="Null mean")
+
+        # Actual values (vertical rug lines)
+        for val in actual_r:
+            ax.axvline(val, color="red", alpha=0.4)
+
+        ax.axvline(actual_r.mean(), color="red", linewidth=2, label="Actual mean")
+
+        ax.set_title(f"{hemi} Hemisphere — Pearson r")
+        ax.set_xlabel("r")
+        ax.set_ylabel("Density")
+        ax.legend()
+
+
+        # ======================================================
+        # ----------- R² (bottom row) --------------------------
+        # ======================================================
+
+        ax = axes[1, h] if n_hemis > 1 else axes[1]
+
+        null_r2 = r2_rand[:, :, h].flatten()
+        actual_r2 = rsquared[:, h]
+
+        kde = gaussian_kde(null_r2)
+        x_vals = np.linspace(null_r2.min(), null_r2.max(), 500)
+        ax.plot(x_vals, kde(x_vals), label="Null", linewidth=2)
+
+        ci_low, ci_high = np.percentile(null_r2, [2.5, 97.5])
+        ax.axvline(ci_low, linestyle="--", alpha=0.7)
+        ax.axvline(ci_high, linestyle="--", alpha=0.7)
+
+        ax.axvline(null_r2.mean(), linestyle=":", alpha=0.8, label="Null mean")
+
+        for val in actual_r2:
+            ax.axvline(val, color="red", alpha=0.4)
+
+        ax.axvline(actual_r2.mean(), color="red", linewidth=2, label="Actual mean")
+
+        ax.set_title(f"{hemi} Hemisphere — R²")
+        ax.set_xlabel("R²")
+        ax.set_ylabel("Density")
+        ax.legend()
+
+    plt.show()
+
+
+
+plot_null_vs_actual(
+    rs, rsquared,
+    r_rand, r2_rand,
+    hemis
+)
