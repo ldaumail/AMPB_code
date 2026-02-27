@@ -251,28 +251,20 @@ def noise_normalized_r(y_true, y_pred, reliability):
     r, _ = pearsonr(y_true, y_pred)
     return r / np.sqrt(reliability)
 
-def null_pearson_r2(y_true, y_pred, frac=1):
-    """
-    y_pred: array (n_runs, n_vertices)
-    frac: fraction of vertices sampled per bootstrap
-    Returns pearon's r between random map and true map
-    """
-    n_vertices, = y_pred.shape
 
-    n_sample = int(frac * n_vertices)
+def null_pearson_r2(y_true, y_pred):
 
-    verts = np.random.choice(n_vertices, n_sample, replace=True)
+    y_perm = np.random.permutation(y_pred)
 
-    A = y_pred[verts]
-    B = y_true
-    r, _ = pearsonr(A, B)
-    r2 = r2_score(A, B)
+    r, _ = pearsonr(y_perm, y_true)
+    r2 = r2_score(y_true, y_perm)
+
     return r, r2
 
 ## Fit Regression Models to each participant
 hemis = ["L", "R"]
 contrast = contrast_order[0]   # e.g. "motionXstationary"
-
+groups = ["EB", "NS"]
 # get n_subj, n_tracts
 n_bootstrap = 1000
 n_subj = len(participants)
@@ -337,7 +329,6 @@ for h, hemi in enumerate(hemis):
     # -------------------------
     # main loop
     # -------------------------
-
     for s, participant in enumerate(participants):
 
         print(f"Fitting participant {participant}")
@@ -373,12 +364,35 @@ for h, hemi in enumerate(hemis):
         mse_full = mean_squared_error(y, y_pred)
         print(f"r={r:.4f}, MSE={mse_full:.4e}, p={p:.4e}")
 
+        ## 1. shuffling across predicted maps vertices
+        # for i in range(n_bootstrap):
+            # r_rand[i,s,h], r2_rand[i,s,h] = null_pearson_r2(y, y_pred)
+    ## 2. Shuffling accross predicted maps of participants
+    # for i in range(n_bootstrap):
+    #     subj_perm = np.random.permutation(np.arange(len(participants)))
+    #     for s, participant in enumerate(participants):
+    #             r_rand[i,s,h], _ = pearsonr(predicted[subj_perm[s],:], C_mean[s, :])
+    #             r2_rand[i,s,h] =r2_score(C_mean[s, :], predicted[subj_perm[s],:])
+    ## 3. Shuffling accross participants within each group
 
-        for i in range(n_bootstrap):
-            r_rand[i,s,h], r2_rand[i,s,h] = null_pearson_r2(y, y_pred)
+    for i in range(n_bootstrap):
+        
+        for g, group in enumerate(groups):
+            participants_group = [p for p in participants if group in p]
+            if "EB" in group:
+                group1_size = len(participants_group)
+                participant_idx =[p for p in range(len(participants_group))]
+                shuf_participants1 = np.random.permutation(participant_idx)
+            elif "NS" in group:
+                participant_idx =[p for p in group1_size+np.arange(len(participants_group))]
+                shuf_participants2 = np.random.permutation(participant_idx)
+        subj_perm = np.concatenate((shuf_participants1, shuf_participants2),
+        axis=0)
+        for s, participant in enumerate(participants):
+            r_rand[i,s,h], _ = pearsonr(predicted[subj_perm[s],:], C_mean[s, :])
+            r2_rand[i,s,h] =r2_score(C_mean[s, :], predicted[subj_perm[s],:])
 
 #Plot
-
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
@@ -386,8 +400,10 @@ from scipy.stats import gaussian_kde
 def plot_null_vs_actual(
     rs, rsquared,
     r_rand, r2_rand,
-    hemis
+    hemis,
+    n_bins=40
 ):
+
     n_subj = rs.shape[0]
     n_hemis = len(hemis)
 
@@ -400,33 +416,48 @@ def plot_null_vs_actual(
     for h, hemi in enumerate(hemis):
 
         # ======================================================
-        # ----------- PEARSON r (top row) ----------------------
+        # ---------------- PEARSON r ---------------------------
         # ======================================================
 
         ax = axes[0, h] if n_hemis > 1 else axes[0]
 
-        # Flatten null across bootstrap and subjects
-        null_r = r_rand[:, :, h].flatten()
+        null_r = r_rand[:, :, h].mean(axis = 1).flatten()
         actual_r = rs[:, h]
 
-        # KDE for null
-        kde = gaussian_kde(null_r)
+        # Shared bins
+        # combined = np.concatenate([null_r, actual_r])
+        bins = np.histogram_bin_edges(null_r, bins=n_bins)
+
+        # Null histogram
+        null_hist = ax.hist(
+            null_r,
+            bins=bins,
+            density=True,
+            alpha=0.3,
+            label="Null (hist)"
+        )
+
+        # Null KDE
+        kde_null = gaussian_kde(null_r)
         x_vals = np.linspace(null_r.min(), null_r.max(), 500)
-        ax.plot(x_vals, kde(x_vals), label="Null", linewidth=2)
+        y_null_kde = kde_null(x_vals)
+        ax.plot(x_vals, y_null_kde, linewidth=2, color="blue", label="Null (KDE)")
 
-        # 95% CI
+
+        # 95% CI (null)
         ci_low, ci_high = np.percentile(null_r, [2.5, 97.5])
-        ax.axvline(ci_low, linestyle="--", alpha=0.7)
-        ax.axvline(ci_high, linestyle="--", alpha=0.7)
+        ax.axvline(ci_low, linestyle="--")
+        ax.axvline(ci_high, linestyle="--")
 
-        # Mean null
-        ax.axvline(null_r.mean(), linestyle=":", alpha=0.8, label="Null mean")
+        ax.axvline(null_r.mean(), linestyle=":", linewidth=2, label="Null mean")
+        ax.axvline(actual_r.mean(), linestyle=":", linewidth=2, color="red", label="True mean")
 
-        # Actual values (vertical rug lines)
-        for val in actual_r:
-            ax.axvline(val, color="red", alpha=0.4)
-
-        ax.axvline(actual_r.mean(), color="red", linewidth=2, label="Actual mean")
+        # Force same y-scale
+        ymax = max(
+            max(null_hist[0]),
+            max(y_null_kde)
+        ) #max(true_hist[0])
+        ax.set_ylim(0, ymax * 1.1)
 
         ax.set_title(f"{hemi} Hemisphere — Pearson r")
         ax.set_xlabel("r")
@@ -435,28 +466,42 @@ def plot_null_vs_actual(
 
 
         # ======================================================
-        # ----------- R² (bottom row) --------------------------
+        # -------------------- R² ------------------------------
         # ======================================================
 
         ax = axes[1, h] if n_hemis > 1 else axes[1]
 
-        null_r2 = r2_rand[:, :, h].flatten()
+        null_r2 = r2_rand[:, :, h].mean(axis = 1).flatten()
         actual_r2 = rsquared[:, h]
 
-        kde = gaussian_kde(null_r2)
+        combined = np.concatenate([null_r2, actual_r2])
+        bins = np.histogram_bin_edges(null_r2, bins=n_bins)
+
+        null_hist = ax.hist(
+            null_r2,
+            bins=bins,
+            density=True,
+            alpha=0.3,
+            label="Null (hist)"
+        )
+
+        kde_null = gaussian_kde(null_r2)
         x_vals = np.linspace(null_r2.min(), null_r2.max(), 500)
-        ax.plot(x_vals, kde(x_vals), label="Null", linewidth=2)
+        y_null_kde = kde_null(x_vals)
+        ax.plot(x_vals, y_null_kde, linewidth=2, color="blue", label="Null (KDE)")
 
         ci_low, ci_high = np.percentile(null_r2, [2.5, 97.5])
-        ax.axvline(ci_low, linestyle="--", alpha=0.7)
-        ax.axvline(ci_high, linestyle="--", alpha=0.7)
+        ax.axvline(ci_low, linestyle="--")
+        ax.axvline(ci_high, linestyle="--")
 
-        ax.axvline(null_r2.mean(), linestyle=":", alpha=0.8, label="Null mean")
+        ax.axvline(null_r2.mean(), linestyle=":", linewidth=2, label="Null mean")
+        ax.axvline(actual_r2.mean(), linestyle=":", linewidth=2, color="red", label="True mean")
 
-        for val in actual_r2:
-            ax.axvline(val, color="red", alpha=0.4)
-
-        ax.axvline(actual_r2.mean(), color="red", linewidth=2, label="Actual mean")
+        ymax = max(
+            max(null_hist[0]),
+            max(y_null_kde)
+        ) #            max(true_hist[0]),
+        ax.set_ylim(0, ymax * 1.1)
 
         ax.set_title(f"{hemi} Hemisphere — R²")
         ax.set_xlabel("R²")
@@ -466,9 +511,207 @@ def plot_null_vs_actual(
     plt.show()
 
 
-
 plot_null_vs_actual(
     rs, rsquared,
     r_rand, r2_rand,
     hemis
+)
+
+#====================
+#Plot per group
+#====================
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
+
+def plot_null_vs_actual_by_group_horizontal(
+    rs, rsquared,
+    r_rand, r2_rand,
+    hemis,
+    participants,
+    groups=("EB", "NS"),
+    n_bins=40
+):
+
+    n_hemis = len(hemis)
+    n_groups = len(groups)
+
+    fig, axes = plt.subplots(
+        2, n_hemis * n_groups,
+        figsize=(4 * n_hemis * n_groups, 8),
+        constrained_layout=True
+    )
+
+    group_indices = {
+        g: np.array([i for i, p in enumerate(participants) if g in p])
+        for g in groups
+    }
+
+    null_colors = {
+        "EB": "green",
+        "NS": "blue"
+    }
+
+    for h, hemi in enumerate(hemis):
+
+        # ==========================================================
+        # Precompute axis limits per metric & hemisphere
+        # ==========================================================
+
+        # ---- Pearson r ----
+        all_r_values = []
+        for g in groups:
+            idx = group_indices[g]
+            null_vals = r_rand[:, idx, h].mean(axis=1)
+            true_vals = rs[idx, h]
+            all_r_values.extend(null_vals)
+            all_r_values.extend(true_vals)
+
+        r_min, r_max = min(all_r_values), max(all_r_values)
+
+        # ---- R² ----
+        all_r2_values = []
+        for g in groups:
+            idx = group_indices[g]
+            null_vals = r2_rand[:, idx, h].mean(axis=1)
+            true_vals = rsquared[idx, h]
+            all_r2_values.extend(null_vals)
+            all_r2_values.extend(true_vals)
+
+        r2_min, r2_max = min(all_r2_values), max(all_r2_values)
+
+        # ==========================================================
+        # Plot per group
+        # ==========================================================
+
+        for g_idx, group in enumerate(groups):
+
+            col_idx = h * n_groups + g_idx
+            idx = group_indices[group]
+            color = null_colors[group]
+
+            # ==================================================
+            # ---------------- Pearson r ----------------------
+            # ==================================================
+            ax = axes[0, col_idx]
+
+            null_vals = r_rand[:, idx, h].mean(axis=1)
+            true_vals = rs[idx, h]
+
+            # Histogram
+            ax.hist(
+                null_vals,
+                bins=n_bins,
+                density=True,
+                alpha=0.35,
+                color=color,
+                orientation="horizontal",
+                label="Null histogram"
+            )
+
+            # KDE
+            kde = gaussian_kde(null_vals)
+            y_vals = np.linspace(r_min, r_max, 500)
+            x_kde = kde(y_vals)
+
+            ax.plot(
+                x_kde, y_vals,
+                linewidth=2,
+                color=color,
+                label="Null KDE"
+            )
+
+            # 95% CI
+            ci_low, ci_high = np.percentile(null_vals, [2.5, 97.5])
+            ax.axhline(ci_low, linestyle="--", color=color, label="Null 95% CI")
+            ax.axhline(ci_high, linestyle="--", color=color)
+
+            # Null mean
+            ax.axhline(
+                null_vals.mean(),
+                linestyle=":",
+                linewidth=2,
+                color=color,
+                label="Null mean"
+            )
+
+            # True group mean
+            ax.axhline(
+                true_vals.mean(),
+                linewidth=3,
+                color="red",
+                label="True mean"
+            )
+
+            ax.set_ylim(r_min, r_max)
+            ax.set_title(f"{hemi} — {group} (r)")
+            ax.set_ylabel("Pearson r")
+            ax.set_xlabel("Density")
+            ax.legend()
+
+            # ==================================================
+            # ------------------- R² ---------------------------
+            # ==================================================
+            ax = axes[1, col_idx]
+
+            null_vals = r2_rand[:, idx, h].mean(axis=1)
+            true_vals = rsquared[idx, h]
+
+            ax.hist(
+                null_vals,
+                bins=n_bins,
+                density=True,
+                alpha=0.35,
+                color=color,
+                orientation="horizontal",
+                label="Null histogram"
+            )
+
+            kde = gaussian_kde(null_vals)
+            y_vals = np.linspace(r2_min, r2_max, 500)
+            x_kde = kde(y_vals)
+
+            ax.plot(
+                x_kde, y_vals,
+                linewidth=2,
+                color=color,
+                label="Null KDE"
+            )
+
+            ci_low, ci_high = np.percentile(null_vals, [2.5, 97.5])
+            ax.axhline(ci_low, linestyle="--", color=color, label="Null 95% CI")
+            ax.axhline(ci_high, linestyle="--", color=color)
+
+            ax.axhline(
+                null_vals.mean(),
+                linestyle=":",
+                linewidth=2,
+                color=color,
+                label="Null mean"
+            )
+
+            ax.axhline(
+                true_vals.mean(),
+                linewidth=3,
+                color="red",
+                label="True mean"
+            )
+
+            ax.set_ylim(r2_min, r2_max)
+            ax.set_title(f"{hemi} — {group} (R²)")
+            ax.set_ylabel("R²")
+            ax.set_xlabel("Density")
+            ax.legend()
+
+    plt.suptitle("Null vs True Distributions by Hemisphere and Group", fontsize=16)
+    plt.show()
+
+plot_null_vs_actual_by_group_horizontal(
+    rs, rsquared,
+    r_rand, r2_rand,
+    hemis,
+    participants,
+    groups=("EB", "NS"),
+    n_bins=40
 )
