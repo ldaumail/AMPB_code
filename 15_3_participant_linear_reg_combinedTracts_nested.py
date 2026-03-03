@@ -483,8 +483,8 @@ sns.despine()
 plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "participants_dMSE_linearreg_combined_tracts_nested.png"),
-            dpi=300, bbox_inches='tight')
+# plt.savefig(op.join(saveDir, "participants_dMSE_linearreg_combined_tracts_nested.png"),
+#             dpi=300, bbox_inches='tight')
 plt.show()
 
 
