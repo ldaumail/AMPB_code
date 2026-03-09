@@ -15,8 +15,8 @@ from sklearn.model_selection import permutation_test_score
 
 #Load beta coeffs
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
-df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits','participants_ridgecv', 'combined', 'participant_betas_contrast-motionXstationary_combined_tracts.csv'))
-# df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits', 'participants_linearcv', 'combined','participant_betas_contrast-motionXstationary_combined_tracts.csv'))
+#df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits','participants_ridgecv', 'combined', 'participant_betas_contrast-motionXstationary_combined_tracts.csv'))
+df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits', 'participants_linearcv', 'combined','participant_betas_contrast-motionXstationary_combined_tracts.csv'))
 
 participants = df["Participant"].unique()
 hemis = ["L", "R"]
@@ -856,7 +856,7 @@ from sklearn.model_selection import permutation_test_score
 #Load beta coeffs
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
 #df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits','participants_ridgecv', 'combined', 'participant_betas_contrast-motionXstationary_combined_tracts.csv'))
-df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits', 'participants_linearcv', 'combined','participant_betas_contrast-motionXstationary_combined_tracts.csv'))
+df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits', 'participants_linearreg', 'combined','participant_betas_contrast-motionXstationary_combined_tracts.csv'))
 
 participants = df["Participant"].unique()
 hemis = ["L", "R"]
@@ -966,9 +966,9 @@ def nested_loso(X, y):
 
 #train model per hemisphere
 #do this if you want to remove a tract:
-# df_no_mtptsts1 = df[df["Tract"] != "MTxPTxSTS1"].copy()
-# selected_tracts = tracts[[0,2]]
-selected_tracts = tracts[:3]
+df_no_mtptsts1 = df[df["Tract"] != "MTxPTxSTS1"].copy()
+selected_tracts = tracts[[0,2]]
+# selected_tracts = tracts[:3]
 results = {}
 
 for hemi in hemis:
@@ -1024,7 +1024,6 @@ def plot_3d_with_plane(
 ):
     assert len(tracts) == 3, "Decision plane only works for 3 features"
 
-    # fig = plt.figure(figsize=(14, 6))
     fig = plt.figure(figsize=(14, 6))
 
     for i, hemi in enumerate(hemis):
@@ -1064,24 +1063,38 @@ def plot_3d_with_plane(
             color="gray",
             edgecolor="none"
         )
-
+        if i == 0:
+            ax.view_init(elev=elev[0], azim=azim[0])
+        if i == 1:
+            ax.view_init(elev=elev[1], azim=azim[1])
         # ---- Labels & formatting ----
-        ax.set_xlabel(tracts[0], labelpad=10, fontweight='bold')
-        ax.set_ylabel(tracts[1], labelpad=10, fontweight='bold')
-        ax.set_zlabel(tracts[2], labelpad=15, fontweight='bold')
+        ax.set_xlabel(tracts[0], labelpad=10,fontsize=18, fontweight='bold')
+        ax.set_ylabel(tracts[1], labelpad=10,fontsize=18, fontweight='bold')
+        ax.set_zlabel(tracts[2], labelpad=15,fontsize=18, fontweight='bold')
         ax.set_title(f"{hemi} Hemisphere")
         # ax.set_zlim(-4, 3)
-        ax.view_init(elev=elev, azim=azim)
+        
 
         # Clean panes
         ax.xaxis.pane.fill = False
         ax.yaxis.pane.fill = False
         ax.zaxis.pane.fill = False
 
-        if i == 0:
-            ax.legend()
+        ax.spines['left'].set_linewidth(2) #axis thickness
+        ax.spines['right'].set_linewidth(2)
+        ax.spines['bottom'].set_linewidth(2) #axis thickness
+        #plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
+
+        ax.set_xticklabels(ax.get_xticklabels(), fontsize=14,fontweight='bold')
+        ax.set_yticklabels(ax.get_yticklabels(), fontsize=14,fontweight='bold')
+        ax.set_zticklabels(ax.get_zticklabels(), fontsize=14,fontweight='bold')
+
+        # ax.tick_params(axis="z", rotation=45, width=2)
+
+            
         if i == 1:
-        # Sometimes the right plot needs more space on the right side
+            ax.legend()
+            # Sometimes the right plot needs more space on the right side
             ax.set_zlabel(tracts[2], labelpad=0)
 
     plt.suptitle("SVM decision planes per hemisphere", fontsize=16)
@@ -1111,8 +1124,8 @@ plot_3d_with_plane(
     hemis=["L", "R"],
     tracts=selected_tracts,
     C = np.array([0.0183, 1.7138]),
-    elev=15, #15
-    azim=-45
+    elev=np.array([15,0]), #15
+    azim=np.array([-45,-45])
 )
 
 #-------------------------------------------
@@ -1177,6 +1190,7 @@ for i, hemi in enumerate(hemis):
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+import seaborn as sns
 
 def make_classifier(C=1):
     return Pipeline([
@@ -1241,20 +1255,27 @@ def plot_2d_with_plane(
             linewidth=2,
             label="Decision boundary"
         )
+        #1 remove box
+        sns.despine(ax=ax, top=True, right=True)
+
+        # 2. Make the remaining axes (Left and Bottom) thick
+        ax.spines['left'].set_linewidth(2.5)
+        ax.spines['bottom'].set_linewidth(2.5)
 
         # ---- Optional: margin lines ----
-        margin = 1 / np.linalg.norm(w)
-        y_margin_up = (-w[0] * x_vals - b + 1) / w[1]
-        y_margin_down = (-w[0] * x_vals - b - 1) / w[1]
+        # margin = 1 / np.linalg.norm(w)
+        # y_margin_up = (-w[0] * x_vals - b + 1) / w[1]
+        # y_margin_down = (-w[0] * x_vals - b - 1) / w[1]
 
-        ax.plot(x_vals, y_margin_up, "k--", linewidth=1)
-        ax.plot(x_vals, y_margin_down, "k--", linewidth=1)
+        # ax.plot(x_vals, y_margin_up, "k--", linewidth=1)
+        # ax.plot(x_vals, y_margin_down, "k--", linewidth=1)
 
         # ---- Formatting ----
-        ax.set_xlabel(tracts[0])
-        ax.set_ylabel(tracts[1])
+        ax.set_xlabel(tracts[0],fontsize=18,fontweight='bold')
+        ax.set_ylabel(tracts[1],fontsize=18,fontweight='bold')
         ax.set_title(f"{hemi} Hemisphere")
         ax.legend()
+        plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
 
     plt.suptitle("Linear SVM decision boundaries", fontsize=16)
 
