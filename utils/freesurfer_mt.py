@@ -166,7 +166,7 @@ rh_mt_actor = actor.contour_from_roi(
 )
 
 ## Functional MT
-func_mt_path = op.join(bids_path, 'analysis', 'functional_vol_roi', participant)
+func_mt_path = op.join(bids_path, 'analysis', 'ROIs', 'func_roi','functional_vol_roi', participant)
 func_mask_images = {}
 for hemi in hemisphere:
     mask_name = f"{hemi}_mt"
