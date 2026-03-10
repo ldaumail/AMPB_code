@@ -1302,3 +1302,95 @@ plot_2d_with_plane(
     tracts=selected_tracts,
     C = np.array([0.0089, 0.0331])
 )
+
+
+#Show only left hemi:
+
+
+def plot_2d_with_plane(
+    df, participants, y, hemis, tracts, C
+):
+    assert len(tracts) == 2, "Decision boundary requires exactly 2 features"
+
+    fig, axes = plt.subplots(1, 1, figsize=(7, 6), constrained_layout=True)
+
+    for i, hemi in enumerate(hemis):
+
+        # ------------------------
+        # Feature matrix
+        # ------------------------
+        X = get_feature_matrix(df, hemi, tracts)
+        C_val = C[i]
+        clf = fit_final_model(X, y, C_val)
+        w, b = get_decision_plane_raw(clf)
+
+        ax = axes
+
+        # ---- Scatter points ----
+        ax.scatter(
+            X[y == 1, 0], X[y == 1, 1],
+            c="blue", marker="s", s=60, label="EB"
+        )
+        ax.scatter(
+            X[y == 0, 0], X[y == 0, 1],
+            c="red", marker="o", s=60, label="NS"
+        )
+
+        # ---- Decision boundary ----
+        x_vals = np.linspace(X[:, 0].min(), X[:, 0].max(), 200)
+        y_vals = (-w[0] * x_vals - b) / w[1]
+
+        ax.plot(
+            x_vals,
+            y_vals,
+            color="black",
+            linewidth=2,
+            label="Decision boundary"
+        )
+        #1 remove box
+        sns.despine(ax=ax, top=True, right=True)
+
+        # 2. Make the remaining axes (Left and Bottom) thick
+        ax.spines['left'].set_linewidth(2.5)
+        ax.spines['bottom'].set_linewidth(2.5)
+
+        # ---- Optional: margin lines ----
+        # margin = 1 / np.linalg.norm(w)
+        # y_margin_up = (-w[0] * x_vals - b + 1) / w[1]
+        # y_margin_down = (-w[0] * x_vals - b - 1) / w[1]
+
+        # ax.plot(x_vals, y_margin_up, "k--", linewidth=1)
+        # ax.plot(x_vals, y_margin_down, "k--", linewidth=1)
+
+        # ---- Formatting ----
+        ax.set_xlabel(tracts[0],fontsize=18,fontweight='bold')
+        ax.set_ylabel(tracts[1],fontsize=18,fontweight='bold')
+        ax.set_title(f"{hemi} Hemisphere",fontsize=18,fontweight='bold')
+        ax.legend()
+        plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
+
+    plt.suptitle("Linear SVM decision boundaries", fontsize=16)
+
+    saveDir = op.join(bids_path, "analysis", "plots")
+    os.makedirs(saveDir, exist_ok=True)
+    plt.savefig(
+        op.join(
+            saveDir,
+            "left_beta_weights_2d_linear_svm_innercv.png"
+        ),
+        dpi=300,
+        bbox_inches="tight"
+    )
+
+    plt.show()
+
+selected_tracts = tracts[[0,2]]  # example — must be exactly 3
+
+plot_2d_with_plane(
+    df=df,
+    participants=participants,
+    y=y,
+    hemis=["L"],
+    tracts=selected_tracts,
+    C = np.array([0.0089, 0.0331])
+)

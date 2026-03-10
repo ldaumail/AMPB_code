@@ -301,6 +301,7 @@ for h, hemi in enumerate(hemis):
     predicted = np.full((n_subj, n_masked), np.nan)  # predicted maps per run
     _, _, n_vertices  = density_data[hemi].shape #get total number of vertices within fsaverage hemisphere
     
+    #select runs and average func maps across runs
     n_target_runs = 3
     all_C = []              # will store (n_subj, 3, n_vertices)
     rnd_run_idx = np.full((n_subj, n_target_runs, len(hemis)), np.nan)
@@ -710,6 +711,117 @@ def plot_null_vs_actual_by_group_horizontal(
 plot_null_vs_actual_by_group_horizontal(
     rs, rsquared,
     r_rand, r2_rand,
+    hemis,
+    participants,
+    groups=("EB", "NS"),
+    n_bins=40
+)
+
+
+
+#===================================================
+# Plot only Pearson's R per group
+#===================================================
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
+import seaborn as sns
+
+def plot_null_vs_actual_by_group_horizontal(rs, r_rand, hemis, participants, groups=("EB", "NS"), n_bins=40):
+
+    n_hemis = len(hemis)
+    n_groups = len(groups)
+
+    fig, axes = plt.subplots(1, n_hemis * n_groups,figsize=(4 * n_hemis * n_groups, 6),constrained_layout=True)
+
+    group_indices = {g: np.array([i for i, p in enumerate(participants) if g in p]) for g in groups}
+    null_colors = {"EB": "green","NS": "blue"}
+
+    for h, hemi in enumerate(hemis):
+
+        # ==========================================================
+        # Precompute axis limits per metric & hemisphere
+        # ==========================================================
+
+        # ---- Pearson r ----
+        all_r_values = []
+        for g in groups:
+            idx = group_indices[g]
+            null_vals = r_rand[:, idx, h].mean(axis=1)
+            true_vals = rs[idx, h]
+            all_r_values.extend(null_vals)
+            all_r_values.extend(true_vals)
+
+        r_min, r_max = min(all_r_values), max(all_r_values)
+
+      
+        # ==========================================================
+        # Plot per group
+        # ==========================================================
+
+        for g_idx, group in enumerate(groups):
+
+            col_idx = h * n_groups + g_idx
+            idx = group_indices[group]
+            color = null_colors[group]
+
+            # ==================================================
+            # ---------------- Pearson r ----------------------
+            # ==================================================
+            ax = axes[col_idx]
+
+            null_vals = r_rand[:, idx, h].mean(axis=1)
+            true_vals = rs[idx, h]
+
+            # Histogram
+            ax.hist(null_vals,bins=n_bins,density=True,alpha=0.35,color=color,orientation="horizontal",label="Null histogram")
+
+            # KDE
+            kde = gaussian_kde(null_vals)
+            y_vals = np.linspace(r_min, r_max, 500)
+            x_kde = kde(y_vals)
+
+            ax.plot(
+                x_kde, y_vals,
+                linewidth=2,
+                color=color,
+                label="Null KDE"
+            )
+
+            # 95% CI
+            ci_low, ci_high = np.percentile(null_vals, [2.5, 97.5])
+            ax.axhline(ci_low, linestyle="--", color=color, label="Null 95% CI")
+            ax.axhline(ci_high, linestyle="--", color=color)
+
+            # Null mean
+            ax.axhline(null_vals.mean(),linestyle=":",linewidth=2,color=color,label="Null mean")
+
+            # True group mean
+            ax.axhline(true_vals.mean(),linewidth=3, color="red",label="True mean")
+
+            ax.set_ylim(r_min, r_max)
+            sns.despine(ax=ax, top=True, right=True)
+            ax.spines['left'].set_linewidth(2) #axis thickness
+            ax.spines['bottom'].set_linewidth(2) #axis thickness
+            ax.set_title(f"{hemi} — {group} (r)")
+            ax.set_ylabel("Pearson r", fontsize=18, fontweight = 'bold')
+            ax.set_xlabel("Density",fontsize=18, fontweight = 'bold')
+            
+            if col_idx == 3:
+                ax.legend()
+
+    plt.suptitle("Null vs True Distributions by Hemisphere and Group", fontsize=16)
+    saveDir = op.join(bids_path, 'analysis', 'plots')
+    os.makedirs(saveDir, exist_ok=True)
+    plt.savefig(op.join(saveDir, "participants_permutation_pearsonr_linearreg_combined_tracts.png"),
+            dpi=300, bbox_inches='tight')
+    plt.show()
+
+plot_null_vs_actual_by_group_horizontal(
+    rs, 
+    r_rand, 
     hemis,
     participants,
     groups=("EB", "NS"),

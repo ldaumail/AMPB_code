@@ -268,7 +268,6 @@ n_tracts = len(tract_order)
 rs   = np.full((n_subj, len(hemis)), np.nan)
 rsquared = np.full(( n_subj, len(hemis)), np.nan) #goodness of fit
 reliability = np.full((n_subj, len(hemis)), np.nan)
-r_all = np.full((n_subj, len(hemis)), np.nan)
 rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan)
 trained_coefs = np.zeros((n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
 delta_mse = np.full((n_tracts, n_subj, len(hemis)), np.nan) #
@@ -353,10 +352,10 @@ for h, hemi in enumerate(hemis):
         reliability[s, h] = vertex_bootstrap_reliability(all_C[s,:,:])
 
         # Optional evaluation
-        if verbose:
-            r, p = pearsonr(y, y_pred)
-            mse_full = mean_squared_error(y, y_pred)
-            print(f"r={r:.4f}, MSE={mse_full:.4e}, p={p:.4e}")
+        r, p = pearsonr(y, y_pred)
+        rs[s,h] = r
+        mse_full = mean_squared_error(y, y_pred)
+        print(f"r={r:.4f}, MSE={mse_full:.4e}, p={p:.4e}")
 
 
         for t in range(n_tracts):
@@ -814,4 +813,182 @@ saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
 plt.savefig(op.join(saveDir, "participants_betas_linearreg_combined_tracts.png"),
             dpi=300, bbox_inches='tight')
+plt.show()
+
+
+
+#--------------------------------------------------------------
+#Pearson's r
+# =====================================
+# SCATTER + JITTER PLOT BY GROUP × HEMI × TRACT
+# =====================================
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import sem
+
+#First compute noise ceiling 95% CI
+hemi_labels = ["L", "R"]
+nc_rows = []
+
+for h in range(2):     # left/right hemispheres
+    for s, participant in enumerate(participants):
+        gp = "EB" if "EB" in participant else "NS"
+
+        nc_rows.append({
+            "Subject": s,
+            "Hemisphere": hemi_labels[h],
+            "Group": gp,
+            "Correlation": reliability[s,h] #r_all[s, h] #
+        })
+
+nc_df = pd.DataFrame(nc_rows)
+nc_sem_df = (
+    nc_df.groupby(["Group", "Hemisphere"])["Correlation"]
+      .agg(["mean", sem])
+      .reset_index()
+      .rename(columns={"mean": "Mean", "sem": "SEM"})
+)
+nc_sem_df["CI95_upper"] = nc_sem_df["Mean"] + 1.96 * nc_sem_df["SEM"]
+nc_sem_df["CI95_lower"] = nc_sem_df["Mean"] - 1.96 * nc_sem_df["SEM"]
+
+# --------------------------------------
+# Organize Pearson's r in table
+# --------------------------------------
+
+hemi_labels = ["L", "R"]
+rows = []
+
+for h in range(2):     # left/right hemispheres
+    for s, participant in enumerate(participants):
+        gp = "EB" if "EB" in participant else "NS"
+        # pearson = rs[:, s, h]
+
+        rows.append({
+            "Subject": s,
+            "Hemisphere": hemi_labels[h],
+            "Group": gp,
+            "Correlation": rs[s,h] #r_all[s, h] #
+        })
+
+df = pd.DataFrame(rows)
+
+# ------------------------------------------------
+# Compute SEM per Group × Hemisphere
+# ------------------------------------------------
+sem_df = (
+    df.groupby(["Group", "Hemisphere"])["Correlation"]
+      .agg(["mean", sem])
+      .reset_index()
+      .rename(columns={"mean": "Mean", "sem": "SEM"})
+)
+
+# ------------------------------------------------
+# Color palette: EB = blue, NS = orange
+# ------------------------------------------------
+palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
+
+# ------------------------------------------------
+# Create 2 subplots — one per hemisphere
+# ------------------------------------------------
+fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+text_plotted = False  # Flag to ensure we only plot the label once
+for ax, hemi in zip(axes, hemi_labels):
+    # ---- Noise ceiling 95% CI upper bound ----
+    nc_h = nc_sem_df[nc_sem_df["Hemisphere"] == hemi]
+
+    df_h = df[df["Hemisphere"] == hemi]
+    sem_h = sem_df[sem_df["Hemisphere"] == hemi]
+
+    # Jittered dots
+    sns.stripplot(
+        data=df_h,
+        x="Group",
+        y="Correlation",
+        hue="Group",
+        dodge=False,
+        jitter=0.15,
+        alpha=0.7,
+        palette=palette,
+        ax=ax
+    )
+
+    # ---- Mean ± SEM (model performance) ----
+    for _, row in sem_h.iterrows():
+        group = row["Group"]
+        mean = row["Mean"]
+        se = row["SEM"]
+
+        x_loc = 0 if group == "EB" else 1
+
+        ax.errorbar(
+            x=x_loc,
+            y=mean,
+            yerr=se,
+            fmt="o",
+            color="black",
+            markersize=8,
+            capsize=3,
+            linewidth=2
+        )
+    # ---- Noise ceiling 95% CI upper/lower bound/mean ----
+    for _, row in nc_h.iterrows():
+        group = row["Group"]
+        up_ci = row["CI95_upper"]
+        low_ci = row["CI95_lower"]
+        mean = row["Mean"]
+
+        x_center = 0 if group == "EB" else 1
+
+        ax.hlines(
+            y=[low_ci, up_ci, mean],
+            xmin=x_center - 0.25,
+            xmax=x_center + 0.25,
+            colors="gray",
+            linestyles=["--","--", ":"],
+            linewidth=3,
+            alpha=0.9
+        )
+        ax.fill_between(
+        [x_center - 0.25, x_center + 0.25],
+        low_ci,
+        up_ci,
+        color="pink",
+        alpha=0.2,
+        linewidth=0
+        )
+        # ADD THIS BLOCK:
+        if not text_plotted:
+            ax.text(
+                x=x_center, 
+                y=mean + 0.02,          # Slightly above the mean line
+                s="Noise ceiling", 
+                ha='center',            # Center horizontally
+                va='bottom',            # Align bottom of text to the Y coordinate
+                fontsize=14, 
+                fontweight='bold', 
+                color='gray'
+            )
+            text_plotted = True         # Toggle flag so it doesn't repeat
+
+    # Formatting
+    ax.set_ylim(-0.2, 1)
+    ax.set_title(f"{hemi}-Hemisphere", fontsize=20)
+    ax.set_xlabel("Group", fontsize=18, fontweight = 'bold')
+    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
+    ax.set_xticklabels(["EB", "NS"], fontsize=18, fontweight = 'bold')
+    # ax.set_yticklabels(ax.get_yticklabels(), fontsize=18, fontweight = 'bold')
+    plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
+
+axes[0].set_ylabel("Pearson's r", fontsize=18, fontweight = 'bold')
+# axes[1].get_legend().remove()   # remove duplicated legend
+sns.despine()
+plt.tight_layout()
+
+#Saving
+saveDir = op.join(bids_path, "analysis", "plots")
+os.makedirs(saveDir, exist_ok=True)
+plt.savefig(op.join(saveDir, "pearson_linreg_participants_combined_tracts.png"), dpi=300, bbox_inches='tight')
 plt.show()

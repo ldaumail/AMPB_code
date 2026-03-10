@@ -759,7 +759,7 @@ palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
 # Create 2 subplots — one per hemisphere
 # ------------------------------------------------
 fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
-
+text_plotted = False  # Flag to ensure we only plot the label once
 for ax, hemi in zip(axes, hemi_labels):
     # ---- Noise ceiling 95% CI upper bound ----
     nc_h = nc_sem_df[nc_sem_df["Hemisphere"] == hemi]
@@ -824,15 +824,28 @@ for ax, hemi in zip(axes, hemi_labels):
         alpha=0.2,
         linewidth=0
         )
+        # ADD THIS BLOCK:
+        if not text_plotted:
+            ax.text(
+                x=x_center, 
+                y=mean + 0.02,          # Slightly above the mean line
+                s="Noise ceiling", 
+                ha='center',            # Center horizontally
+                va='bottom',            # Align bottom of text to the Y coordinate
+                fontsize=14, 
+                fontweight='bold', 
+                color='gray'
+            )
+            text_plotted = True         # Toggle flag so it doesn't repeat
 
     # Formatting
     ax.set_ylim(-0.2, 1)
-    ax.set_title(f"{hemi}-Hemisphere", fontsize=16)
-    ax.set_xlabel("Group", fontsize=14)
+    ax.set_title(f"{hemi}-Hemisphere", fontsize=20)
+    ax.set_xlabel("Group", fontsize=18, fontweight = 'bold')
     ax.axhline(0, color='gray', linestyle='--', linewidth=1)
-    ax.set_xticklabels(["EB", "NS"], fontsize=13)
+    ax.set_xticklabels(["EB", "NS"], fontsize=18, fontweight = 'bold')
 
-axes[0].set_ylabel("Mean Pearson's r", fontsize=14)
+axes[0].set_ylabel("Pearson's r", fontsize=18, fontweight = 'bold')
 # axes[1].get_legend().remove()   # remove duplicated legend
 sns.despine()
 plt.tight_layout()
