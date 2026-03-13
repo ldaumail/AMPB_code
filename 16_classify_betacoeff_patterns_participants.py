@@ -1019,6 +1019,7 @@ def get_decision_plane_raw(clf):
 
     return w, b
 
+import matplotlib.ticker as mticker
 def plot_3d_with_plane(
     df, participants, y, hemis, tracts, C, elev=10, azim=20
 ):
@@ -1085,15 +1086,26 @@ def plot_3d_with_plane(
         ax.spines['bottom'].set_linewidth(2) #axis thickness
         #plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
 
-        ax.set_xticklabels(ax.get_xticklabels(), fontsize=14,fontweight='bold')
-        ax.set_yticklabels(ax.get_yticklabels(), fontsize=14,fontweight='bold')
-        ax.set_zticklabels(ax.get_zticklabels(), fontsize=14,fontweight='bold')
+        ax.xaxis.set_major_formatter(mticker.StrMethodFormatter('{x:.1f}'))
+        ax.yaxis.set_major_formatter(mticker.StrMethodFormatter('{x:.1f}'))
+        ax.zaxis.set_major_formatter(mticker.StrMethodFormatter('{x:.1f}'))
+        # Helper to bold and hide every other label
+        def format_every_other(labels):
+            for i, label in enumerate(labels):
+                if i % 2 == 0:  # Keep even indices
+                    label.set_visible(False)
+                else:           # Hide odd indices
+                    label.set_fontweight('bold')
+                    label.set_fontsize(14)
+                    
 
-        # ax.tick_params(axis="z", rotation=45, width=2)
-
+        format_every_other(ax.xaxis.get_ticklabels())
+        format_every_other(ax.yaxis.get_ticklabels())
+        format_every_other(ax.zaxis.get_ticklabels())
             
+        
+        ax.legend()
         if i == 1:
-            ax.legend()
             # Sometimes the right plot needs more space on the right side
             ax.set_zlabel(tracts[2], labelpad=0)
 
@@ -1107,7 +1119,7 @@ def plot_3d_with_plane(
     plt.savefig(
         op.join(
             saveDir,
-            "beta_weights_3d_linreg_participants_combined_tracts_innercv.png"
+            "beta_weights_3d_linreg_participants_combined_tracts_innercv_2.png"
         ),
         dpi=300,
         bbox_inches="tight"
@@ -1124,7 +1136,7 @@ plot_3d_with_plane(
     hemis=["L", "R"],
     tracts=selected_tracts,
     C = np.array([0.0183, 1.7138]),
-    elev=np.array([15,0]), #15
+    elev=np.array([15,15]), #15
     azim=np.array([-45,-45])
 )
 

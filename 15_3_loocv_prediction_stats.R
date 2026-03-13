@@ -282,8 +282,8 @@ result[[6]] =t.test(data$Beta[data$Tract == "MTxFEF" & data$Hemisphere == "R" & 
 #---------------
 # Pearson's R
 #---------------
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/ridgecv_loso_predicted_maps/combined/mean_pearsonsR_contrast-motionXstationary_combined_tracts.csv'
-#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/linearcv_group_loso_predicted_maps/combined/pearsons_contrast-motionXstationary_combined_tracts.csv'
+#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/ridgecv_loso_predicted_maps/combined/mean_pearsonsR_contrast-motionXstationary_combined_tracts.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/linearcv_group_loso_predicted_maps/combined/pearsons_contrast-motionXstationary_combined_tracts.csv'
 #path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/ridgecv_group_loso_predicted_maps/combined/pearson_r_contrast-motionXstationary_combined_tracts.csv'
 file = file.path(path)
 data = read.csv(file) #

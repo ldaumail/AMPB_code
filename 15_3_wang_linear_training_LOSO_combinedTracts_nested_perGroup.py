@@ -724,14 +724,12 @@ for h, hemi in enumerate(hemis):
 # =====================================
 # SCATTER + JITTER PLOT BY GROUP × HEMI × TRACT
 # =====================================
-
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import sem
 
-#First compute noise ceiling 95% CI
 hemi_labels = ["L", "R"]
 nc_rows = []
 
@@ -756,11 +754,7 @@ nc_sem_df = (
 nc_sem_df["CI95_upper"] = nc_sem_df["Mean"] + 1.96 * nc_sem_df["SEM"]
 nc_sem_df["CI95_lower"] = nc_sem_df["Mean"] - 1.96 * nc_sem_df["SEM"]
 
-# --------------------------------------
-# Organize Pearson's r in table
-# --------------------------------------
 
-hemi_labels = ["L", "R"]
 rows = []
 
 for h in range(2):     # left/right hemispheres
@@ -796,7 +790,7 @@ palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
 # Create 2 subplots — one per hemisphere
 # ------------------------------------------------
 fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
-
+text_plotted = False  # Flag to ensure we only plot the label once
 for ax, hemi in zip(axes, hemi_labels):
     # ---- Noise ceiling 95% CI upper bound ----
     nc_h = nc_sem_df[nc_sem_df["Hemisphere"] == hemi]
@@ -861,15 +855,30 @@ for ax, hemi in zip(axes, hemi_labels):
         alpha=0.2,
         linewidth=0
         )
+        # ADD THIS BLOCK:
+        if not text_plotted:
+            ax.text(
+                x=x_center, 
+                y=mean + 0.02,          # Slightly above the mean line
+                s="Noise ceiling", 
+                ha='center',            # Center horizontally
+                va='bottom',            # Align bottom of text to the Y coordinate
+                fontsize=14, 
+                fontweight='bold', 
+                color='gray'
+            )
+            text_plotted = True         # Toggle flag so it doesn't repeat
 
     # Formatting
     ax.set_ylim(-0.2, 1)
-    ax.set_title(f"{hemi}-Hemisphere", fontsize=16)
-    ax.set_xlabel("Group", fontsize=14)
+    ax.set_title(f"{hemi}-Hemisphere", fontsize=20)
+    ax.set_xlabel("Group", fontsize=18, fontweight = 'bold')
     ax.axhline(0, color='gray', linestyle='--', linewidth=1)
-    ax.set_xticklabels(["EB", "NS"], fontsize=13)
+    ax.set_xticklabels(["EB", "NS"], fontsize=18, fontweight = 'bold')
+    # ax.set_yticklabels(ax.get_yticklabels(), fontsize=18, fontweight = 'bold')
+    plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
 
-axes[0].set_ylabel("Mean Pearson's r", fontsize=14)
+axes[0].set_ylabel("Pearson's r", fontsize=18, fontweight = 'bold')
 # axes[1].get_legend().remove()   # remove duplicated legend
 sns.despine()
 plt.tight_layout()
@@ -877,7 +886,7 @@ plt.tight_layout()
 #Saving
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "pearson_mean_linearreg_loso_combined_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "pearson_linreg_loso_group_combined_tracts.png"), dpi=300, bbox_inches='tight')
 plt.show()
 
 #----------------------------

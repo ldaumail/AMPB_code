@@ -1,3 +1,6 @@
+#Here, same approach as 15_3_participant_linear_reg_combined_tracts_nested.py
+#In addition, we add a permutation analysis of pearson's r 
+
 import os
 import os.path as op
 import pandas as pd
@@ -393,6 +396,10 @@ for h, hemi in enumerate(hemis):
             r_rand[i,s,h], _ = pearsonr(predicted[subj_perm[s],:], C_mean[s, :])
             r2_rand[i,s,h] =r2_score(C_mean[s, :], predicted[subj_perm[s],:])
 
+#===============================
+# Figures
+#===============================
+
 #Plot
 import numpy as np
 import matplotlib.pyplot as plt
@@ -774,6 +781,9 @@ def plot_null_vs_actual_by_group_horizontal(rs, r_rand, hemis, participants, gro
 
             null_vals = r_rand[:, idx, h].mean(axis=1)
             true_vals = rs[idx, h]
+            true_mean = true_vals.mean()
+
+            p_val = np.sum(null_vals >= true_mean) / len(null_vals)
 
             # Histogram
             ax.hist(null_vals,bins=n_bins,density=True,alpha=0.35,color=color,orientation="horizontal",label="Null histogram")
@@ -799,14 +809,29 @@ def plot_null_vs_actual_by_group_horizontal(rs, r_rand, hemis, participants, gro
             ax.axhline(null_vals.mean(),linestyle=":",linewidth=2,color=color,label="Null mean")
 
             # True group mean
-            ax.axhline(true_vals.mean(),linewidth=3, color="red",label="True mean")
+            ax.axhline(true_mean,linewidth=3, color="red",label="True mean")
 
+
+            # --- DISPLAY P-VALUE ON PLOT ---
+            # Position it at the top of the KDE/Histogram
+            # ax.text(
+            #     x=8,                     # Horizontal position (check your x-scale)
+            #     y=true_mean + 0.05,      # Just above the red line
+            #     s=f"p = {p_val:.3f}",
+            #     fontsize=16,
+            #     fontweight='bold',
+            #     color='red',
+            #     ha='center'
+            # )
             ax.set_ylim(r_min, r_max)
+            ax.set_xlim(0, 16)
             sns.despine(ax=ax, top=True, right=True)
             ax.spines['left'].set_linewidth(2) #axis thickness
             ax.spines['bottom'].set_linewidth(2) #axis thickness
             ax.set_title(f"{hemi} — {group} (r)")
-            ax.set_ylabel("Pearson r", fontsize=18, fontweight = 'bold')
+            plt.setp(ax.get_xticklabels(),fontsize=18,fontweight='bold')
+            plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
+            ax.set_ylabel("Pearson's r", fontsize=18, fontweight = 'bold')
             ax.set_xlabel("Density",fontsize=18, fontweight = 'bold')
             
             if col_idx == 3:

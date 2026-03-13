@@ -1,4 +1,4 @@
-#Goal of this script: 1. perform a ridge regression on each group data.
+#Goal of this script: 1. perform a linear regression on each group data.
 # 2. build some null distributions of betas for each tract
 #by randomly shuffling participants data across groups before 
 # performing the regression on each randomized group. 
@@ -402,6 +402,8 @@ for h in range(n_hemi):
         null_vals = null_dist_diff[t, :, h]
         observed = sample_diff[t, h]
 
+        p_val = np.sum(null_vals >= observed) / len(null_vals)
+
         # 1. Plot Histogram + KDE
         sns.histplot(null_vals, bins=30, kde=True, stat="density", 
                      ax=ax, color="#4C72B0", alpha=0.4, label='Null Dist',edgecolor="none")
@@ -431,6 +433,18 @@ for h in range(n_hemi):
         plt.setp(ax.get_xticklabels(), fontweight='bold')
         plt.setp(ax.get_yticklabels(), fontweight='bold')
 
+        # --- DISPLAY P-VALUE ON PLOT ---
+        # Position it at the top of the KDE/Histogram
+        ax.text(
+            x=observed + 0.05,                     # Horizontal position (check your x-scale)
+            y=8,      # Just above the red line
+            s=f"p = {p_val:.3f}",
+            fontsize=16,
+            fontweight='bold',
+            color='red',
+            ha='center'
+        )
+
 
     # 4. Handle the Legend Subplot (Last column of each row)
     legend_ax = axes[h, -1]
@@ -446,8 +460,8 @@ sns.despine()
 plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "permutation_group_diff_betas_linreg_combined_tracts.png"),
-            dpi=300, bbox_inches='tight')
+# plt.savefig(op.join(saveDir, "permutation_group_diff_betas_linreg_combined_tracts.png"),
+#             dpi=300, bbox_inches='tight')
 plt.show()
 
 
