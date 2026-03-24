@@ -61,8 +61,8 @@ def lines_as_tubes(streamlines, line_width, color):
 # }
 tracts = {
     # "afq-LeftMTxLGNxPU": (1, 0.2, 0.2),
-    # "afq-LeftMTxPTxSTS1": (0, 0.8, 0.2),
-    # "afq-LeftMTxFEF": (0.2, 0.6, 1),
+    #"afq-LeftMTxPTxSTS1": (0, 0.8, 0.2),
+    "afq-LeftMTxFEF": (0.2, 0.6, 1),
     # "afq-RightMTxLGNxPU": (1, 0.2, 0.2),
     # "afq-RightMTxPTxSTS1": (0, 0.8, 0.2),
     # "afq-RightMTxFEF": (0.2, 0.6, 1),
@@ -112,13 +112,13 @@ def roi_actor(roi_path, color):
 # } #    "MT":    ("analysis/functional_vol_roi", "MT_mask_dilated", (0, 0, 1)),
 roi_defs = {
      "MT":    ("analysis/ROIs/wang_space-ACPC_rois", "MT_mask_dilated", (0, 0, 1)),
-    "LGNxPU":    ("analysis/ROIs/julich_space-ACPC_rois", "LGNxPU_mask", (0, 0.8, 0.2)),
-    "PTxSTS1":   ("analysis/ROIs/julich_space-ACPC_rois", "PTxSTS1_mask", (1, 0, 0)),
-    "FEF":   ("analysis/ROIs/julich_space-ACPC_rois", "FEF_mask", (0.2, 0.6, 1)),
+    # "LGNxPU":    ("analysis/ROIs/julich_space-ACPC_rois", "LGNxPU_mask", (0, 0.8, 0.2)),
+    # "PTxSTS1":   ("analysis/ROIs/julich_space-ACPC_rois", "PTxSTS1_mask", (1, 0, 0)),
+     "FEF":   ("analysis/ROIs/julich_space-ACPC_rois", "FEF_mask", (0.2, 0.6, 1)),
 }
 roi_actors = []
 
-for hemi in ["L", "R"]: #
+for hemi in ["L",]: # "R"
     for roi_name, (subdir, label, color) in roi_defs.items():
         if roi_name == "MT":
             roi_path = op.join(bids_path, subdir, participant,

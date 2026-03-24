@@ -1,5 +1,7 @@
 #Compute average MotionxStationary heatmap of PT localizer in NS
-
+#The first part of this script loads tstat contrast maps from functional activity (BOLD) of PT localizer
+#It then computes an average map.
+#The second part of this script computes an average func MT and creates a label file out of it
 import os
 import os.path as op
 import numpy as np
