@@ -423,7 +423,7 @@ for h, hemi in enumerate(hemis):
 
 
 
-    # Optionally save predicted maps per subject using a reference image
+# Optionally save predicted maps per subject using a reference image
 # ----------------------------------------------------------
 # Save predicted maps 
 # ----------------------------------------------------------

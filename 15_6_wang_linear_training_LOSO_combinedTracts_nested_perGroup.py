@@ -22,6 +22,7 @@ bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tra
 density_dir = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps')
 func_dir = op.join(bids_path, 'analysis', 'fMRI_data')
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
+
 # -----------------------
 #1 Generate endpoint densities array
 #-------------------------
@@ -718,7 +719,105 @@ for h, hemi in enumerate(hemis):
         # ---- save + close ----
         display.savefig(out_png, dpi=300)
         plt.close(display.figure)
+#=============================================================
+#Plot input density maps
+#=============================================================
+from nilearn import plotting
+from nibabel.freesurfer import read_label
+import matplotlib.pyplot as plt
 
+fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
+
+for h, hemi in enumerate(hemis):
+    hemi_fs = "lh" if hemi == "L" else "rh"
+    infl_surf = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.inflated")
+    # ----------------------------
+    # Load curvature map (sulci/gyri)
+    # ----------------------------
+    curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
+    curv = nib.freesurfer.read_morph_data(curv_file)
+
+    # normalize curvature for nicer background display
+    curv_norm = (curv - np.percentile(curv, 5)) / (
+        np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
+    )
+    curv_norm = np.clip(curv_norm, 0, 1)
+
+    # ----------------------------
+    # Load Wang MT ROI
+    # ----------------------------
+    wang_hmt_path = op.join(
+        '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
+        f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+    )
+    surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+    wang_hmt_vertices = np.where(surf_roi > 0)[0]
+
+    for s, participant in enumerate(participants):
+        # ----------------------------
+        # Functional MT ROI (binary surface map)
+        # ----------------------------
+        label_file = op.join(bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi', participant,
+            f"{participant}_hemi-{hemi}_space-fsaverage_label-MT_mask.label")
+
+        func_mt_vertices = read_label(label_file)
+
+        func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
+        func_mt_roi[func_mt_vertices] = 1
+
+        # ----------------------------
+        # Density Map visualization
+        # ----------------------------
+        vmin, vmax = -1.0, 1.0
+        # -------------------------------------------------
+        # Tract endpoint Density map
+        # -------------------------------------------------
+        for t, tract in enumerate(tract_order):
+            # Build full-surface vector 
+            surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
+            surf_map[:] = density_data[hemi][s][t][:,] #wang_hmt_vertices
+
+            # Output filename (no run index)
+            img_out_dir = op.join(bids_path, "analysis", "plots", "surface_pngs", participant)
+            os.makedirs(img_out_dir, exist_ok=True)
+            out_png = op.join(
+                img_out_dir,
+                f"{participant}_hemi-{hemi}_desc-{tract}_density_inflated.png"
+            )
+
+            # -------------------------------------------------
+            # Plot only once
+            # -------------------------------------------------
+
+            display = plotting.plot_surf_stat_map(
+                surf_mesh=infl_surf,
+                stat_map=surf_map,
+                hemi="left" if hemi == "L" else "right",
+                view="lateral",
+                cmap="plasma",
+                colorbar=True,
+                vmin=vmin,
+                vmax=vmax,
+                threshold=None,
+                bg_map=curv_norm,
+                bg_on_data=True,
+                darkness=0.6,
+            )
+
+            # ---- MT boundary overlay ----
+            plotting.plot_surf_contours(
+                surf_mesh=infl_surf,
+                roi_map=func_mt_roi,
+                levels=[1],
+                colors=["lightgray"],
+                linewidths=2.0,
+                figure=display.figure,
+                axes=display.axes[0]
+            )
+
+            # ---- save + close ----
+            display.savefig(out_png, dpi=300)
+            plt.close(display.figure)
 #--------------------------------------------------------------
 #Pearson's r
 # =====================================
