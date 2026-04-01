@@ -5,10 +5,13 @@ import os
 import os.path as op
 import numpy as np
 import nibabel as nib
+import pandas as pd
 
 from nilearn import plotting
 from nibabel.freesurfer import read_label
 import matplotlib.pyplot as plt
+from nilearn.surface import load_surf_mesh
+
 
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
 density_dir = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps')
@@ -73,13 +76,34 @@ for hemi in hemis:
 #========================
 #Load linreg beta coefs
 #========================
-beta_dir = op.join(bids_path, 'analysis', 'diff2func_model_fits', 'linearcv_group_loso_predicted_maps', 'combined', 'betas_contrast-motionXstationary_combined_tracts.csv')
+
+beta_dir = op.join(bids_path, 'analysis', 'diff2func_model_fits', 'participants_linearreg','combined', 'participant_betas_contrast-motionXstationary_combined_tracts.csv')
+df = pd.read_csv(beta_dir)
+
+dims = ["Participant", "Tract", "Hemisphere"]  # order matters!
+value_col = "Beta"
+
+# get unique values per dimension (sorted for consistency)
+levels = [sorted(df[d].unique()) for d in dims]
+
+# create full grid index
+multi_index = pd.MultiIndex.from_product(levels, names=dims)
+
+# align data to full grid
+df_indexed = df.set_index(dims)[value_col].reindex(multi_index)
+
+# reshape into N-D array
+shape = [len(l) for l in levels]
+beta_coeffs = df_indexed.to_numpy().reshape(shape)
+
+
 
 #=============================================================
 # Plot
 #=============================================================
-
+global_max = np.max(np.abs(beta_coeffs)) + 1e-8
 for h, hemi in enumerate(hemis):
+    n_subjects, n_tracts, n_vertices = density_data[hemi].shape
     hemi_fs = "lh" if hemi == "L" else "rh"
     infl_surf = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.inflated")
     # ----------------------------
@@ -116,56 +140,106 @@ for h, hemi in enumerate(hemis):
         func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
         func_mt_roi[func_mt_vertices] = 1
 
-        # ----------------------------
-        # Density Map visualization
-        # ----------------------------
-        vmin, vmax = -1.0, 1.0
         # -------------------------------------------------
-        # Tract endpoint Density map
+        # Build RGB map (3 tracts → RGB)
         # -------------------------------------------------
+
+        rgb_map = np.zeros((n_vertices, 3), dtype=np.float32)
+
         for t, tract in enumerate(tract_order):
-            # Build full-surface vector 
-            surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
-            surf_map[:] = density_data[hemi][s][t][:,] #wang_hmt_vertices
+            surf_map = np.zeros(n_vertices, dtype=np.float32)
 
-            # Output filename (no run index)
-            img_out_dir = op.join(bids_path, "analysis", "plots", "surface_pngs", participant)
-            os.makedirs(img_out_dir, exist_ok=True)
-            out_png = op.join(
-                img_out_dir,
-                f"{participant}_hemi-{hemi}_desc-{tract}_density_inflated.png"
-            )
+            # replace density > 0 with beta
+            mask = density_data[hemi][s][t] > 0
+            surf_map[mask] = beta_coeffs[s, t, h]
 
-            # -------------------------------------------------
-            # Plot only once
-            # -------------------------------------------------
+            # restrict to Wang ROI
+            surf_map_full = np.zeros(n_vertices, dtype=np.float32)
+            surf_map_full[wang_hmt_vertices] = surf_map[wang_hmt_vertices]
 
-            display = plotting.plot_surf_stat_map(
-                surf_mesh=infl_surf,
-                stat_map=surf_map,
-                hemi="left" if hemi == "L" else "right",
-                view="lateral",
-                cmap="plasma",
-                colorbar=True,
-                vmin=vmin,
-                vmax=vmax,
-                threshold=None,
-                bg_map=curv_norm,
-                bg_on_data=True,
-                darkness=0.6,
-            )
+            # assign to RGB channel
+            rgb_map[:, t] = surf_map_full
+        # normalize betas → 0–1
+        vmin, vmax = -1.0, 1.0
+        # normalize per channel
+        for t in range(3):
+            max_val = np.max(rgb_map[:, t]) + 1e-8
+            rgb_map[:, t] /= max_val
 
-            # ---- MT boundary overlay ----
-            plotting.plot_surf_contours(
-                surf_mesh=infl_surf,
-                roi_map=func_mt_roi,
-                levels=[1],
-                colors=["lightgray"],
-                linewidths=2.0,
-                figure=display.figure,
-                axes=display.axes[0]
-            )
+        rgb_map = np.clip(rgb_map, 0, 1)
 
-            # ---- save + close ----
-            display.savefig(out_png, dpi=300)
-            plt.close(display.figure)
+        # Output filename (no run index)
+        img_out_dir = op.join(bids_path, "analysis", "plots", "surface_pngs", participant)
+        os.makedirs(img_out_dir, exist_ok=True)
+        out_png = op.join(
+            img_out_dir,
+            f"{participant}_hemi-{hemi}_desc-tracts_betas_inflated.png"
+        )
+
+        # -------------------------------------------------
+        # Plot only once
+        # -------------------------------------------------
+
+        # display = plotting.plot_surf(
+        #     surf_mesh=infl_surf,
+        #     surf_map=rgb_map,
+        #     hemi="left" if hemi == "L" else "right",
+        #     view="lateral",
+        #     bg_map=curv_norm,
+        #     bg_on_data=True,
+        #     darkness=0.6,
+        # )   
+
+        # # ---- MT boundary overlay ----
+        # plotting.plot_surf_contours(
+        #     surf_mesh=infl_surf,
+        #     roi_map=func_mt_roi,
+        #     levels=[1],
+        #     colors=["lightgray"],
+        #     linewidths=2.0,
+        #     figure=display.figure,
+        #     axes=display.axes[0]
+        # )
+
+        # # ---- save + close ----
+        # display.savefig(out_png, dpi=300)
+        # plt.close(display.figure)
+
+
+        coords, faces = load_surf_mesh(infl_surf)
+
+        fig = plt.figure(figsize=(6, 6))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # plot mesh with RGB colors
+        mesh = ax.plot_trisurf(
+            coords[:, 0],
+            coords[:, 1],
+            coords[:, 2],
+            triangles=faces,
+            linewidth=0.0,
+            antialiased=False,
+            shade=False,
+        )
+
+        # assign RGB colors per vertex → per face
+        face_colors = rgb_map[faces].mean(axis=1)
+        mesh.set_facecolors(face_colors)
+
+        # background curvature (optional blend)
+        curv_faces = curv_norm[faces].mean(axis=1)
+        blended = 0.6 * face_colors + 0.4 * plt.cm.gray(curv_faces)[:, :3]
+        blended = np.clip(blended, 0, 1)
+        mesh.set_facecolors(blended)
+
+        if hemi == "L":
+            ax.view_init(elev=0, azim=180)   # lateral left
+        else:
+            ax.view_init(elev=0, azim=0)     # lateral right
+        ax.set_axis_off()
+
+        plt.savefig(out_png, dpi=300)
+        plt.close(fig)
+
+
+
