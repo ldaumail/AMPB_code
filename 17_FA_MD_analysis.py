@@ -5,12 +5,13 @@ import os.path as op
 import os
 import nibabel as nib
 import numpy as np
+import pandas as pd
 
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
 pyAFQ_dir = op.join(bids_path, "derivatives", "pyAFQ", "wmgmi_wang")
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 # -----------------------
-#1 Generate endpoint densities array
+#1 Generate dki FA / dki MD arrays
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
@@ -22,7 +23,8 @@ with open(participants_list, 'r') as f: #read file and create file object that y
 hemis = ["L", "R"]
 
 # Initialize storage dictionary
-density_data = {hemi: [] for hemi in hemis}
+dkifa_data = {hemi: [] for hemi in hemis}
+dkimd_data = {hemi: [] for hemi in hemis}
 
 for participant in participants:
     if not participant.startswith("sub-"):
@@ -33,39 +35,140 @@ for participant in participants:
     # -----------------
     for hemi in hemis:
         hemi_pyAFQ = "Left" if hemi == "L" else "Right"
-        # for tract in ['MTmaskxLGN', 'MTmaskxPT', 'MTmaskxSTS1', 'MTmaskxPU', 'MTmaskxFEF', 'MTmaskxhIP', 'MTmaskxV1']:
         print(f"   🧩 Hemisphere: {hemi}")
-        hemi_fs = "lh" if hemi == "L" else "rh"
-        # subj_masks = []
+
         subj_fa = []
+        subj_md = []
 
         # Loop through *tracts in fixed order*
         for tract in tract_order:
-            fa_file_path = op.join(pyAFQ_dir,f"afq-{hemi_pyAFQ}{tract}", participant, 'models', f"{participant}_ses-concat_acq-HCPdir99_model-dki_param-fa_dwimap.nii.gz")
-            density_file_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant, 'wang_MT', f"{participant}_ses-concat_desc-wang{hemi_pyAFQ}{tract}_tdi_map2.nii.gz")
-            # Load the file
+            fa_file_path = op.join(pyAFQ_dir,f"afq-{hemi_pyAFQ}{tract}", participant, f"{participant}_ses-concat_acq-HCPdir99_desc-profiles_tractography.csv")
 
-            density_img = nib.load(density_file_path)
-            density_data = density_img.get_fdata().astype(np.float32)
-            tract_mask = density_data > 0
-            # subj_masks.append(tract_mask)
-            fa_img = nib.load(fa_file_path)
-            fa_data = fa_img.get_fdata().astype(np.float32)
+            df = pd.read_csv(fa_file_path)
+            fa_data = df["dki_fa"].to_numpy()
             subj_fa.append(fa_data)
 
+            md_data = df["dki_md"].to_numpy()
+            subj_md.append(md_data)
+
+        # Stack into one array: shape (n_tracts, n_nodes)
+        subj_fa = np.stack(subj_fa, axis=0)  # (3, n_nodes)
+        dkifa_data[hemi].append(subj_fa)
+        subj_md = np.stack(subj_md, axis=0)  # (3, n_nodes)
+        dkimd_data[hemi].append(subj_md)
 
 
-        # Stack into one array: shape (n_tracts, n_vertices)
-        subj_fa = np.stack(subj_fa, axis=0)  # (7, n_vertices)
-        fa_data[hemi].append(subj_fa)
-        # subj_densities = np.stack(subj_densities, axis=0)  # (7, n_vertices)
-        # density_data[hemi].append(subj_densities)
-
-# for i, arr in enumerate(density_data[hemi]):
-#     print(f"{hemi} element {i}: shape = {arr.shape}")
-    
 # Convert to numpy arrays
 for hemi in hemis:
-    density_data[hemi] = np.squeeze(np.stack(density_data[hemi], axis=0))  # (n_subjects, n_tracts, n_vertices)
-    fa_data[hemi] = np.squeeze(np.stack(fa_data[hemi], axis=0))  # (n_subjects, n_tracts, n_vertices)
-    print(f"✅ {hemi}-hemisphere shape: {density_data[hemi].shape}")
+    dkifa_data[hemi] = np.squeeze(np.stack(dkifa_data[hemi], axis=0))  # (n_subjects, n_tracts, n_vertices)
+    dkimd_data[hemi] = np.squeeze(np.stack(dkimd_data[hemi], axis=0))  # (n_subjects, n_tracts, n_vertices)
+    print(f"✅ {hemi}-hemisphere shape: {dkifa_data[hemi].shape}")
+
+
+#===================================================================
+#==================================================================
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+import os.path as op
+
+def plotnodes(dkifa_data, groups, hemis, save_path, tract_names, variable):
+    """
+    dkifa_data: dict like {"L": array, "R": array}
+        each array shape = (participants, tracts, nodes)
+    groups: list/array of length n_participants ("EB" or "NS")
+    hemis: ["L", "R"]
+    tract_names: optional list of tract names
+    """
+
+    # assume both hemis have same shape
+    n_participants, n_tracts, n_nodes = dkifa_data[hemis[0]].shape
+
+    fig, axes = plt.subplots(
+        n_tracts, 2,
+        figsize=(12, 4 * n_tracts),
+        sharex=True,
+        sharey=True
+    )
+
+    # ensure axes is 2D even if n_tracts = 1
+    if n_tracts == 1:
+        axes = np.array([axes])
+
+    for t in range(n_tracts):
+        for h, hemi in enumerate(hemis):
+
+            data_array = dkifa_data[hemi][:, t, :]  # (participants, nodes)
+
+            # -------------------------
+            # Build dataframe
+            # -------------------------
+            df = pd.DataFrame({
+                "participant": np.repeat(np.arange(n_participants), n_nodes),
+                "node": np.tile(np.arange(n_nodes), n_participants),
+                f"{variable}": data_array.reshape(-1),
+            })
+
+            df["group"] = np.repeat(groups, n_nodes)
+
+            # -------------------------
+            # Plot (mean + error)
+            # -------------------------
+            ax = axes[t, h]
+
+            sns.lineplot(
+                data=df,
+                x="node",
+                y=f"{variable}",
+                hue="group",
+                estimator="mean",
+                errorbar="se",   # 👈 adds error bars
+                marker=None,
+                ax=ax
+            )
+
+            # titles
+            if t == 0:
+                ax.set_title(f"{hemi} hemisphere")
+
+            if h == 0:
+                tract_label = tract_names[t] if tract_names else f"Tract {t+1}"
+                ax.set_ylabel(f"{tract_label}\ndki {variable}")
+            else:
+                ax.set_ylabel("")
+
+            if t == n_tracts - 1:
+                ax.set_xlabel("Node")
+            else:
+                ax.set_xlabel("")
+
+            # cleaner legend (only once)
+            if not (t == 0 and h == 1):
+                ax.get_legend().remove()
+            sns.despine() #remove box edges around plot
+    # keep one legend
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper right")
+
+    plt.tight_layout()
+
+    os.makedirs(save_path, exist_ok=True)
+    plt.savefig(
+        op.join(save_path, f"dki_{variable}_nodes_by_tract.png"),
+        dpi=300,
+        bbox_inches='tight'
+    )
+
+    plt.show()
+
+# using fnc for class
+groups = ["EB" if "EB" in p else "NS" for p in participants]
+save_path = op.join(bids_path, "analysis", "plots")
+os.makedirs(save_path, exist_ok=True)
+plotnodes(dkifa_data, groups, hemis, save_path, tract_order, "FA")
+
+
+plotnodes(dkimd_data, groups, hemis, save_path, tract_order, "MD")
+
