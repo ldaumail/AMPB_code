@@ -131,22 +131,22 @@ def plotnodes(dkifa_data, groups, hemis, save_path, tract_names, variable):
 
             # titles
             if t == 0:
-                ax.set_title(f"{hemi} hemisphere")
+                ax.set_title(f"{hemi} hemisphere",  fontsize=22, fontweight='bold')
 
             if h == 0:
                 tract_label = tract_names[t] if tract_names else f"Tract {t+1}"
-                ax.set_ylabel(f"{tract_label}\ndki {variable}")
+                ax.set_ylabel(f"{tract_label}\ndki {variable}", fontsize=18, fontweight='bold')
             else:
                 ax.set_ylabel("")
 
             if t == n_tracts - 1:
-                ax.set_xlabel("Node")
+                ax.set_xlabel("Node", fontsize=18, fontweight='bold')
             else:
                 ax.set_xlabel("")
 
             # cleaner legend (only once)
-            if not (t == 0 and h == 1):
-                ax.get_legend().remove()
+            # if not (t == 0 and h == 1):
+            ax.get_legend().remove()
             sns.despine() #remove box edges around plot
     # keep one legend
     handles, labels = axes[0, 0].get_legend_handles_labels()
@@ -160,6 +160,11 @@ def plotnodes(dkifa_data, groups, hemis, save_path, tract_names, variable):
         dpi=300,
         bbox_inches='tight'
     )
+    plt.savefig(
+        op.join(save_path, f"dki_{variable}_nodes_by_tract.svg"),
+        dpi=300,
+        bbox_inches='tight'
+    )
 
     plt.show()
 
@@ -167,6 +172,7 @@ def plotnodes(dkifa_data, groups, hemis, save_path, tract_names, variable):
 groups = ["EB" if "EB" in p else "NS" for p in participants]
 save_path = op.join(bids_path, "analysis", "plots")
 os.makedirs(save_path, exist_ok=True)
+tract_order = ['Thalamo-cortical', 'Temporal', 'Frontal']
 plotnodes(dkifa_data, groups, hemis, save_path, tract_order, "FA")
 
 
