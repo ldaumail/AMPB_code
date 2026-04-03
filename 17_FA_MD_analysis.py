@@ -6,6 +6,11 @@ import os
 import nibabel as nib
 import numpy as np
 import pandas as pd
+import sys
+
+current_dir = op.dirname(op.abspath(__file__))
+sys.path.append(current_dir)
+import utils.cluster_stats as cls
 
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
 pyAFQ_dir = op.join(bids_path, "derivatives", "pyAFQ", "wmgmi_wang")
@@ -178,3 +183,14 @@ plotnodes(dkifa_data, groups, hemis, save_path, tract_order, "FA")
 
 plotnodes(dkimd_data, groups, hemis, save_path, tract_order, "MD")
 
+#============================
+# Stats
+#============================
+cluster_results = {hemi: [] for hemi in hemis}
+for hemi in hemis:
+    cluster_permutation = {tract: [] for tract in tract_order}
+    for t, tract in enumerate(tract_order):
+        yvar = np.squeeze(dkimd_data[hemi][:,t,:])
+        cluster_permutation[tract] = cls.run_cluster_test(yvar, alpha=0.05, n_iter=1000)
+    cluster_results[hemi] = cluster_permutation
+    
