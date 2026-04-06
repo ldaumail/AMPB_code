@@ -69,7 +69,16 @@ for hemi in hemis:
     dkimd_data[hemi] = np.squeeze(np.stack(dkimd_data[hemi], axis=0))  # (n_subjects, n_tracts, n_vertices)
     print(f"✅ {hemi}-hemisphere shape: {dkifa_data[hemi].shape}")
 
-
+#============================
+# Stats: Cluster permutation analysis
+#============================
+cluster_results = {hemi: [] for hemi in hemis}
+for hemi in hemis:
+    cluster_permutation = {tract: [] for tract in tract_order}
+    for t, tract in enumerate(tract_order):
+        yvar = np.squeeze(dkimd_data[hemi][:,t,:])
+        cluster_permutation[tract] = cls.run_cluster_test(yvar, alpha=0.05, n_iter=1000)
+    cluster_results[hemi] = cluster_permutation
 #===================================================================
 #==================================================================
 import pandas as pd
@@ -79,7 +88,7 @@ import seaborn as sns
 import os
 import os.path as op
 
-def plotnodes(dkifa_data, groups, hemis, save_path, tract_names, variable):
+def plotnodes(dkifa_data, groups, hemis, save_path, tract_names, variable, cluster_results):
     """
     dkifa_data: dict like {"L": array, "R": array}
         each array shape = (participants, tracts, nodes)
@@ -90,7 +99,6 @@ def plotnodes(dkifa_data, groups, hemis, save_path, tract_names, variable):
 
     # assume both hemis have same shape
     n_participants, n_tracts, n_nodes = dkifa_data[hemis[0]].shape
-
     fig, axes = plt.subplots(
         n_tracts, 2,
         figsize=(12, 4 * n_tracts),
@@ -102,9 +110,9 @@ def plotnodes(dkifa_data, groups, hemis, save_path, tract_names, variable):
     if n_tracts == 1:
         axes = np.array([axes])
 
-    for t in range(n_tracts):
+    for t, tract in enumerate(tract_order):
         for h, hemi in enumerate(hemis):
-
+            tract_labels = list(cluster_results[hemi].keys())
             data_array = dkifa_data[hemi][:, t, :]  # (participants, nodes)
 
             # -------------------------
@@ -133,6 +141,42 @@ def plotnodes(dkifa_data, groups, hemis, save_path, tract_names, variable):
                 marker=None,
                 ax=ax
             )
+            # -------------------------
+            # Add significant clusters (red stars)
+            # -------------------------
+            
+            cluster_info = cluster_results[hemi][tract_labels[t]]
+
+            clusters = cluster_info["clusters"]
+            # sig_idx = cluster_info["significant_clusters"]
+
+            # # get all significant node indices
+            # sig_nodes = []
+            # for idx in sig_idx:
+            #     sig_nodes.extend(clusters[idx])
+
+            # sig_nodes = np.array(sig_nodes)
+            cluster_nodes = np.array(clusters)
+
+            if len(cluster_nodes) > 0:
+                # compute mean line to position stars above
+                mean_vals = (
+                    df.groupby("node")[variable]
+                    .mean()
+                    .values
+                )
+
+                # small vertical offset
+                y_offset = 0.05 * (mean_vals.max() - mean_vals.min())
+
+                ax.scatter(
+                    cluster_nodes,
+                    mean_vals[cluster_nodes] + y_offset,
+                    color="red",
+                    marker="*",
+                    s=80,
+                    zorder=5
+                )
 
             # titles
             if t == 0:
@@ -161,15 +205,15 @@ def plotnodes(dkifa_data, groups, hemis, save_path, tract_names, variable):
 
     os.makedirs(save_path, exist_ok=True)
     plt.savefig(
-        op.join(save_path, f"dki_{variable}_nodes_by_tract.png"),
+        op.join(save_path, f"dki_{variable}_nodes_by_tract_clusters.png"),
         dpi=300,
         bbox_inches='tight'
     )
-    plt.savefig(
-        op.join(save_path, f"dki_{variable}_nodes_by_tract.svg"),
-        dpi=300,
-        bbox_inches='tight'
-    )
+    # plt.savefig(
+    #     op.join(save_path, f"dki_{variable}_nodes_by_tract.svg"),
+    #     dpi=300,
+    #     bbox_inches='tight'
+    # )
 
     plt.show()
 
@@ -178,19 +222,10 @@ groups = ["EB" if "EB" in p else "NS" for p in participants]
 save_path = op.join(bids_path, "analysis", "plots")
 os.makedirs(save_path, exist_ok=True)
 tract_order = ['Thalamo-cortical', 'Temporal', 'Frontal']
-plotnodes(dkifa_data, groups, hemis, save_path, tract_order, "FA")
+plotnodes(dkifa_data, groups, hemis, save_path, tract_order, "FA", cluster_results)
 
 
-plotnodes(dkimd_data, groups, hemis, save_path, tract_order, "MD")
+plotnodes(dkimd_data, groups, hemis, save_path, tract_order, "MD", cluster_results)
 
-#============================
-# Stats
-#============================
-cluster_results = {hemi: [] for hemi in hemis}
-for hemi in hemis:
-    cluster_permutation = {tract: [] for tract in tract_order}
-    for t, tract in enumerate(tract_order):
-        yvar = np.squeeze(dkimd_data[hemi][:,t,:])
-        cluster_permutation[tract] = cls.run_cluster_test(yvar, alpha=0.05, n_iter=1000)
-    cluster_results[hemi] = cluster_permutation
+
     

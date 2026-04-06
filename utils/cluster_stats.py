@@ -36,48 +36,6 @@ def find_clusters(stats):
 # =========================================================
 # GENERATE NULL DISTRIBUTION (PERMUTATION TEST)
 # =========================================================
-# def sig_cluster_dist(data, num_iterations=1000, alpha=0.05):
-#     """
-#     data: dict with keys 'hits', 'miss'
-#           shape = (subjects, timepoints)
-#     """
-
-#     hits = data["hits"]
-#     miss = data["miss"]
-
-#     n_subjects, n_timepoints = hits.shape
-
-#     max_interval_len = np.zeros(num_iterations)
-
-#     for iteration in range(num_iterations):
-
-#         # random flip per subject
-#         flip = np.random.randint(0, 2, size=n_subjects)
-
-#         perm_hits = hits.copy()
-#         perm_miss = miss.copy()
-
-#         for s in range(n_subjects):
-#             if flip[s]:
-#                 perm_hits[s, :] = miss[s, :]
-#                 perm_miss[s, :] = hits[s, :]
-
-#         # paired t-test at each timepoint
-#         pvals = np.array([ ttest_ind(perm_miss[:, t], perm_hits[:, t], nan_policy='omit').pvalue
-#             for t in range(n_timepoints)])
-
-#         sig = pvals < alpha
-
-#         clusters = find_clusters(sig)
-
-#         if len(clusters) > 0:
-#             max_interval_len[iteration] = max(len(c) for c in clusters)
-#         else:
-#             max_interval_len[iteration] = 0
-
-#     upper_ci = np.quantile(max_interval_len, 0.95)
-
-#     return upper_ci, max_interval_len
 
 def sig_cluster_dist(data, num_iterations=1000, alpha=0.05):
 
