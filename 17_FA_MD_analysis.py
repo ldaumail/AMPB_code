@@ -3,7 +3,6 @@
 
 import os.path as op
 import os
-import nibabel as nib
 import numpy as np
 import pandas as pd
 import sys
@@ -70,7 +69,7 @@ for hemi in hemis:
     print(f"✅ {hemi}-hemisphere shape: {dkifa_data[hemi].shape}")
 
 #============================
-# Stats: Cluster permutation analysis
+# Stats 1: Cluster permutation analysis
 #============================
 cluster_results = {hemi: [] for hemi in hemis}
 for hemi in hemis:
@@ -79,6 +78,12 @@ for hemi in hemis:
         yvar = np.squeeze(dkimd_data[hemi][:,t,:])
         cluster_permutation[tract] = cls.run_cluster_test(yvar, alpha=0.05, n_iter=1000)
     cluster_results[hemi] = cluster_permutation
+
+#============================
+# Stats 2: GAM analysis
+#============================
+sig_nodes_file_path = op.join(bids_path,"analysis", "along_tract", f"GAM_significant_nodes.csv")
+gam_df = pd.read_csv(sig_nodes_file_path)
 #===================================================================
 #==================================================================
 import pandas as pd
