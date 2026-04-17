@@ -82,9 +82,152 @@ for hemi in hemis:
 #============================
 # Stats 2: GAM analysis
 #============================
-sig_nodes_file_path = op.join(bids_path,"analysis", "along_tract", f"GAM_significant_nodes.csv")
+sig_nodes_file_path = op.join(bids_path,"analysis", "along_tract", f"tractable_md_significant_nodes.csv")
 gam_df = pd.read_csv(sig_nodes_file_path)
+
 #===================================================================
+# GAM analysis plot
+#==================================================================
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+import os.path as op
+
+def plotnodes(dkifa_data, groups, hemis, save_path, tract_order, tract_names, variable, gam_results):
+    """
+    dkifa_data: dict like {"L": array, "R": array}
+        each array shape = (participants, tracts, nodes)
+    groups: list/array of length n_participants ("EB" or "NS")
+    hemis: ["L", "R"]
+    tract_names: optional list of tract names
+    """
+    #variable = "FA"
+    #gam_results = gam_df.copy()
+    # assume both hemis have same shape
+    n_participants, n_tracts, n_nodes = dkifa_data[hemis[0]].shape
+    fig, axes = plt.subplots(
+        n_tracts, 2,
+        figsize=(12, 4 * n_tracts),
+        sharex=True,
+        sharey=True
+    )
+
+    # ensure axes is 2D even if n_tracts = 1
+    if n_tracts == 1:
+        axes = np.array([axes])
+
+    for t, tract in enumerate(tract_order):
+        for h, hemi in enumerate(hemis):
+            tract_labels = list(cluster_results[hemi].keys())
+            data_array = dkifa_data[hemi][:, t, :]  # (participants, nodes)
+
+            # -------------------------
+            # Build dataframe
+            # -------------------------
+            df = pd.DataFrame({
+                "participant": np.repeat(np.arange(n_participants), n_nodes),
+                "node": np.tile(np.arange(n_nodes), n_participants),
+                f"{variable}": data_array.reshape(-1),
+            })
+
+            df["group"] = np.repeat(groups, n_nodes)
+
+            # -------------------------
+            # Plot (mean + error)
+            # -------------------------
+            ax = axes[t, h]
+
+            sns.lineplot(
+                data=df,
+                x="node",
+                y=f"{variable}",
+                hue="group",
+                estimator="mean",
+                errorbar="se",   # 👈 adds error bars
+                marker=None,
+                ax=ax
+            )
+            # -------------------------
+            # Add significant clusters (red stars)
+            # -------------------------
+            
+            sig_nodes_info = gam_results[gam_results["tract_id"] == tract] #cluster_results[hemi][tract_labels[t]]
+
+            sig_nodes = sig_nodes_info["nodeID"]
+
+            cluster_nodes = np.array(sig_nodes)
+
+            if len(cluster_nodes) > 0:
+                # compute mean line to position stars above
+                mean_vals = (
+                    df.groupby("node")[variable]
+                    .mean()
+                    .values
+                )
+
+                # small vertical offset
+                y_offset = 0.05 * (mean_vals.max() - mean_vals.min())
+
+                ax.scatter(
+                    cluster_nodes,
+                    mean_vals[cluster_nodes] + y_offset,
+                    color="red",
+                    marker="*",
+                    s=80,
+                    zorder=5
+                )
+
+            # titles
+            if t == 0:
+                ax.set_title(f"{hemi} hemisphere",  fontsize=22, fontweight='bold')
+
+            if h == 0:
+                tract_label = tract_names[t] if tract_names else f"Tract {t+1}"
+                ax.set_ylabel(f"{tract_label}\ndki {variable}", fontsize=18, fontweight='bold')
+            else:
+                ax.set_ylabel("")
+
+            if t == n_tracts - 1:
+                ax.set_xlabel("Node", fontsize=18, fontweight='bold')
+            else:
+                ax.set_xlabel("")
+
+            # cleaner legend (only once)
+            # if not (t == 0 and h == 1):
+            ax.get_legend().remove()
+            sns.despine() #remove box edges around plot
+    # keep one legend
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper right")
+
+    plt.tight_layout()
+
+    os.makedirs(save_path, exist_ok=True)
+    plt.savefig(
+        op.join(save_path, f"dki_{variable}_nodes_by_tract_gam_tractable.png"),
+        dpi=300,
+        bbox_inches='tight'
+    )
+    # plt.savefig(
+    #     op.join(save_path, f"dki_{variable}_nodes_by_tract.svg"),
+    #     dpi=300,
+    #     bbox_inches='tight'
+    # )
+
+    plt.show()
+
+# using fnc for class
+groups = ["EB" if "EB" in p else "NS" for p in participants]
+save_path = op.join(bids_path, "analysis", "plots")
+os.makedirs(save_path, exist_ok=True)
+tract_names = ['Thalamo-cortical', 'Temporal', 'Frontal']
+plotnodes(dkifa_data, groups, hemis, save_path, tract_order, tract_names, "FA", gam_df)
+
+plotnodes(dkimd_data, groups, hemis, save_path, tract_order, tract_names, "MD", gam_df)
+#===================================================================
+# Cluster analysis plot
 #==================================================================
 import pandas as pd
 import numpy as np

@@ -95,8 +95,10 @@ ggplot(data = final_df[final_df$tract_id == "MTxLGNxPU" & final_df$hemisphere ==
   geom_smooth(method = "gam") +
   scale_colour_manual(values = c("blue", "chocolate")) +
   theme_classic(base_size = 12)
-
+#======================================
 # GAM
+#======================================
+
 library(gratia)
 subj_fa_gp_coefs <- list()
 subj_fa_smooth_coefs <- list()
@@ -109,8 +111,10 @@ for (hemi in hemis) {
 #    gam_fa_node_group <- gam(dki_fa ~ groupID + s(nodeID, by = groupID, k = 15) 
 #                             + s(nodeID, participant, bs = "re"), data = subset_df,
 #      method = "REML") #, k = 5, m = 1
+#    fa ~ age + group + s(nodeID, by = group, bs = "fs", k = 9) + 
+#>     s(subjectID, bs = "re")
     
-    gam_fa_node_group <- gam(dki_fa ~ groupID + s(nodeID, by = groupID, k = 15) + s(nodeID, participant, bs = "fs", k = 5, m = 1), # 'fs' handles both vars
+    gam_fa_node_group <- gam(dki_fa ~ groupID + s(nodeID, by = groupID, k = 15) + s(nodeID, participant, bs = "fs", k = 5, m = 1), # 'fs' handles both vars.  s(nodeID, participant, bs = "fs"
       data = subset_df, method = "REML")
     
     #summary(gam_fa_node_group)
@@ -118,17 +122,17 @@ for (hemi in hemis) {
     
     #=================
     
-    diff <- difference_smooths(
-      gam_fa_node_group,
-      select = "s(nodeID)"
-    )
-    
     # diff <- difference_smooths(
-    # gam_fa_node_group, 
-    # smooth = "s(nodeID)", 
-    # f1 = "EB",  # Level 1
-    # f2 = "NS"   # Level 2
+    #   gam_fa_node_group,
+    #   select = "s(nodeID)"
     # )
+    
+    diff <- difference_smooths(
+    gam_fa_node_group,
+    smooth = "s(nodeID)",
+    f1 = "EB",  # Level 1
+    f2 = "NS"   # Level 2
+    )
     draw(diff)
     
     #===================
@@ -175,10 +179,10 @@ for (hemi in hemis) {
 }
 subj_fa_smooth_coefs_df <- do.call(rbind,  subj_fa_smooth_coefs)
 subj_fa_gp_coefs_df <- do.call(rbind,  subj_fa_gp_coefs)
-write.csv(subj_fa_gp_coefs_df, file.path('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/along_tract/GAM_group_coefficients.csv'), row.names = FALSE)
-write.csv(subj_fa_smooth_coefs_df, file.path('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/along_tract/GAM_smooth_pvalues.csv'), row.names = FALSE)
 all_sig_nodes_df <- do.call(rbind, all_sig_nodes)
-write.csv(all_sig_nodes_df,file.path('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/along_tract/GAM_significant_nodes.csv'), row.names = FALSE)
+write.csv(subj_fa_gp_coefs_df, file.path('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/along_tract/GAM_fa_group_coefficients_fs_nodesdep.csv'), row.names = FALSE)
+write.csv(subj_fa_smooth_coefs_df, file.path('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/along_tract/GAM_fa_smooth_pvalues_fs_nodesdep.csv'), row.names = FALSE)
+write.csv(all_sig_nodes_df,file.path('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/along_tract/GAM_fa_significant_nodes_fs_nodesdep.csv'), row.names = FALSE)
 #===================
 
 plot(gam_fa_node_group, shade = TRUE) +
