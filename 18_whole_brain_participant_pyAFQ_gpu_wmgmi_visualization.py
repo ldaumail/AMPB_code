@@ -46,14 +46,14 @@ def lines_as_tubes(streamlines, line_width, color):
 # -------------------------------------------------------------------------
 
 tracts = {
-    # "CallosumAnteriorFrontal": (0.2, 0.6, 1),
+    #"CallosumAnteriorFrontal": (0.2, 0.6, 1),
     # "CallosumMotor": (1, 0.2, 0.2),
     # "CallosumOccipital": (1, 0.5, 0),
     # "CallosumOrbital": (0.9, 0.8, 0),
     # "CallosumPosteriorParietal": (0, 0.8, 0.2),
     # "CallosumSuperiorFrontal": (0.8, 0.2, 1),
     # "CallosumSuperiorParietal": (0.5, 0.5, 0.5),
-    # "CallosumTemporal": (1, 0.2, 0.2),
+    "CallosumTemporal": (1, 0.2, 0.2),
     # "LeftAnteriorThalamic": (1, 0.5, 0),
     # "LeftArcuate": (0.9, 0.8, 0),
     # "LeftCingulumCingulate": (0, 0.8, 0.2),
