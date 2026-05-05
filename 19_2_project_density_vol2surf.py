@@ -58,9 +58,10 @@ def project_density_vol2surf(participants_file, tract_list, bids_path, pyAFQ_pat
             #new_tract_name = tract_name.replace("Left", "") if "Left" in tract_name else tract_name.replace("Right", "") if "Right" in tract_name else None
             # roi_names = [new_name] #, 'RightMTmaskxLGN'
             for h, hemi in enumerate(hemisphere):
+                whemi = "Left" if hemi == "L" else "Right"
                 match = re.search(r"^(Left|Right)?", tract)
                 tract_hemi = match.group(1) # This will be 'Left', 'Right', or None
-                if tract_hemi in [hemi, None]: #If the hemisphere value (Left/Right) matches the actual hemi, or if the hemi is not specified, do the next steps
+                if tract_hemi in [whemi, None]: #If the hemisphere value (Left/Right) matches the actual hemi, or if the hemi is not specified, do the next steps
                     # ----------------------------
                     # STEP 1: Load volumetric ROI 
                     # ----------------------------
