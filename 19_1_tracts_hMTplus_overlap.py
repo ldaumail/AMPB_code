@@ -9,6 +9,7 @@ import glob
 import nibabel as nib
 import numpy as np
 import pandas as pd
+from pathlib import Path 
 from scipy.stats import sem
 current_dir = op.dirname(op.abspath(__file__))
 project_dir = op.abspath(op.join(current_dir, '..'))  # main_script.py is inside project/
@@ -24,71 +25,74 @@ with open(participants_file, "r") as f:
 pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb')
 filenames = glob.glob(os.path.join(pyAFQ_path, "afq-Left", "sub-EBxGxCCx1986", "bundles","*.trx"))#
 
-tract_names = [
-    re.search(r"desc-(.*?)_tractography", f).group(1)
-    for f in filenames
-]
+# tract_names = [
+#     re.search(r"desc-(.*?)_tractography", f).group(1)
+#     for f in filenames
+# ]
 
-tract_names = ['CallosumOrbital',
- 'RightInferiorFrontooccipital',
- 'RightArcuate',
- 'RightSuperiorLongitudinal',
- 'RightUncinate',
- 'RightInferiorLongitudinal',
- 'CallosumOccipital',
- 'LeftPosteriorArcuate',
- 'RightPosteriorArcuate',
- 'CallosumSuperiorFrontal',
- 'RightCingulumCingulate',
- 'CallosumAnteriorFrontal',
- 'CallosumPosteriorParietal',
- 'LeftVerticalOccipital',
- 'LeftUncinate',
- 'CallosumSuperiorParietal',
- 'LeftInferiorFrontooccipital',
- 'LeftInferiorLongitudinal',
- 'RightCorticospinal',
- 'RightAnteriorThalamic',
- 'RightVerticalOccipital',
- 'LeftCingulumCingulate',
- 'LeftArcuate',
- 'LeftCorticospinal',
- 'LeftAnteriorThalamic',
- 'LeftSuperiorLongitudinal']
+# tract_names = ['CallosumMotor',
+#                'CallosumTemporal']
+# tract_names = ['CallosumOrbital',
+#  'RightInferiorFrontooccipital',
+#  'RightArcuate',
+#  'RightSuperiorLongitudinal',
+#  'RightUncinate',
+#  'RightInferiorLongitudinal',
+#  'CallosumOccipital',
+#  'LeftPosteriorArcuate',
+#  'RightPosteriorArcuate',
+#  'CallosumSuperiorFrontal',
+#  'RightCingulumCingulate',
+#  'CallosumAnteriorFrontal',
+#  'CallosumPosteriorParietal',
+#  'LeftVerticalOccipital',
+#  'LeftUncinate',
+#  'CallosumSuperiorParietal',
+#  'LeftInferiorFrontooccipital',
+#  'LeftInferiorLongitudinal',
+#  'RightCorticospinal',
+#  'RightAnteriorThalamic',
+#  'RightVerticalOccipital',
+#  'LeftCingulumCingulate',
+#  'LeftArcuate',
+#  'LeftCorticospinal',
+#  'LeftAnteriorThalamic',
+#  'LeftSuperiorLongitudinal']
 
 
-# tracts_list =  {"CallosumAnteriorFrontal",
-#     "CallosumMotor",
-#     "CallosumOccipital",
-#     "CallosumOrbital",
-#     "CallosumPosteriorParietal",
-#     "CallosumSuperiorFrontal",
-#     "CallosumSuperiorParietal",
-#     "CallosumTemporal",
-#     "LeftAnteriorThalamic",
-#     "LeftArcuate",
-#     "LeftCingulumCingulate",
-#     "LeftCorticospinal",
-#     "LeftInferiorFrontooccipital",
-#     "LeftInferiorLongitudinal",
-#     "LeftPosteriorArcuate",
-#     "LeftSuperiorLongitudinal",
-#     "LeftUncinate",
-#     "LeftVerticalOccipital",
-#     "RightAnteriorThalamic",
-#     "RightArcuate",
-#     "RightCingulumCingulate",
-#     "RightCorticospinal",
-#     "RightInferiorFrontooccipital",
-#     "RightInferiorLongitudinal",
-#     "RightPosteriorArcuate",
-#     "RightSuperiorLongitudinal",
-#     "RightUncinate",
-#     "RightVerticalOccipital"}
+tract_names =  {"CallosumAnteriorFrontal",
+    "CallosumMotor",
+    "CallosumOccipital",
+    "CallosumOrbital",
+    "CallosumPosteriorParietal",
+    "CallosumSuperiorFrontal",
+    "CallosumSuperiorParietal",
+    "CallosumTemporal",
+    "LeftAnteriorThalamic",
+    "LeftArcuate",
+    "LeftCingulumCingulate",
+    "LeftCorticospinal",
+    "LeftInferiorFrontooccipital",
+    "LeftInferiorLongitudinal",
+    "LeftPosteriorArcuate",
+    "LeftSuperiorLongitudinal",
+    "LeftUncinate",
+    "LeftVerticalOccipital",
+    "RightAnteriorThalamic",
+    "RightArcuate",
+    "RightCingulumCingulate",
+    "RightCorticospinal",
+    "RightInferiorFrontooccipital",
+    "RightInferiorLongitudinal",
+    "RightPosteriorArcuate",
+    "RightSuperiorLongitudinal",
+    "RightUncinate",
+    "RightVerticalOccipital"}
 n_subj = len(participants)
 n_tracts = len(tract_names)
 rows = []
-nnz_count = np.full((n_tracts), np.zeros)
+# nnz_count = np.full((n_tracts), np.zeros)
+nnz_count = {}
 for p, participant in enumerate(participants): 
 
     hmt_path = op.join(bids_path, 'analysis', 'ROIs', 'wang_space-ACPC_rois',participant, participant+'_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz')
@@ -100,28 +104,30 @@ for p, participant in enumerate(participants):
         tdi_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant, 'pyAFQ_default_atlas')
         os.makedirs(tdi_path, exist_ok=True)
     
-        tract_path = os.path.join(pyAFQ_path, f"afq-Left", participant, 'bundles', participant+'_ses-concat_acq-HCPdir99_desc-' + tract + '_tractography.trx')
-        tract_tdi_map = os.path.join(tdi_path, participant+'_ses-concat_desc-' + tract + '_tdi_map.nii.gz')
-        template = op.join(pyAFQ_path, f"afq-Left", participant, participant+'_ses-concat_acq-HCPdir99_b0ref.nii.gz')
-
-        streamline2dipy_density(tract_path, template, tract_tdi_map)
-
-        #Load data 
-        MT_map = nib.load(hmt_path).get_fdata() 
-        tract_map = nib.load(tract_tdi_map).get_fdata() 
+        tract_path = Path(os.path.join(pyAFQ_path, f"afq-Left", participant, 'bundles', participant+'_ses-concat_acq-HCPdir99_desc-' + tract + '_tractography.trx'))
         
+        if tract_path.exists():
+            tract_tdi_map = os.path.join(tdi_path, participant+'_ses-concat_desc-' + tract + '_tdi_map.nii.gz')
+            template = op.join(pyAFQ_path, f"afq-Left", participant, participant+'_ses-concat_acq-HCPdir99_b0ref.nii.gz')
 
-        overlap_val = np.sum((MT_map * tract_map) > 0)
+            streamline2dipy_density(tract_path, template, tract_tdi_map)
 
-        if overlap_val > 0:
-            nnz_count[t] = nnz_count[t] +1
+            #Load data 
+            MT_map = nib.load(hmt_path).get_fdata() 
+            tract_map = nib.load(tract_tdi_map).get_fdata() 
+            
 
-        # ✅ store structured row
-        rows.append({
-            "participant": participant,
-            "tract": tract,
-            "overlap": overlap_val
-        })
+            overlap_val = np.sum((MT_map * tract_map) > 0)
+
+            if overlap_val > 0:
+                nnz_count[t] = nnz_count.get(t, 0) +1
+
+            # ✅ store structured row
+            rows.append({
+                "participant": participant,
+                "tract": tract,
+                "overlap": overlap_val
+            })
 
 # 👉 convert to DataFrame
 overlap_df = pd.DataFrame(rows)

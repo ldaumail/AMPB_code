@@ -23,15 +23,16 @@ fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
-tract_order = ['CallosumOccipital', 'VerticalOccipital', 'InferiorFrontooccipital', 'InferiorLongitudinal'] 
-# tract_order = ['CallosumOccipital', 'CallosumTemporal','CallosumPosteriorParietal',
-#                'VerticalOccipital', 'InferiorFrontooccipital', 'InferiorLongitudinal', 
-#                'SuperiorLongitudinal', 'PosteriorArcuate',  'Arcuate'] 
+#tract_order = ['CallosumOccipital', 'VerticalOccipital', 'InferiorFrontooccipital', 'InferiorLongitudinal'] 
+tract_order = ['CallosumOccipital', 'CallosumTemporal','CallosumPosteriorParietal',
+               'VerticalOccipital', 'InferiorFrontooccipital', 'InferiorLongitudinal', 
+               'SuperiorLongitudinal', 'PosteriorArcuate',  'Arcuate'] 
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
 
 # Initialize storage dictionary
 density_data = {hemi: [] for hemi in hemis}
+density_mask = {hemi: [] for hemi in hemis}
 
 for participant in participants:
     if not participant.startswith("sub-"):
@@ -46,6 +47,7 @@ for participant in participants:
         hemi_fs = "lh" if hemi == "L" else "rh"
         subj_dir = op.join(density_dir, participant, 'pyAFQ_default_atlas')
         subj_densities = []
+        subj_present = []
 
         # Loop through *tracts in fixed order*
         for tract in tract_order:
@@ -57,6 +59,7 @@ for participant in participants:
                 print(f"   ⚠️ Missing: {tract} ({hemi}) for {participant}")
                 # subj_densities.append(np.zeros_like(subj_densities[0]) if subj_densities else None)
                 subj_densities.append(np.zeros([163842, 1, 1])) #if there is no match, replace by map of zeros
+                subj_present.append(np.zeros([163842, 1, 1]))
                 continue
 
             # Load the file
@@ -64,10 +67,13 @@ for participant in participants:
             img = nib.load(file_path)
             data = img.get_fdata().astype(np.float32)
             subj_densities.append(data)
+            subj_present.append(np.ones([163842, 1, 1]))
 
         # Stack into one array: shape (n_tracts, n_vertices)
         subj_densities = np.stack(subj_densities, axis=0)  # (n_tracts, n_vertices)
+        subj_present = np.stack(subj_present, axis=0)
         density_data[hemi].append(subj_densities)
+        density_mask[hemi].append(subj_present)
 
 # for i, arr in enumerate(density_data[hemi]):
 #     print(f"{hemi} element {i}: shape = {arr.shape}")
@@ -272,7 +278,7 @@ rs   = np.full((n_subj, len(hemis)), np.nan)
 rsquared = np.full(( n_subj, len(hemis)), np.nan) #goodness of fit
 reliability = np.full((n_subj, len(hemis)), np.nan)
 rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan)
-trained_coefs = np.zeros((n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
+trained_coefs = np.zeros((n_tracts*2, n_subj, len(hemis)))  # scalar summary per tract/run
 delta_mse = np.full((n_tracts, n_subj, len(hemis)), np.nan) #
 predicted_maps = {hemi: [] for hemi in hemis}
 for h, hemi in enumerate(hemis):
@@ -333,7 +339,10 @@ for h, hemi in enumerate(hemis):
 
         # X: density maps for this participant
         # shape: (n_vertices_masked, n_tracts)
-        X = norm_density_data[hemi][s].T
+        X_density = norm_density_data[hemi][s].T
+        X_present = np.squeeze(density_mask[hemi][s].T)
+        X_present = X_present[:X_density.shape[0],]
+        X = np.concatenate([X_density, X_present], axis=-1)
 
         # y: functional contrast map
         # shape: (n_vertices_masked,)
@@ -1455,7 +1464,7 @@ plt.tight_layout()
 #Saving
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "wb_pearson_linreg_participants_combined_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "wb_pearson_linreg_participants_all_combined_tracts.png"), dpi=300, bbox_inches='tight')
 plt.show()
 
 
@@ -1552,5 +1561,5 @@ sns.despine()
 plt.tight_layout()
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "wb_pearson_barplot_linreg_participants_combined_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "wb_pearson_barplot_linreg_participants_all_combined_tracts.png"), dpi=300, bbox_inches='tight')
 plt.show()

@@ -23,6 +23,7 @@ def project_density_vol2surf(participants_file, tract_list, bids_path, pyAFQ_pat
     '''
     with open(participants_file, "r") as f:
         participants = [line.strip().lstrip("/") for line in f if line.strip()]
+        participants = [p for p in participants if p != "sub-NSxLxQUx1953"]
 
     for participant in participants :
         # participant = 'sub-EBxGxCCx1986' #sub-NSxGxBAx1970
@@ -204,9 +205,8 @@ def project_density_vol2surf(participants_file, tract_list, bids_path, pyAFQ_pat
 participants_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'code', 'utils', 'study2_subjects_updated.txt')
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
 
-
-tract_list= ['CallosumPosteriorParietal', 'CallosumOccipital', 'LeftVerticalOccipital', 'LeftInferiorFrontooccipital', 'LeftInferiorLongitudinal', 'LeftSuperiorLongitudinal', 'LeftPosteriorArcuate',  'LeftArcuate']
- 
+# tract_list= ['CallosumTemporal','CallosumPosteriorParietal', 'CallosumOccipital', 'LeftVerticalOccipital', 'LeftInferiorFrontooccipital', 'LeftInferiorLongitudinal', 'LeftSuperiorLongitudinal', 'LeftPosteriorArcuate',  'LeftArcuate']
+tract_list= ['RightVerticalOccipital', 'RightInferiorFrontooccipital', 'RightInferiorLongitudinal', 'RightSuperiorLongitudinal', 'RightPosteriorArcuate',  'RightArcuate']
 pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb')
 
 projdist = '0'
