@@ -5,6 +5,7 @@ import argparse
 import AFQ.api.bundle_dict as abd
 from AFQ.api.participant import ParticipantAFQ
 from AFQ.definitions.image import ImageFile, RoiImage
+import AFQ.data.fetch as afd
 
 BUNDLES_KWARGS = {
   "cross_midline": False,
@@ -34,6 +35,66 @@ def main(dwi_data_file, bval_file, bvec_file, t1_file, output_dir):
   # }
   # define bundles as BundleDict
   # bundles = abd.BundleDict(bundles, resample_subject_to=True)
+  bundles = abd.BundleDict({
+      "L_PTR": {
+          "include": [
+              template_dir + 'SFgL.nii.gz',
+              template_dir + 'PaL.nii.gz'],
+          "exclude": [
+              template_dir + 'SLFt_roi2_L.nii.gz'],
+
+          "cross_midline": False,
+
+          "mahal": {
+              "clean_rounds": 20,
+              "length_threshold": 4,
+              "distance_threshold": 2}
+      },
+      "L_STR": {
+          "include": [
+              template_dir + 'MFgL.nii.gz',
+              template_dir + 'PaL.nii.gz'],
+          "exclude": [
+              template_dir + 'SLFt_roi2_L.nii.gz'],
+
+          "cross_midline": False,
+
+          "mahal": {
+              "clean_rounds": 20,
+              "length_threshold": 4,
+              "distance_threshold": 2}
+      },
+      "R_PTR": {
+          "include": [
+              template_dir + 'PrgL.nii.gz',
+              template_dir + 'PaL.nii.gz'],
+          "exclude": [
+              template_dir + 'SLFt_roi2_L.nii.gz'],
+
+          "cross_midline": False,
+
+          "mahal": {
+              "clean_rounds": 20,
+              "length_threshold": 4,
+              "distance_threshold": 2}
+      },
+      "R_STR": {
+          "include": [
+              template_dir + 'MFgL.nii.gz',
+              template_dir + 'PaL.nii.gz'],
+          "exclude": [
+              template_dir + 'SLFt_roi2_L.nii.gz'],
+
+          "cross_midline": False,
+
+          "mahal": {
+              "clean_rounds": 20,
+              "length_threshold": 4,
+              "distance_threshold": 2}
+      }
+  })
+
+  bundles = bundles + abd.default18_bd()
 
 
 #   scalars = [
@@ -68,7 +129,7 @@ def main(dwi_data_file, bval_file, bvec_file, t1_file, output_dir):
     bvec_file             = bvec_file,
     t1_file               = t1_file,
     output_dir            = output_dir,
-    # bundle_info           = bundles,
+    bundle_info           = bundles,
     tracking_params       = tracking_params, 
     # segmentation_params   = segmentation_params,
     tractography_ngpus    = 1

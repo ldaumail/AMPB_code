@@ -1,3 +1,5 @@
+# This script aims to show the overlap between tracts generated through whole brain tractography
+#and targetted tractography
 
 ##----
 import ants
@@ -11,15 +13,16 @@ from dipy.tracking.streamline import transform_streamlines
 # ------------------------------------------------------------
 # 1. Define paths
 # ------------------------------------------------------------
-participant = 'sub-EBxLxTZx1956' #'sub-EBxGxZAx1990'#'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990' #'sub-EBxLxTZx1956'
+participant = 'sub-NSxLxYKx1964' #'sub-EBxGxZAx1990'#'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990' #'sub-EBxLxTZx1956'
 
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research',
                     'ampb_mt_tractometry_analysis', 'ampb')
-afq_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb', 'afq-wb') ##op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
+wb_afq_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb', 'afq-wb') ##op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
+targ_afq_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')
 qsiprep_path = op.join(bids_path, 'derivatives', 'qsiprep', participant)
 
 # Files
-gmwmi_mask_file = op.join(afq_path, participant,
+gmwmi_mask_file = op.join(wb_afq_path, participant,
                           f"{participant}_ses-concat_acq-HCPdir99_desc-wmgmi_mask.nii.gz")
 t1w_acpc_file = op.join(qsiprep_path, 'anat',
                         f"{participant}_space-ACPC_desc-preproc_T1w.nii.gz")
@@ -45,7 +48,7 @@ def lines_as_tubes(streamlines, line_width, color):
 # 4. Define tracts and colors
 # -------------------------------------------------------------------------
 
-tracts = {
+wb_tracts = {
     #"CallosumAnteriorFrontal": (0.2, 0.6, 1),
     # "CallosumMotor": (1, 0.2, 0.2),
     # "CallosumOccipital": (1, 0.5, 0),
@@ -53,15 +56,15 @@ tracts = {
     # "CallosumPosteriorParietal": (0, 0.8, 0.2),
     # "CallosumSuperiorFrontal": (0.8, 0.2, 1),
     # "CallosumSuperiorParietal": (0.5, 0.5, 0.5),
-    "CallosumTemporal": (1, 0.2, 0.2),
+    # "CallosumTemporal": (1, 0.2, 0.2),
     # "LeftAnteriorThalamic": (1, 0.5, 0),
     # "LeftArcuate": (0.9, 0.8, 0),
     # "LeftCingulumCingulate": (0, 0.8, 0.2),
     # "LeftCorticospinal": (0.2, 0.6, 1),
     # "LeftInferiorFrontooccipital": (0.8, 0.2, 1),
-    # "LeftInferiorLongitudinal": (0.7, 0.7, 0.7),
+    "LeftInferiorLongitudinal": (0.9, 0.6, 0.9),
     # "LeftPosteriorArcuate": (0.2, 0.6, 1),
-    # "LeftSuperiorLongitudinal": (0.2, 1, 1),
+    #"LeftSuperiorLongitudinal": (0.2, 1, 1),
     # "LeftUncinate": (0.2, 0.8, 1),
     # "LeftVerticalOccipital": (0.2, 0, 1),
     # "RightAnteriorThalamic": (0.2, 0.6, 0),
@@ -69,22 +72,26 @@ tracts = {
     # "RightCingulumCingulate": (0.4, 0.6, 0.8),
     # "RightCorticospinal": (0.5, 0.5, 0.9),
     # "RightInferiorFrontooccipital": (0.7, 0.6, 1),
-    # "RightInferiorLongitudinal": (0.9, 0.6, 0.9),
+    "RightInferiorLongitudinal": (0.9, 0.6, 0.9),
     # "RightPosteriorArcuate": (0.8, 0.8, 1),
-    # "RightSuperiorLongitudinal": (0.2, 0.3, 1),
+    # "RightSuperiorLongitudinal": (0.2, 1, 1),
     # "RightUncinate": (0.1, 0.1, 1),
     # "RightVerticalOccipital": (0.3, 0.3, 1),
 
+}
+
+targ_tracts = { "LeftMTxPTxSTS1": (0.2, 0.6, 1),
+                "RightMTxPTxSTS1": (0.2, 0.6, 1)
 }
 # -------------------------------------------------------------------------
 # 5. Load and transform tracts
 # -------------------------------------------------------------------------
 tract_actors = []
-for tract_name, color in tracts.items():
+for tract_name, color in wb_tracts.items():
     # hemi = "Left" if tract_name.startswith("Left") else "Right"
     # mask_name = tract_name.replace("MT", "MTmask")
     # mask_name = mask_name.replace("afq-", "")
-    tract_file = op.join(afq_path, participant, "bundles",
+    tract_file = op.join(wb_afq_path, participant, "bundles",
                          f"{participant}_ses-concat_acq-HCPdir99_desc-{tract_name}_tractography.trx")
     if not op.exists(tract_file):
         print(f"⚠️ Missing: {tract_file}")
@@ -95,6 +102,23 @@ for tract_name, color in tracts.items():
     trk_xfm = transform_streamlines(trk.streamlines, np.linalg.inv(t1w_img.affine))
     tract_actor = lines_as_tubes(trk_xfm, 5, color=color)
     tract_actors.append(tract_actor)
+
+for tract_name, color in targ_tracts.items():
+    hemi = "Left" if tract_name.startswith("Left") else "Right"
+    mask_name = tract_name.replace("MT", "MTmask")
+    mask_name = mask_name.replace("afq-", "")
+    tract_file = op.join(targ_afq_path, f"afq-{tract_name}", participant, "bundles",
+                         f"{participant}_ses-concat_acq-HCPdir99_desc-{mask_name}_tractography.trx")
+    if not op.exists(tract_file):
+        print(f"⚠️ Missing: {tract_file}")
+        continue
+
+    trk = load_tractogram(tract_file, t1w_img)
+    trk.to_rasmm()
+    trk_xfm = transform_streamlines(trk.streamlines, np.linalg.inv(t1w_img.affine))
+    tract_actor = lines_as_tubes(trk_xfm, 5, color=color)
+    tract_actors.append(tract_actor)
+
 
 # -------------------------------------------------------------------------
 # 6. ROI loading helper
@@ -161,4 +185,34 @@ window.show(scene)
 
 
 
+##--------------------------------------------
+# Quantify overlap using endpoint density maps
+##--------------------------------------------
+import os
+import pandas as pd
+density_dir = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps')
+participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
+rows = []
+for hemi in {"Left", "Right"}:
+    for p, participant in enumerate(participants): 
 
+        ILF_path = tdi_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant, 'pyAFQ_default_atlas', participant+'_ses-concat_desc-' + f"{hemi}InferiorLongitudinal" + '_tdi_map.nii.gz')
+        PTxSTS1_path = tdi_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant, 'wang_MT', participant+'_ses-concat_desc-' + f"wang{hemi}MTxPTxSTS1" + '_tdi_map2.nii.gz')
+  
+        ILF_map = nib.load(ILF_path).get_fdata() 
+        PTxSTS1_map = nib.load(PTxSTS1_path).get_fdata() 
+
+        overlap_val = np.sum((ILF_map * PTxSTS1_map) > 0)
+        percent_ILF = np.sum((ILF_map * PTxSTS1_map) > 0) * 100 / np.sum(ILF_map > 0) 
+        percent_PTxSTS1 = np.sum((ILF_map * PTxSTS1_map) > 0) * 100 / np.sum(PTxSTS1_map > 0)
+
+        rows.append({
+            "hemi": hemi,
+            "participant": participant,
+            "overlap": overlap_val,
+            "percent ILF": percent_ILF,
+            "percent_MT-PTxSTS1": percent_PTxSTS1,
+
+        })
+
+overlap_df = pd.DataFrame(rows)
