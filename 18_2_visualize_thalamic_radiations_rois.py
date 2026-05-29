@@ -14,7 +14,7 @@ mni_aicha = ants.image_read(op.join(mni_aicha_path, 'AICHA1mm.nii'))
 # rh_rois = [368, 370, 372, 374, 376, 378, 380, 382, 384]
 #
 #
-lh_rois = [105,
+lh_rois = [##-----ROIs for PTRs:
            77, 79, 81, 83, 85, #Parietal sup (right above inferior parietal)
            107, #Parietal inferior (pretty much located on parietal cortex)
            109, 111, 113, ##Intraparietal 
@@ -24,9 +24,17 @@ lh_rois = [105,
            129, 131, #Occipital sup
            133, 135, 137, 139, #Occipital mid (close to MT)
            141, 143, #Occipital inf
-           283, 285, 287, 291, 293 #Parietooccipital (towards the superior edge of hemisphere)
+           283, 285, 287, 291, 293, #Parietooccipital (towards the superior edge of hemisphere)
+           
+           ##-----Additional ROIs for hMT+ overlap
+           193, 195,#G_Temporal_Inf-4-L/5-L
+           185, #G_Temporal_Mid-4-L
+           177, 175, #S_Sup_Temporal-5-L/4-L
+           99, #G_SupraMarginal-7-L
+           103,105,# #G_Angular
            ]
-rh_rois = [78, 80, 82, 84, 86,
+rh_rois = [
+           78, 80, 82, 84, 86,
            108, 
            110, 112, 114, 
            116, 
@@ -35,9 +43,16 @@ rh_rois = [78, 80, 82, 84, 86,
            130, 132, 
            134, 136, 138, 140, 
            142, 144, 
-           284, 286, 288, 292, 294
+           284, 286, 288, 292, 294,
+           ##
+           194,196,
+           186,
+           178, 176,
+           100,
+           104,106
            ]
-
+lh_cand_roi = [195]
+rh_cand_roi = [196]
 roi_name = "posterior"
 for hemi_fs in ['lh', 'rh']:
 
@@ -49,7 +64,6 @@ for hemi_fs in ['lh', 'rh']:
     # Build binary ROI mask
     # ---------------------------------------
     mni_img = mni_aicha * 0
-
     for roi in rois:
         mni_img = mni_img + (mni_aicha == roi)
 
@@ -60,16 +74,6 @@ for hemi_fs in ['lh', 'rh']:
     print(f"Shape: {mni_img.shape}")
     print(f"Spacing: {mni_img.spacing}")
 
-    # ---------------------------------------
-    # Resample from 2 mm → 1 mm
-    # ---------------------------------------
-    # mni_img_1mm = ants.resample_image(mni_img, resample_params=(1.0, 1.0, 1.0),
-    #     use_voxels=False, interp_type=1  # nearest neighbor for labels/masks
-    # )
-
-    # print(f"\nResampled resolution for hemi-{hemi}:")
-    # print(f"Shape: {mni_img_1mm.shape}")
-    # print(f"Spacing: {mni_img_1mm.spacing}")
 
     # ---------------------------------------
     # Save 1 mm ROI mask
@@ -79,8 +83,18 @@ for hemi_fs in ['lh', 'rh']:
     )
 
     ants.image_write(mni_img, mni_roi_path)
-
     print(f"\nSaved: {mni_roi_path}")
+
+    candidate_mni_roi = mni_aicha * 0
+    cand_roi = lh_cand_roi if hemi_fs == "lh" else rh_cand_roi
+    candidate_mni_roi = candidate_mni_roi + (mni_aicha == cand_roi)
+    cand_roi_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases', 'AICHA', 'mni_rois',
+        f"hemi-{hemi}_space-mni_desc-candidate_mask.nii.gz"
+    )
+
+    ants.image_write(candidate_mni_roi, cand_roi_path)
+    print(f"\nSaved: {cand_roi_path}")
+    
 # -------------------------------------------------------------------------
 # 6. ROI loading helper
 # -------------------------------------------------------------------------
@@ -97,7 +111,8 @@ def roi_actor(roi_path, color):
 # 7. ROI definitions
 # -------------------------------------------------------------------------
 roi_defs = {"MT":    (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases', 'Wang_2015', 'hmtplus'), 'hMT', (1, 0, 0)),
-            "posteriorCortex": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'posterior', (0,1,0))
+            "posteriorCortex": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'posterior', (0,1,0)),
+            "candidateRoi": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'candidate', (0,0,1))
             }
 roi_actors = []
 
