@@ -1,59 +1,77 @@
-#Here we generate the thalamocortical rois and visuzalize them within MNI space
+#Here we generate the thalamocortical rois and visualize them within MNI space
 
 import os.path as op
 import ants
 import numpy as np
 from fury import window, actor
+import sys
+current_dir = op.dirname(op.abspath(__file__))
+project_dir = op.abspath(op.join(current_dir, '..'))  # main_script.py is inside project/
+sys.path.append(project_dir)
+from utils.dilate_mask import dilate_mask
 
 mni_aicha_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases','AICHA')
 
 #Load atlas file
 mni_aicha = ants.image_read(op.join(mni_aicha_path, 'AICHA1mm.nii'))
 
+# Thalamus ROIs from AICHA atlas (LUT):
 # lh_rois = [367, 369, 371, 373, 375, 377, 379, 381, 383]
 # rh_rois = [368, 370, 372, 374, 376, 378, 380, 382, 384]
 #
 #
-lh_rois = [##-----ROIs for PTRs:
-           77, 79, 81, 83, 85, #Parietal sup (right above inferior parietal)
-           107, #Parietal inferior (pretty much located on parietal cortex)
-           109, 111, 113, ##Intraparietal 
-           115, # Intra occipital (superior part of occipital)
-           117, #occipital pole
-           119, 121, 123, 125, 127, #occipital regions/lateral
-           129, 131, #Occipital sup
-           133, 135, 137, 139, #Occipital mid (close to MT)
-           141, 143, #Occipital inf
-           283, 285, 287, 291, 293, #Parietooccipital (towards the superior edge of hemisphere)
+# STRs cortex ROIs from AICHA atlas (LUT):
+lh_rois = [63,65,67,69, #S_Rolando-1-L/-4-L
+           51, 53, 55, 57, 59, 61, #S_Precentral-1-L/-6-L
+           71, 73, 75, #S_Postcentral-1-L/3-L
+           257,259,261,263 #G_Paracentral_Lobule-1-L/-4-L
+           ]
+rh_rois = [64,66,68,70,
+           52, 54, 56, 58, 60, 62, 
+           72, 74, 76, 
+           258,260,262,264]
+
+# # PTRs cortex ROIs from AICHA atlas (LUT):
+# lh_rois = [##-----ROIs for PTRs:
+#            77, 79, 81, 83, 85, #Parietal sup (right above inferior parietal)
+#            107, #Parietal inferior (pretty much located on parietal cortex)
+#            109, 111, 113, ##Intraparietal 
+#            115, # Intra occipital (superior part of occipital)
+#            117, #occipital pole
+#            119, 121, 123, 125, 127, #occipital regions/lateral
+#            129, 131, #Occipital sup
+#            133, 135, 137, 139, #Occipital mid (close to MT)
+#            141, 143, #Occipital inf
+#            283, 285, 287, 291, 293, #Parietooccipital (towards the superior edge of hemisphere)
            
-           ##-----Additional ROIs for hMT+ overlap
-           193, 195,#G_Temporal_Inf-4-L/5-L
-           185, #G_Temporal_Mid-4-L
-           177, 175, #S_Sup_Temporal-5-L/4-L
-           99, #G_SupraMarginal-7-L
-           103,105,# #G_Angular
-           ]
-rh_rois = [
-           78, 80, 82, 84, 86,
-           108, 
-           110, 112, 114, 
-           116, 
-           118, 
-           120, 122, 124, 126, 128, 
-           130, 132, 
-           134, 136, 138, 140, 
-           142, 144, 
-           284, 286, 288, 292, 294,
-           ##
-           194,196,
-           186,
-           178, 176,
-           100,
-           104,106
-           ]
-lh_cand_roi = [195]
-rh_cand_roi = [196]
-roi_name = "posterior"
+#            ##-----Additional ROIs for hMT+ overlap
+#            191,193, 195,#G_Temporal_Inf-3-L/-4-L/5-L
+#            185, #G_Temporal_Mid-4-L
+#            177, 175, #S_Sup_Temporal-5-L/4-L
+#            99, #G_SupraMarginal-7-L
+#            103,105,# #G_Angular
+#            ]
+# rh_rois = [
+#            78, 80, 82, 84, 86,
+#            108, 
+#            110, 112, 114, 
+#            116, 
+#            118, 
+#            120, 122, 124, 126, 128, 
+#            130, 132, 
+#            134, 136, 138, 140, 
+#            142, 144, 
+#            284, 286, 288, 292, 294,
+#            ##
+#            192,194,196,
+#            186,
+#            178, 176,
+#            100,
+#            104,106
+#            ]
+lh_cand_roi = [191]
+rh_cand_roi = [192]
+roi_name = "superior"
 for hemi_fs in ['lh', 'rh']:
 
     # Register and Transform mask from MNI to fs native space
@@ -85,6 +103,12 @@ for hemi_fs in ['lh', 'rh']:
     ants.image_write(mni_img, mni_roi_path)
     print(f"\nSaved: {mni_roi_path}")
 
+    ##Dilate and save
+    input_mask =  mni_roi_path
+    output_mask = op.join(mni_aicha_path,'mni_rois',f"hemi-{hemi}_space-mni_desc-{roi_name}_mask_dilated.nii.gz")
+
+    dilate_mask(input_mask, output_mask, dilate = 2)
+
     candidate_mni_roi = mni_aicha * 0
     cand_roi = lh_cand_roi if hemi_fs == "lh" else rh_cand_roi
     candidate_mni_roi = candidate_mni_roi + (mni_aicha == cand_roi)
@@ -112,7 +136,9 @@ def roi_actor(roi_path, color):
 # -------------------------------------------------------------------------
 roi_defs = {"MT":    (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases', 'Wang_2015', 'hmtplus'), 'hMT', (1, 0, 0)),
             "posteriorCortex": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'posterior', (0,1,0)),
-            "candidateRoi": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'candidate', (0,0,1))
+            "superiorCortex": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'superior', (0,1,1)),
+            "thalamus": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'thalamus', (0,0,1)),
+            # "candidateRoi": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'candidate', (0,0,1))
             }
 roi_actors = []
 

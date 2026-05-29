@@ -9,20 +9,20 @@ import os.path as op
 import ants
 import argparse
 import sys
-import numpy as np
-# current_dir = op.dirname(op.abspath(__file__))
-# project_dir = op.abspath(op.join(current_dir, '..'))  # main_script.py is inside project/
-# sys.path.append(project_dir)
-# from utils.dilate_mask import dilate_mask
+# import numpy as np
+current_dir = op.dirname(op.abspath(__file__))
+project_dir = op.abspath(op.join(current_dir, '..'))  # main_script.py is inside project/
+sys.path.append(project_dir)
+from utils.dilate_mask import dilate_mask
 
 
 def main(participants_file, bids_path, roi_name, lh_rois, rh_rois):
     '''
-    Bash command line:
+    Bash command line (posterior ROI) :
     python 18_1_generate_thalamic_radiations_rois.py --participants_file /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/code/utils/study2_subjects_updated.txt \
             --bids_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --roi_name "posterior" \
-            --lh_rois 77 79 81 83 85 107 109 111 113 115 117 119 121 123 125 127 129 131 133 135 137 139 141 143 283 285 287 291 293 \
-            --rh_rois 78 80 82 84 86 108 110 112 114 116 118 120 122 124 126 128 130 132 134 136 138 140 142 144 284 286 288 292 294
+            --lh_rois 77 79 81 83 85 107 109 111 113 115 117 119 121 123 125 127 129 131 133 135 137 139 141 143 283 285 287 291 293 191 193 195 185 177 175 99 103 105 \
+            --rh_rois 78 80 82 84 86 108 110 112 114 116 118 120 122 124 126 128 130 132 134 136 138 140 142 144 284 286 288 292 294 192 194 196 186 178 176 100 104 106
     '''
     # roi_name = 'posterior'
     mni_aicha_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases','AICHA')
@@ -30,10 +30,13 @@ def main(participants_file, bids_path, roi_name, lh_rois, rh_rois):
     #Load atlas file
     mni_aicha = ants.image_read(op.join(mni_aicha_path, 'AICHA.nii'))
 
+    #Thalamus ROIs:
     # lh_rois = [367, 369, 371, 373, 375, 377, 379, 381, 383]
     # rh_rois = [368, 370, 372, 374, 376, 378, 380, 382, 384]
-    # lh_rois = [77, 79, 81, 83, 85, 107, 109, 111, 113, 115, 117, 119, 121, 123, 125, 127, 129, 131, 133, 135, 137, 139, 141, 143, 283, 285, 287, 291, 293]
-    # rh_rois = [78, 80, 82, 84, 86, 108, 110, 112, 114, 116, 118, 120, 122, 124, 126, 128, 130, 132, 134, 136, 138, 140, 142, 144, 284, 286, 288, 292, 294]
+
+    #PTRs cortex ROIs:
+    #lh_rois = [77, 79, 81, 83, 85,107, 109, 111, 113, 115, 117, 119, 121, 123, 125, 127, 129, 131, 133, 135, 137, 139, 141, 143, 283, 285, 287, 291, 293, 191,193, 195, 185, 177, 175, 99, 103, 105]
+    #rh_rois = [78, 80, 82, 84, 86, 108, 110, 112, 114, 116, 118, 120, 122, 124, 126, 128, 130, 132, 134, 136, 138, 140, 142, 144, 284, 286, 288, 292, 294, 192, 194, 196, 186, 178, 176, 100, 104, 106]
 
     for participant in participants_file:
         # participant = 'sub-NSxGxHNx1952'
@@ -105,10 +108,10 @@ def main(participants_file, bids_path, roi_name, lh_rois, rh_rois):
                 ants.image_write(transformed_mask, transformed_path)
 
                 ##Dilate and save
-                # input_mask = transformed_MT_path
-                # output_mask = op.join(save_dir,  participant+'_hemi-'+hemi+'_space-ACPC_desc-MT_mask_dilated.nii.gz')
+                input_mask = transformed_path
+                output_mask = op.join(save_dir,  f"{participant}_hemi-{hemi}_space-ACPC_desc-{roi_name}_mask_dilated.nii.gz")
 
-                # dilate_mask(input_mask, output_mask, dilate = 2)
+                dilate_mask(input_mask, output_mask, dilate = 2)
 
 
 if __name__ == "__main__":
