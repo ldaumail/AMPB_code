@@ -21,12 +21,20 @@ mni_aicha = ants.image_read(op.join(mni_aicha_path, 'AICHA1mm.nii'))
 #
 #
 # STRs cortex ROIs from AICHA atlas (LUT):
-lh_rois = [63,65,67,69, #S_Rolando-1-L/-4-L
+lh_rois = [257, 259, 261, 263, #G_Paracentral_Lobule-1-L/-4-L
+           229, 331, 233, #S_Cingulate-4-L #231,
+           15, 17, #S_Sup_Frontal-5-L/-6-L #13, #11, 9,
+           221, 223, 225, #SMA1-L/3-L
+           63,65,67,69, #S_Rolando-1-L/-4-L
            51, 53, 55, 57, 59, 61, #S_Precentral-1-L/-6-L
            71, 73, 75, #S_Postcentral-1-L/3-L
            257,259,261,263 #G_Paracentral_Lobule-1-L/-4-L
            ]
-rh_rois = [64,66,68,70,
+rh_rois = [258,260, 262, 264,
+           230, 232, 234,
+           16, 18,
+           222, 224, 226,
+           64,66,68,70,
            52, 54, 56, 58, 60, 62, 
            72, 74, 76, 
            258,260,262,264]
@@ -43,6 +51,7 @@ rh_rois = [64,66,68,70,
 #            133, 135, 137, 139, #Occipital mid (close to MT)
 #            141, 143, #Occipital inf
 #            283, 285, 287, 291, 293, #Parietooccipital (towards the superior edge of hemisphere)
+#            299, 301, 303, #Calcarine gyrus
            
 #            ##-----Additional ROIs for hMT+ overlap
 #            191,193, 195,#G_Temporal_Inf-3-L/-4-L/5-L
@@ -62,6 +71,8 @@ rh_rois = [64,66,68,70,
 #            134, 136, 138, 140, 
 #            142, 144, 
 #            284, 286, 288, 292, 294,
+#            300, 302, 304,
+
 #            ##
 #            192,194,196,
 #            186,
@@ -69,8 +80,9 @@ rh_rois = [64,66,68,70,
 #            100,
 #            104,106
 #            ]
-lh_cand_roi = [191]
-rh_cand_roi = [192]
+
+lh_cand_roi = [231]
+rh_cand_roi = [232]
 roi_name = "superior"
 for hemi_fs in ['lh', 'rh']:
 
@@ -138,7 +150,7 @@ roi_defs = {"MT":    (op.join('/Users','ldaumail3', 'Documents','research','brai
             "posteriorCortex": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'posterior', (0,1,0)),
             "superiorCortex": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'superior', (0,1,1)),
             "thalamus": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'thalamus', (0,0,1)),
-            # "candidateRoi": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'candidate', (0,0,1))
+            "candidateRoi": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'candidate', (0,0,1))
             }
 roi_actors = []
 
