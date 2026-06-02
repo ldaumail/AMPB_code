@@ -16,7 +16,7 @@ from sklearn.model_selection import permutation_test_score
 #Load beta coeffs
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
 #df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits','participants_ridgecv', 'combined', 'participant_betas_contrast-motionXstationary_combined_tracts.csv'))
-df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits', 'participants_linearcv', 'combined','participant_betas_contrast-motionXstationary_combined_tracts.csv'))
+df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits', 'participants_linearreg', 'combined','participant_betas_contrast-motionXstationary_combined_tracts.csv'))
 
 participants = df["Participant"].unique()
 hemis = ["L", "R"]

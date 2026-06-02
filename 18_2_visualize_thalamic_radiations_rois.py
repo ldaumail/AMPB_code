@@ -20,70 +20,71 @@ mni_aicha = ants.image_read(op.join(mni_aicha_path, 'AICHA1mm.nii'))
 # rh_rois = [368, 370, 372, 374, 376, 378, 380, 382, 384]
 #
 #
-# STRs cortex ROIs from AICHA atlas (LUT):
-lh_rois = [257, 259, 261, 263, #G_Paracentral_Lobule-1-L/-4-L
-           229, 331, 233, #S_Cingulate-4-L #231,
-           15, 17, #S_Sup_Frontal-5-L/-6-L #13, #11, 9,
-           221, 223, 225, #SMA1-L/3-L
-           63,65,67,69, #S_Rolando-1-L/-4-L
-           51, 53, 55, 57, 59, 61, #S_Precentral-1-L/-6-L
-           71, 73, 75, #S_Postcentral-1-L/3-L
-           257,259,261,263 #G_Paracentral_Lobule-1-L/-4-L
-           ]
-rh_rois = [258,260, 262, 264,
-           230, 232, 234,
-           16, 18,
-           222, 224, 226,
-           64,66,68,70,
-           52, 54, 56, 58, 60, 62, 
-           72, 74, 76, 
-           258,260,262,264]
+# # STRs cortex ROIs from AICHA atlas (LUT):
+# lh_rois = [257, 259, 261, 263, #G_Paracentral_Lobule-1-L/-4-L
+#            229, 231, 233,  #S_Cingulate-2-L/-4-L #,
+#            15, 17, #S_Sup_Frontal-5-L/-6-L #
+#            221, 223, 225, #SMA1-L/3-L
+#            63,65,67,69, #S_Rolando-1-L/-4-L
+#            51, 53, 55, 57, 59, 61, #S_Precentral-1-L/-6-L
+#            71, 73, 75, #S_Postcentral-1-L/3-L
+#            ]
+# rh_rois = [258,260, 262, 264,
+#            230, 232, 234, #232,
+#            16, 18,
+#            222, 224, 226,
+#            64,66,68,70,
+#            52, 54, 56, 58, 60, 62, 
+#            72, 74, 76, 
+#            258,260,262,264]
 
 # # PTRs cortex ROIs from AICHA atlas (LUT):
-# lh_rois = [##-----ROIs for PTRs:
-#            77, 79, 81, 83, 85, #Parietal sup (right above inferior parietal)
-#            107, #Parietal inferior (pretty much located on parietal cortex)
-#            109, 111, 113, ##Intraparietal 
-#            115, # Intra occipital (superior part of occipital)
-#            117, #occipital pole
-#            119, 121, 123, 125, 127, #occipital regions/lateral
-#            129, 131, #Occipital sup
-#            133, 135, 137, 139, #Occipital mid (close to MT)
-#            141, 143, #Occipital inf
-#            283, 285, 287, 291, 293, #Parietooccipital (towards the superior edge of hemisphere)
-#            299, 301, 303, #Calcarine gyrus
+roi_name = "posterior"
+lh_rois = [##-----ROIs for PTRs:
+           77, 79, 81, 83, 85, #G-Parietal sup -1-L/-5-L(right above inferior parietal)
+           107, #G-Parietal inferior (pretty much located on parietal cortex)
+           109, 111, 113, ##S-Intraparietal 
+           115, # Intra occipital (superior part of occipital)
+           117, #occipital pole
+           119, 121, 123, 125, 127, #G- occipital lateral
+           129, 131, #G-Occipital sup
+           133, 135, 137, 139, #G-Occipital mid (close to MT)
+           141, 143, #Occipital inf
+           265, 267, 269, 271, 273, 275, 277, 279, 281, #Precuneus
+           283, 285, 287, 289, 291, 293, #Parietooccipital (towards the superior edge of hemisphere)
+           299, 301, 303, #Calcarine gyrus
            
-#            ##-----Additional ROIs for hMT+ overlap
-#            191,193, 195,#G_Temporal_Inf-3-L/-4-L/5-L
-#            185, #G_Temporal_Mid-4-L
-#            177, 175, #S_Sup_Temporal-5-L/4-L
-#            99, #G_SupraMarginal-7-L
-#            103,105,# #G_Angular
-#            ]
-# rh_rois = [
-#            78, 80, 82, 84, 86,
-#            108, 
-#            110, 112, 114, 
-#            116, 
-#            118, 
-#            120, 122, 124, 126, 128, 
-#            130, 132, 
-#            134, 136, 138, 140, 
-#            142, 144, 
-#            284, 286, 288, 292, 294,
-#            300, 302, 304,
+           ##-----Additional ROIs for hMT+ overlap
+           191,193, 195,#G_Temporal_Inf-3-L/-4-L/5-L
+           185, #G_Temporal_Mid-4-L
+           177, 175, #S_Sup_Temporal-5-L/4-L
+           99, #G_SupraMarginal-7-L
+           103,105,# #G_Angular
+           ]
+rh_rois = [
+           78, 80, 82, 84, 86,
+           108, 
+           110, 112, 114, 
+           116, 
+           118, 
+           120, 122, 124, 126, 128, 
+           130, 132, 
+           134, 136, 138, 140, 
+           142, 144, 
+           266, 268, 270, 272, 274, 276, 278, 280, 282, 
+           284, 286, 288, 290, 292, 294,
+           300, 302, 304,
 
-#            ##
-#            192,194,196,
-#            186,
-#            178, 176,
-#            100,
-#            104,106
-#            ]
+           ##
+           192,194,196,
+           186,
+           178, 176,
+           100,
+           104,106
+           ]
 
-lh_cand_roi = [231]
-rh_cand_roi = [232]
-roi_name = "superior"
+lh_cand_roi = [271]
+rh_cand_roi = [272]
 for hemi_fs in ['lh', 'rh']:
 
     # Register and Transform mask from MNI to fs native space
@@ -148,9 +149,9 @@ def roi_actor(roi_path, color):
 # -------------------------------------------------------------------------
 roi_defs = {"MT":    (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases', 'Wang_2015', 'hmtplus'), 'hMT', (1, 0, 0)),
             "posteriorCortex": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'posterior', (0,1,0)),
-            "superiorCortex": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'superior', (0,1,1)),
+            #"superiorCortex": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'superior', (0,1,1)),
             "thalamus": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'thalamus', (0,0,1)),
-            "candidateRoi": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'candidate', (0,0,1))
+            # "candidateRoi": (op.join('/Users','ldaumail3', 'Documents','research','brain_atlases','AICHA', 'mni_rois'), 'candidate', (0,0,1))
             }
 roi_actors = []
 

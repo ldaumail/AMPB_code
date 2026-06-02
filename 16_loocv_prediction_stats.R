@@ -226,7 +226,7 @@ result[[6]] =t.test(data$Correlation[data$Tract == "MTxFEF" & data$Hemisphere ==
 #path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/participants_betas/combined/participant_betas_contrast-motionXstationary_combined_tracts.csv'
 #path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/ridgecv_group_loso_predicted_maps/combined/betas_contrast-motionXstationary_combined_tracts.csv'
 #path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/linearcv_group_loso_predicted_maps/combined/betas_contrast-motionXstationary_combined_tracts.csv'
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/participants_linearcv/combined/participant_betas_contrast-motionXstationary_combined_tracts.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/participants_linearreg/combined/participant_betas_contrast-motionXstationary_combined_tracts.csv'
 file = file.path(path)
 data = read.csv(file) #
 
