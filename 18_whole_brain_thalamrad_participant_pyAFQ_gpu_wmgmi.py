@@ -1,17 +1,19 @@
 #Run pyAFQ in subject ACPC space
 #08/20/2025
 import re
+import os.path as op
 import argparse
 import AFQ.api.bundle_dict as abd
 from AFQ.api.participant import ParticipantAFQ
 from AFQ.definitions.image import ImageFile, RoiImage
+import AFQ.data.fetch as afd
 
 BUNDLES_KWARGS = {
   "cross_midline": False,
   "space": "subject",
 }
 
-def main(dwi_data_file, bval_file, bvec_file, t1_file, output_dir):
+def main(dwi_data_file, bval_file, bvec_file, t1_file, template_dir, participant, output_dir):
   # define custom bundles dictionary
   # bundles = {} # intialize empty bundles dictionary
   # hemis = {"L","R"}
@@ -34,6 +36,66 @@ def main(dwi_data_file, bval_file, bvec_file, t1_file, output_dir):
   # }
   # define bundles as BundleDict
   # bundles = abd.BundleDict(bundles, resample_subject_to=True)
+  bundles = abd.BundleDict({
+    "L_PTR": {
+      "include": [
+          op.join(template_dir, f"/{participant}/", participant+'_hemi-L_space-ACPC_desc-thalamus_mask.nii.gz'),
+          op.join(template_dir, f"/{participant}/", participant+'_hemi-L_space-ACPC_desc-posterior_mask.nii.gz')],
+    #   "exclude": [
+    #       template_dir + 'SLFt_roi2_L.nii.gz'],
+
+      "cross_midline": False,
+
+      "mahal": {
+          "clean_rounds": 20,
+          "length_threshold": 4,
+          "distance_threshold": 2}
+  },
+  "L_STR": {
+      "include": [
+          op.join(template_dir, f"/{participant}/", participant+'_hemi-L_space-ACPC_desc-thalamus_mask.nii.gz'),
+          op.join(template_dir, f"/{participant}/", participant+'_hemi-L_space-ACPC_desc-superior_mask.nii.gz')],
+      # "exclude": [
+      #     template_dir + 'SLFt_roi2_L.nii.gz'],
+
+      "cross_midline": False,
+
+      "mahal": {
+          "clean_rounds": 20,
+          "length_threshold": 4,
+          "distance_threshold": 2}
+  },
+  "R_PTR": {
+      "include": [
+          op.join(template_dir, f"/{participant}/", participant+'_hemi-R_space-ACPC_desc-thalamus_mask.nii.gz'),
+          op.join(template_dir, f"/{participant}/", participant+'_hemi-R_space-ACPC_desc-posterior_mask.nii.gz')],
+      # "exclude": [
+      #     template_dir + 'SLFt_roi2_L.nii.gz'],
+
+      "cross_midline": False,
+
+      "mahal": {
+          "clean_rounds": 20,
+          "length_threshold": 4,
+          "distance_threshold": 2}
+  },
+  "R_STR": {
+      "include": [
+          op.join(template_dir, f"/{participant}/", participant+'_hemi-R_space-ACPC_desc-thalamus_mask.nii.gz'),
+          op.join(template_dir, f"/{participant}/", participant+'_hemi-R_space-ACPC_desc-superior_mask.nii.gz')],
+      # "exclude": [
+      #     template_dir + 'SLFt_roi2_L.nii.gz'],
+
+      "cross_midline": False,
+
+      "mahal": {
+          "clean_rounds": 20,
+          "length_threshold": 4,
+          "distance_threshold": 2}
+  }
+  })
+
+  bundles = bundles + abd.default18_bd()
 
 
 #   scalars = [
@@ -43,7 +105,7 @@ def main(dwi_data_file, bval_file, bvec_file, t1_file, output_dir):
 
   # define tracking parameters
   tracking_params = {
-    "n_seeds": 4000000,
+    "n_seeds": 2000000,
     "random_seeds": True, 
     "seed_mask": RoiImage(
             use_waypoints=False,
@@ -68,7 +130,7 @@ def main(dwi_data_file, bval_file, bvec_file, t1_file, output_dir):
     bvec_file             = bvec_file,
     t1_file               = t1_file,
     output_dir            = output_dir,
-    # bundle_info           = bundles,
+    bundle_info           = bundles,
     tracking_params       = tracking_params, 
     # segmentation_params   = segmentation_params,
     tractography_ngpus    = 1
@@ -83,7 +145,8 @@ if __name__ == "__main__":
   parser.add_argument("--bval_file", type = str)
   parser.add_argument("--bvec_file", type = str)
   parser.add_argument("--t1_file", type = str)
-  parser.add_argument("--roi_files", type = str, nargs = 2, action = "append")
+  parser.add_argument("--template_dir", type = str)
+  parser.add_argument("--participant", type = str)
   parser.add_argument("--output_dir", type = str)
   args = parser.parse_args()
   
@@ -91,7 +154,9 @@ if __name__ == "__main__":
     dwi_data_file  = args.dwi_data_file,
     bval_file      = args.bval_file, 
     bvec_file      = args.bvec_file,
-    t1_file        = args.t1_file,  
+    t1_file        = args.t1_file, 
+    template_dir   = args.template_dir,
+    participant    = args.participant,
     output_dir     = args.output_dir
   )
 
