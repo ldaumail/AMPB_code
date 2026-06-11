@@ -11,15 +11,16 @@ from dipy.tracking.streamline import transform_streamlines
 # ------------------------------------------------------------
 # 1. Define paths
 # ------------------------------------------------------------
-participant = 'sub-EBxLxTZx1956' #'sub-EBxGxZAx1990'#'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990' #'sub-EBxLxTZx1956'
+participant = 'sub-EBxGxPEx1959' #'sub-EBxGxZAx1990'#'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990' #'sub-EBxLxTZx1956'
 
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research',
                     'ampb_mt_tractometry_analysis', 'ampb')
-afq_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb', 'afq-wb') ##op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
+afq_TR_path = op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi_wb', 'afq-wb_TRs_5rounds') ##op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
+afq_julich_path = op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi_wb', 'afq-wb_julich_10rounds')
 qsiprep_path = op.join(bids_path, 'derivatives', 'qsiprep', participant)
 
 # Files
-gmwmi_mask_file = op.join(afq_path, participant,
+gmwmi_mask_file = op.join(afq_TR_path, participant,
                           f"{participant}_ses-concat_acq-HCPdir99_desc-wmgmi_mask.nii.gz")
 t1w_acpc_file = op.join(qsiprep_path, 'anat',
                         f"{participant}_space-ACPC_desc-preproc_T1w.nii.gz")
@@ -53,7 +54,7 @@ tracts = {
     # "CallosumPosteriorParietal": (0, 0.8, 0.2),
     # "CallosumSuperiorFrontal": (0.8, 0.2, 1),
     # "CallosumSuperiorParietal": (0.5, 0.5, 0.5),
-    "CallosumTemporal": (1, 0.2, 0.2),
+    # "CallosumTemporal": (1, 0.2, 0.2),
     # "LeftAnteriorThalamic": (1, 0.5, 0),
     # "LeftArcuate": (0.9, 0.8, 0),
     # "LeftCingulumCingulate": (0, 0.8, 0.2),
@@ -74,7 +75,16 @@ tracts = {
     # "RightSuperiorLongitudinal": (0.2, 0.3, 1),
     # "RightUncinate": (0.1, 0.1, 1),
     # "RightVerticalOccipital": (0.3, 0.3, 1),
-
+    # "LPTR": (1, 1, 0.3),
+    # "RPTR": (1, 1, 0.3),
+    # "LSTR": (0.3, 0.3, 1),
+    # "RSTR": (0.3, 0.3, 1),
+    "LMTLGNxPU": (0.8, 0.8, 1),
+    "RMTLGNxPU": (0.8, 0.8, 1),
+    "LMTFEF": (0.7, 0.7, 0.7),
+    "RMTFEF": (0.7, 0.7, 0.7),
+    "LMTPTxSTS1": (0.2, 1, 1),
+    "RMTPTxSTS1": (0.2, 1, 1)
 }
 # -------------------------------------------------------------------------
 # 5. Load and transform tracts
@@ -84,8 +94,12 @@ for tract_name, color in tracts.items():
     # hemi = "Left" if tract_name.startswith("Left") else "Right"
     # mask_name = tract_name.replace("MT", "MTmask")
     # mask_name = mask_name.replace("afq-", "")
-    tract_file = op.join(afq_path, participant, "bundles",
-                         f"{participant}_ses-concat_acq-HCPdir99_desc-{tract_name}_tractography.trx")
+    if "TR" in tract_name:
+        tract_file = op.join(afq_TR_path, participant, "bundles",
+                            f"{participant}_ses-concat_acq-HCPdir99_desc-{tract_name}_tractography.trx")
+    else:
+        tract_file = op.join(afq_julich_path, participant, "bundles",
+                            f"{participant}_ses-concat_acq-HCPdir99_desc-{tract_name}_tractography.trx")
     if not op.exists(tract_file):
         print(f"⚠️ Missing: {tract_file}")
         continue
@@ -112,9 +126,10 @@ def roi_actor(roi_path, color):
 # -------------------------------------------------------------------------
 roi_defs = {
      "MT":    ("analysis/ROIs/wang_space-ACPC_rois", "MT_mask_dilated", (1, 0, 0)),
-    # "LGNxPU":    ("analysis/ROIs/julich_space-ACPC_rois", "LGNxPU_mask", (0, 0.8, 0.2)),
-    # "PTxSTS1":   ("analysis/ROIs/julich_space-ACPC_rois", "PTxSTS1_mask", (1, 0, 0)),
-    # "FEF":   ("analysis/ROIs/julich_space-ACPC_rois", "FEF_mask", (0.2, 0.6, 1)),
+     "LGNxPU":    ("analysis/ROIs/julich_space-ACPC_rois", "LGNxPU_mask", (0.2, 0.6, 1)),
+     "PTxSTS1":   ("analysis/ROIs/julich_space-ACPC_rois", "PTxSTS1_mask", (0.2, 0.6, 1)),
+     "FEF":   ("analysis/ROIs/julich_space-ACPC_rois", "FEF_mask", (0.2, 0.6, 1)),
+    # "thalamus":  ("analysis/ROIs/AICHA_space-ACPC_rois", "thalamus_mask", (0, 0.8, 0.2)),
 }
 roi_actors = []
 
@@ -123,6 +138,9 @@ for hemi in ["L", "R"]: # "R"
         if roi_name == "MT":
             roi_path = op.join(bids_path, subdir, participant,
                                f"{participant}_hemi-{hemi}_space-ACPC_label-{roi_name}_mask_dilated.nii.gz")
+        elif roi_name == "thalamus":
+            roi_path = op.join(bids_path, subdir, participant, #'ses-concat', 'anat',
+                               f"{participant}_hemi-{hemi}_space-ACPC_desc-{roi_name}_mask.nii.gz")
         else:
             roi_path = op.join(bids_path, subdir, participant, 'ses-concat', 'anat',
                                f"{participant}_hemi-{hemi}_space-ACPC_desc-{roi_name}_mask.nii.gz")
@@ -158,6 +176,7 @@ scene.add(t1_actor)
 scene.reset_camera_tight()
 scene.background((0, 0, 0))
 window.show(scene)
+
 
 
 

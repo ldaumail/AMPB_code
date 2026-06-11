@@ -15,13 +15,13 @@ BUNDLES_KWARGS = {
 
 def main(dwi_data_file, bval_file, bvec_file, t1_file, template_dir, participant, output_dir):
   # define custom bundles dictionary
-  clean_rounds = 2
+  clean_rounds = 10
   distance_threshold = 3
   bundles = abd.BundleDict({
-    "L_PTR": {
+    "L_MT-PTxSTS1": {
       "include": [
-          op.join(template_dir, participant, participant+'_hemi-L_space-ACPC_desc-thalamus_mask.nii.gz'),
-          op.join(template_dir, participant, participant+'_hemi-L_space-ACPC_desc-posterior_mask.nii.gz')],
+          op.join(template_dir, participant, 'ses-concat','anat', participant+'_hemi-L_space-ACPC_desc-PTxSTS1_mask.nii.gz'),
+          op.join('~/scratch', 'afq_ampb', 'analysis', 'wang_space-ACPC_rois', participant, participant+'_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz')],
     #   "exclude": [
     #       template_dir + 'SLFt_roi2_L.nii.gz'],
 
@@ -32,10 +32,10 @@ def main(dwi_data_file, bval_file, bvec_file, t1_file, template_dir, participant
           "length_threshold": 4,
           "distance_threshold": distance_threshold}
   },
-  "L_STR": {
+  "L_MT-LGNxPU": {
       "include": [
-          op.join(template_dir, participant, participant+'_hemi-L_space-ACPC_desc-thalamus_mask.nii.gz'),
-          op.join(template_dir, participant, participant+'_hemi-L_space-ACPC_desc-superior_mask.nii.gz')],
+          op.join(template_dir, participant, 'ses-concat','anat', participant+'_hemi-L_space-ACPC_desc-LGNxPU_mask.nii.gz'),
+          op.join('~/scratch', 'afq_ampb', 'analysis', 'wang_space-ACPC_rois', participant, participant+'_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz')],
       # "exclude": [
       #     template_dir + 'SLFt_roi2_L.nii.gz'],
 
@@ -46,10 +46,10 @@ def main(dwi_data_file, bval_file, bvec_file, t1_file, template_dir, participant
           "length_threshold": 4,
           "distance_threshold": distance_threshold}
   },
-  "R_PTR": {
+    "L_MT-FEF": {
       "include": [
-          op.join(template_dir, participant, participant+'_hemi-R_space-ACPC_desc-thalamus_mask.nii.gz'),
-          op.join(template_dir, participant, participant+'_hemi-R_space-ACPC_desc-posterior_mask.nii.gz')],
+          op.join(template_dir, participant, 'ses-concat','anat', participant+'_hemi-L_space-ACPC_desc-FEF_mask.nii.gz'),
+          op.join('~/scratch', 'afq_ampb', 'analysis', 'wang_space-ACPC_rois', participant, participant+'_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz')],
       # "exclude": [
       #     template_dir + 'SLFt_roi2_L.nii.gz'],
 
@@ -60,10 +60,38 @@ def main(dwi_data_file, bval_file, bvec_file, t1_file, template_dir, participant
           "length_threshold": 4,
           "distance_threshold": distance_threshold}
   },
-  "R_STR": {
+  "R_MT-PTxSTS1": {
       "include": [
-          op.join(template_dir, participant, participant+'_hemi-R_space-ACPC_desc-thalamus_mask.nii.gz'),
-          op.join(template_dir, participant, participant+'_hemi-R_space-ACPC_desc-superior_mask.nii.gz')],
+          op.join(template_dir, participant, 'ses-concat','anat', participant+'_hemi-R_space-ACPC_desc-PTxSTS1_mask.nii.gz'),
+          op.join('~/scratch', 'afq_ampb', 'analysis', 'wang_space-ACPC_rois', participant, participant+'_hemi-R_space-ACPC_label-MT_mask_dilated.nii.gz')],
+      # "exclude": [
+      #     template_dir + 'SLFt_roi2_L.nii.gz'],
+
+      "cross_midline": False,
+
+      "mahal": {
+          "clean_rounds": clean_rounds,
+          "length_threshold": 4,
+          "distance_threshold": distance_threshold}
+  },
+  "R_MT-LGNxPU": {
+      "include": [
+          op.join(template_dir, participant, 'ses-concat','anat', participant+'_hemi-R_space-ACPC_desc-LGNxPU_mask.nii.gz'),
+          op.join('~/scratch', 'afq_ampb', 'analysis', 'wang_space-ACPC_rois', participant, participant+'_hemi-R_space-ACPC_label-MT_mask_dilated.nii.gz')],
+      # "exclude": [
+      #     template_dir + 'SLFt_roi2_L.nii.gz'],
+
+      "cross_midline": False,
+
+      "mahal": {
+          "clean_rounds": clean_rounds,
+          "length_threshold": 4,
+          "distance_threshold": distance_threshold}
+  },
+  "R_MT-FEF": {
+      "include": [
+          op.join(template_dir, participant, 'ses-concat','anat', participant+'_hemi-R_space-ACPC_desc-FEF_mask.nii.gz'),
+          op.join('~/scratch', 'afq_ampb', 'analysis', 'wang_space-ACPC_rois', participant, participant+'_hemi-R_space-ACPC_label-MT_mask_dilated.nii.gz')],
       # "exclude": [
       #     template_dir + 'SLFt_roi2_L.nii.gz'],
 
