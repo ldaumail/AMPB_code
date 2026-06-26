@@ -41,16 +41,16 @@ mni_aicha = ants.image_read(op.join(mni_aicha_path, 'AICHA1mm.nii'))
 # # PTRs cortex ROIs from AICHA atlas (LUT):
 roi_name = "posterior"
 lh_rois = [##-----ROIs for PTRs:
-           77, 79, 81, 83, 85, #G-Parietal sup -1-L/-5-L(right above inferior parietal)
-           107, #G-Parietal inferior (pretty much located on parietal cortex)
-           109, 111, 113, ##S-Intraparietal 
+           #77, 79, 81, 83, 85, #G-Parietal sup -1-L/-5-L(right above inferior parietal)
+           #107, #G-Parietal inferior (pretty much located on parietal cortex)
+           #109, 111, 113, ##S-Intraparietal 
            115, # Intra occipital (superior part of occipital)
            117, #occipital pole
            119, 121, 123, 125, 127, #G- occipital lateral
            129, 131, #G-Occipital sup
            133, 135, 137, 139, #G-Occipital mid (close to MT)
            141, 143, #Occipital inf
-           265, 267, 269, 271, 273, 275, 277, 279, 281, #Precuneus
+           #265, 267, 269, 271, 273, 275, 277, 279, 281, #Precuneus
            283, 285, 287, 289, 291, 293, #Parietooccipital (towards the superior edge of hemisphere)
            299, 301, 303, #Calcarine gyrus
            
@@ -62,16 +62,16 @@ lh_rois = [##-----ROIs for PTRs:
            103,105,# #G_Angular
            ]
 rh_rois = [
-           78, 80, 82, 84, 86,
-           108, 
-           110, 112, 114, 
+           #78, 80, 82, 84, 86,
+           #108, 
+           #110, 112, 114, 
            116, 
            118, 
            120, 122, 124, 126, 128, 
            130, 132, 
            134, 136, 138, 140, 
            142, 144, 
-           266, 268, 270, 272, 274, 276, 278, 280, 282, 
+           #266, 268, 270, 272, 274, 276, 278, 280, 282, 
            284, 286, 288, 290, 292, 294,
            300, 302, 304,
 

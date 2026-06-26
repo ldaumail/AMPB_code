@@ -21,10 +21,12 @@ def main(participants_file, bids_path, roi_name, lh_rois, rh_rois):
     Bash command line (posterior ROI) :
     python 18_1_generate_thalamic_radiations_rois.py --participants_file /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/code/utils/study2_subjects_updated.txt \
             --bids_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --roi_name "posterior" \
-            --lh_rois 77 79 81 83 85 107 109 111 113 115 117 119 121 123 125 127 129 131 133 135 137 139 141 143 265 267 269 271 273 275 277 279 281 283 285 287 289 291 293 299 301 303 191 193 195 185 177 175 99 103 105 \
-            --rh_rois 78 80 82 84 86 108 110 112 114 116 118 120 122 124 126 128 130 132 134 136 138 140 142 144 266 268 270 272 274 276 278 280 282 284 286 288 290 292 294 300 302 304 192 194 196 186 178 176 100 104 106
+            --lh_rois 115 117 119 121 123 125 127 129 131 133 135 137 139 141 143 283 285 287 289 291 293 299 301 303 191 193 195 185 177 175 99 103 105 \ 
+            --rh_rois 116 118 120 122 124 126 128 130 132 134 136 138 140 142 144 284 286 288 290 292 294 300 302 304 192 194 196 186 178 176 100 104 106
 
-            
+            #77 79 81 83 85 107 109 111 113 265 267 269 271 273 275 277 279 281
+            #78 80 82 84 86 108 110 112 114 266 268 270 272 274 276 278 280 282
+
             #STRs
     python 18_1_generate_thalamic_radiations_rois.py --participants_file /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/code/utils/study2_subjects_updated.txt \
             --bids_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --roi_name "superior" \
