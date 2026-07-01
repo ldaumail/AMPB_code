@@ -7,16 +7,23 @@ import os.path as op
 from fury import window, actor
 from dipy.io.streamline import load_tractogram
 from dipy.tracking.streamline import transform_streamlines
-
+# expected = "/Volumes/cos-lab-wpark78/LoicDaumail/ampb/derivatives/pyafq/wmgmi_wang/afq-RightMTxLGNxPU/sub-EBxGxCCx1986/bundles/sub-EBxGxCCx1986_ses-concat_acq-HCPdir99_desc-RightMTmaskxLGNxPU_tractography.trx"
+# print(tract_file  == expected)
+# print(repr(tract_file))
+# print(repr(expected))
+# print(tract_file)
+# print(os.path.exists(tract_file))
+# print(os.path.isfile(tract_file))
+# print(os.path.exists(os.path.dirname(tract_file)))
 # ------------------------------------------------------------
 # 1. Define paths
 # ------------------------------------------------------------
-participant = 'sub-NSxLxQUx1953' #'sub-EBxGxZAx1990'#'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990' #'sub-EBxLxTZx1956'
+participant = 'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990'#'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990' #'sub-EBxLxTZx1956'
 
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research',
                     'ampb_mt_tractometry_analysis', 'ampb')
-afq_TR_path = op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi_wb', 'afq3-wb_15rounds') ##op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
-# afq_julich_path = op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi_wb', 'afq-wb_julich_10rounds')
+afq_TR_path = op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi_wb', 'afq33-wb_15rounds') ##op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
+afq_julich_path = op.join('/Volumes','cos-lab-wpark78','LoicDaumail','ampb','derivatives','pyafq','wmgmi_wang')
 qsiprep_path = op.join(bids_path, 'derivatives', 'qsiprep', participant)
 
 # Files
@@ -80,12 +87,12 @@ tracts = {
     "RPTR": (1, 1, 0.3),
     # "LSTR": (0.3, 0.3, 1),
     # "RSTR": (0.3, 0.3, 1),
-    "LMTLGNxPU": (0.8, 0.8, 1),
-    "RMTLGNxPU": (0.8, 0.8, 1),
-    "LMTFEF": (0.7, 0.7, 0.7),
-    "RMTFEF": (0.7, 0.7, 0.7),
-    "LMTPTxSTS1": (0.2, 1, 1),
-    "RMTPTxSTS1": (0.2, 1, 1)
+    "LeftMTxLGNxPU": (0.8, 0.8, 1),
+    "RightMTxLGNxPU": (0.8, 0.8, 1),
+    # "LeftMTxFEF": (0.7, 0.7, 0.7),
+    # "RightMTxFEF": (0.7, 0.7, 0.7),
+    # "LeftMTxPTxSTS1": (0.2, 1, 1),
+    # "RightMTxPTxSTS1": (0.2, 1, 1)
 }
 # -------------------------------------------------------------------------
 # 5. Load and transform tracts
@@ -95,12 +102,13 @@ for tract_name, color in tracts.items():
     # hemi = "Left" if tract_name.startswith("Left") else "Right"
     # mask_name = tract_name.replace("MT", "MTmask")
     # mask_name = mask_name.replace("afq-", "")
-    # if "TR" in tract_name:
-    tract_file = op.join(afq_TR_path, participant, "bundles",
+    if "TR" in tract_name:
+        tract_file = op.join(afq_TR_path, participant, "bundles",
                             f"{participant}_ses-concat_acq-HCPdir99_desc-{tract_name}_tractography.trx")
-    # else:
-    #     tract_file = op.join(afq_TR_path, participant, "bundles",
-    #                         f"{participant}_ses-concat_acq-HCPdir99_desc-{tract_name}_tractography.trx")
+    else:
+        tract = tract_name.replace("MTx", "MTmaskx")
+        tract_file = op.join(afq_julich_path, f"afq-{tract_name}", participant, "bundles",
+                            f"{participant}_ses-concat_acq-HCPdir99_desc-{tract}_tractography.trx")
     if not op.exists(tract_file):
         print(f"⚠️ Missing: {tract_file}")
         continue
@@ -128,8 +136,8 @@ def roi_actor(roi_path, color):
 roi_defs = {
      "MT":    ("analysis/ROIs/wang_space-ACPC_rois", "MT_mask_dilated", (1, 0, 0)),
      "LGNxPU":    ("analysis/ROIs/julich_space-ACPC_rois", "LGNxPU_mask", (0.2, 0.6, 1)),
-     "PTxSTS1":   ("analysis/ROIs/julich_space-ACPC_rois", "PTxSTS1_mask", (0.2, 0.6, 1)),
-     "FEF":   ("analysis/ROIs/julich_space-ACPC_rois", "FEF_mask", (0.2, 0.6, 1)),
+    #  "PTxSTS1":   ("analysis/ROIs/julich_space-ACPC_rois", "PTxSTS1_mask", (0.2, 0.6, 1)),
+    #  "FEF":   ("analysis/ROIs/julich_space-ACPC_rois", "FEF_mask", (0.2, 0.6, 1)),
     # "thalamus":  ("analysis/ROIs/AICHA_space-ACPC_rois", "thalamus_mask", (0, 0.8, 0.2)),
 }
 roi_actors = []

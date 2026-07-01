@@ -27,7 +27,7 @@ module load cuda/12.1
 module load gcc/12.3.0
 # Directories ------------------------------------------------------------------
 
-APPTAINER_DIR="${HOME}/p-wpark78-0/images"
+APPTAINER_DIR="${HOME}/r-wpark78-0/images"
 DATA_HOME="${HOME}/scratch/afq_ampb"
 DERIVATIVES_DIR="${DATA_HOME}/derivatives"
 DATA_DIR="${DERIVATIVES_DIR}/qsiprep/${participant}"
@@ -67,7 +67,7 @@ if [[ ! -f "${curr_out}/${fname}" ]]; then
     --bind "${FUNC_ROIS_DIR}:/frois" \
     --bind "${curr_out}/..:/out" \
     --nv \
-    "${APPTAINER_DIR}/pyafq_gpu_cuda_12_gmwmi3.sif" \
+    "${APPTAINER_DIR}/pyafq_33_gpu.sif" \
     "${DATA_HOME}/code/9_wang_participant_pyAFQ_gpu_wmgmi.py" \
     --dwi_data_file "/data/ses-concat/dwi/${participant}_ses-concat_acq-HCPdir99_space-ACPC_desc-preproc_dwi.nii.gz" \
     --bval_file "/data/ses-concat/dwi/${participant}_ses-concat_acq-HCPdir99_space-ACPC_desc-preproc_dwi.bval" \
