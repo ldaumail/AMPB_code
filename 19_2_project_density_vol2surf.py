@@ -19,7 +19,7 @@ def project_density_vol2surf(participants_file, tract_list, bids_path, pyAFQ_pat
     '''
     project_density_vol2surf --participants_file ./utils/study2_subjects_updated.txt --tract_list ["MTxLGNxPU"] --bids_path /Use
     rs/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --pyAFQ_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/deriva
-    tives/pyAFQ/wmgmi_wang --projdist 0
+    tives/pyAFQ/wmgmi_wb --projdist 0
     '''
     with open(participants_file, "r") as f:
         participants = [line.strip().lstrip("/") for line in f if line.strip()]
@@ -32,7 +32,7 @@ def project_density_vol2surf(participants_file, tract_list, bids_path, pyAFQ_pat
         analysis_path = op.join(bids_path, 'analysis')
         roi_path = op.join(analysis_path, 'ROIs','wang_space-ACPC_rois', participant)
         fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
-        out_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant, 'pyAFQ_default_atlas')
+        out_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant, 'pyAFQ33_wb_red')
         os.makedirs(out_path, exist_ok=True)
 
         #Files 
@@ -71,7 +71,7 @@ def project_density_vol2surf(participants_file, tract_list, bids_path, pyAFQ_pat
                     # wmgmi_mask_img = ants.image_read(wmgmi_mask_file)
 
                     #--- STEP 2: Calculate overlap mask between MT mask and WMGMI from pyAFQ (used to catch endpoint values)
-                    afq_path = op.join(pyAFQ_path, f"afq-Left", participant)
+                    afq_path = op.join(pyAFQ_path, participant)
                     wmgmi_mask_file = op.join(afq_path, f"{participant}_ses-concat_acq-HCPdir99_desc-wmgmi_mask.nii.gz")
 
                     input_files = [wmgmi_mask_file, mt_mask_file]
@@ -206,8 +206,18 @@ participants_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'amp
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
 
 # tract_list= ['CallosumTemporal','CallosumPosteriorParietal', 'CallosumOccipital', 'LeftVerticalOccipital', 'LeftInferiorFrontooccipital', 'LeftInferiorLongitudinal', 'LeftSuperiorLongitudinal', 'LeftPosteriorArcuate',  'LeftArcuate']
-tract_list= ['RightVerticalOccipital', 'RightInferiorFrontooccipital', 'RightInferiorLongitudinal', 'RightSuperiorLongitudinal', 'RightPosteriorArcuate',  'RightArcuate']
-pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb')
+#tract_list= ['RightVerticalOccipital', 'RightInferiorFrontooccipital', 'RightInferiorLongitudinal', 'RightSuperiorLongitudinal', 'RightPosteriorArcuate',  'RightArcuate']
+tract_list=['LPTR', 'RPTR', 'LSTR', 'RSTR', 'LeftInferiorLongitudinal', 'RightInferiorLongitudinal', 
+    'LeftInferiorFrontooccipital', 'RightInferiorFrontooccipital', 
+    'LeftSuperiorLongitudinalI', 'RightSuperiorLongitudinalI',
+    'LeftSuperiorLongitudinalII', 'RightSuperiorLongitudinalII',
+    'LeftSuperiorLongitudinalIII', 'RightSuperiorLongitudinalIII',
+    'LeftAnteriorVerticalOccipital', 'RightAnteriorVerticalOccipital', 
+    'LeftPosteriorVerticalOccipital', 'RightPosteriorVerticalOccipital',
+    'LeftArcuate', 'RightArcuate',
+    'LeftPosteriorArcuate', 'RightPosteriorArcuate'] #'CallosumOccipital'
+
+pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb', 'afq33-wb_6rounds')
 
 projdist = '0'
 

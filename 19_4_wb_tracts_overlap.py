@@ -22,7 +22,8 @@ participants_file = op.join('/Users','ldaumail3', 'Documents', 'research', 'ampb
 with open(participants_file, "r") as f:
     participants = [line.strip().lstrip("/") for line in f if line.strip()]
 pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb')
-afq_wb_path = op.join(pyAFQ_path, 'afq33-wb_5rounds') ##op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
+clean_rounds = '6rounds'
+afq_wb_path = op.join(pyAFQ_path, f"afq33-wb_{clean_rounds}") ##op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
 # afq_julich_path = op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi_wb', 'afq-wb_julich_10rounds')
 
 #filenames = glob.glob(os.path.join(pyAFQ_path, "afq-wb_TRs_10rounds", "sub-EBxGxCCx1986", "bundles","*.trx"))#
@@ -61,9 +62,9 @@ for hemi in {"L", "R"}:
             
             if tract_path.exists():
                 if "CallosumOccipital" in tract:
-                    tract_tdi_map = os.path.join(tdi_path, participant+'_ses-concat_desc-'+f"{tract}"+'_tdi_map_5rounds.nii.gz')
+                    tract_tdi_map = os.path.join(tdi_path, participant+'_ses-concat_desc-'+f"{tract}"+f"_tdi_map_{clean_rounds}.nii.gz")
                 else:
-                    tract_tdi_map = os.path.join(tdi_path, participant+'_ses-concat_desc-'+f"{hemi_afq}{tract}"+'_tdi_map_5rounds.nii.gz')
+                    tract_tdi_map = os.path.join(tdi_path, participant+'_ses-concat_desc-'+f"{hemi_afq}{tract}"+f"_tdi_map_{clean_rounds}.nii.gz")
                 template = op.join(afq_wb_path, participant, participant+'_ses-concat_acq-HCPdir99_b0ref.nii.gz')
 
                 streamline2dipy_density(tract_path, template, tract_tdi_map)
@@ -93,9 +94,9 @@ for hemi in {"L", "R"}:
         for tr in TR_tract_names:
             for targ in targ_tract_names:
                 if "CallosumOccipital" in tr:
-                    TR_path = op.join(density_dir, participant, 'pyAFQ33_wb', participant+'_ses-concat_desc-' + f"{tr}" + '_tdi_map_5rounds.nii.gz')
+                    TR_path = op.join(density_dir, participant, 'pyAFQ33_wb', participant+'_ses-concat_desc-' + f"{tr}" + f"_tdi_map_{clean_rounds}.nii.gz")
                 else:
-                    TR_path = op.join(density_dir, participant, 'pyAFQ33_wb', participant+'_ses-concat_desc-' + f"{hemi_afq}{tr}" + '_tdi_map_5rounds.nii.gz')
+                    TR_path = op.join(density_dir, participant, 'pyAFQ33_wb', participant+'_ses-concat_desc-' + f"{hemi_afq}{tr}" + f"_tdi_map_{clean_rounds}.nii.gz")
                     
                 targ_path = op.join(density_dir, participant, 'wang_MT', participant+'_ses-concat_desc-' + f"wang{hemi_afq}{targ}" + '_tdi_map2.nii.gz')
         
@@ -149,7 +150,7 @@ for ax, hemi in zip(axes, ["L", "R"]):
     ax.set_ylabel("Atlas tract")
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, f"pyafq3_5rounds_tracts_overlap_percentTarg.png"),
+plt.savefig(op.join(saveDir, f"pyafq3_{clean_rounds}_tracts_overlap_percentTarg.png"),
                 dpi=300, bbox_inches='tight')
 plt.tight_layout()
 

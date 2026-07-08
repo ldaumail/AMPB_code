@@ -19,16 +19,16 @@ from utils.dilate_mask import dilate_mask
 def main(participants_file, bids_path, roi_name, lh_rois, rh_rois):
     '''
     Bash command line (posterior ROI) :
-    python 18_1_generate_thalamic_radiations_rois.py --participants_file /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/code/utils/study2_subjects_updated.txt \
-            --bids_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --roi_name "posterior" \
-            --lh_rois 115 117 119 121 123 125 127 129 131 133 135 137 139 141 143 283 285 287 289 291 293 299 301 303 191 193 195 185 177 175 99 103 105 \ 
-            --rh_rois 116 118 120 122 124 126 128 130 132 134 136 138 140 142 144 284 286 288 290 292 294 300 302 304 192 194 196 186 178 176 100 104 106
+    python 18_2_generate_thalamic_radiations_rois.py --participants_file /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/code/utils/study2_subjects_updated.txt \
+            --bids_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --roi_name "posteriorred" \
+            --lh_rois 115 117 119 121 123 125 127 129 131 133 135 137 139 141 143 299 301 303 191 193 195 185 177 175 99 103 105 \ 
+            --rh_rois 116 118 120 122 124 126 128 130 132 134 136 138 140 142 144 300 302 304 192 194 196 186 178 176 100 104 106
 
-            #77 79 81 83 85 107 109 111 113 265 267 269 271 273 275 277 279 281
-            #78 80 82 84 86 108 110 112 114 266 268 270 272 274 276 278 280 282
+            #77 79 81 83 85 107 109 111 113 265 267 269 271 273 275 277 279 281 283 285 287 289 291 293
+            #78 80 82 84 86 108 110 112 114 266 268 270 272 274 276 278 280 282 284 286 288 290 292 294
 
             #STRs
-    python 18_1_generate_thalamic_radiations_rois.py --participants_file /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/code/utils/study2_subjects_updated.txt \
+    python 18_2_generate_thalamic_radiations_rois.py --participants_file /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/code/utils/study2_subjects_updated.txt \
             --bids_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --roi_name "superior" \
             --lh_rois 257 259 261 263 229 231 233 15 17 221 223 225 63 65 67 69 51 53 55 57 59 61 71 73 75 \
             --rh_rois 258 260 262 264 230 232 234 16 18 222 224 226 64 66 68 70 52 54 56 58 60 62 72 74 76 

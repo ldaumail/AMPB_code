@@ -22,16 +22,14 @@ participants_file = op.join('/Users','ldaumail3', 'Documents', 'research', 'ampb
 with open(participants_file, "r") as f:
     participants = [line.strip().lstrip("/") for line in f if line.strip()]
 
-pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb')
-filenames = glob.glob(os.path.join(pyAFQ_path, "afq-Left", "sub-EBxGxCCx1986", "bundles","*.trx"))#
+pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb', 'afq33-wb_6rounds')
 
+#filenames = glob.glob(os.path.join(pyAFQ_path, "afq33-wb_6rounds", "sub-EBxGxCCx1986", "bundles","*.trx"))#
 # tract_names = [
 #     re.search(r"desc-(.*?)_tractography", f).group(1)
 #     for f in filenames
 # ]
 
-# tract_names = ['CallosumMotor',
-#                'CallosumTemporal']
 # tract_names = ['CallosumOrbital',
 #  'RightInferiorFrontooccipital',
 #  'RightArcuate',
@@ -59,35 +57,80 @@ filenames = glob.glob(os.path.join(pyAFQ_path, "afq-Left", "sub-EBxGxCCx1986", "
 #  'LeftAnteriorThalamic',
 #  'LeftSuperiorLongitudinal']
 
+tract_names = [
+    'LPTR', 
+    'LeftInferiorLongitudinal', 
+    'LeftInferiorFrontooccipital',  
+    'LeftSuperiorLongitudinalI', 
+    'LeftSuperiorLongitudinalII', 
+    'LeftSuperiorLongitudinalIII', 
+    'LeftAnteriorVerticalOccipital', 
+    'LeftPosteriorVerticalOccipital', 
+    'LeftArcuate', 
+    'LeftPosteriorArcuate',
 
-tract_names =  {"CallosumAnteriorFrontal",
-    "CallosumMotor",
-    "CallosumOccipital",
-    "CallosumOrbital",
-    "CallosumPosteriorParietal",
-    "CallosumSuperiorFrontal",
-    "CallosumSuperiorParietal",
-    "CallosumTemporal",
-    "LeftAnteriorThalamic",
-    "LeftArcuate",
-    "LeftCingulumCingulate",
-    "LeftCorticospinal",
-    "LeftInferiorFrontooccipital",
-    "LeftInferiorLongitudinal",
-    "LeftPosteriorArcuate",
-    "LeftSuperiorLongitudinal",
-    "LeftUncinate",
-    "LeftVerticalOccipital",
-    "RightAnteriorThalamic",
-    "RightArcuate",
-    "RightCingulumCingulate",
-    "RightCorticospinal",
-    "RightInferiorFrontooccipital",
-    "RightInferiorLongitudinal",
-    "RightPosteriorArcuate",
-    "RightSuperiorLongitudinal",
-    "RightUncinate",
-    "RightVerticalOccipital"}
+    'LSTR', 
+    'LeftAnteriorThalamic',
+    'LeftCingulumCingulate',
+    'LeftCorticospinal',
+    'LeftEarlyVisual',
+    'LeftOpticRadiation',
+    'LeftTemporoparietal',
+    'LeftUncinate',
+
+    ]
+
+# tract_names = [
+#     'RPTR', 
+ 
+#     'RightInferiorLongitudinal', 
+#     'RightInferiorFrontooccipital', 
+#     'RightSuperiorLongitudinalI',
+#     'RightSuperiorLongitudinalII',
+#     'RightSuperiorLongitudinalIII',
+#     'RightAnteriorVerticalOccipital', 
+#     'RightPosteriorVerticalOccipital',
+#     'RightArcuate',
+#     'RightPosteriorArcuate',
+
+#     'RSTR',
+#     'RightAnteriorThalamic',
+#     'RightCingulumCingulate',
+#     'RightCorticospinal',
+#     'RightEarlyVisual',
+#     'RightOpticRadiation',
+#     'RightTemporoparietal',
+#     'RightUncinate',
+#     ]
+
+# tract_names =  {"CallosumAnteriorFrontal",
+#     "CallosumMotor",
+#     "CallosumOccipital",
+#     "CallosumOrbital",
+#     "CallosumPosteriorParietal",
+#     "CallosumSuperiorFrontal",
+#     "CallosumSuperiorParietal",
+#     "CallosumTemporal",
+#     "LeftAnteriorThalamic",
+#     "LeftArcuate",
+#     "LeftCingulumCingulate",
+#     "LeftCorticospinal",
+#     "LeftInferiorFrontooccipital",
+#     "LeftInferiorLongitudinal",
+#     "LeftPosteriorArcuate",
+#     "LeftSuperiorLongitudinal",
+#     "LeftUncinate",
+#     "LeftVerticalOccipital",
+#     "RightAnteriorThalamic",
+#     "RightArcuate",
+#     "RightCingulumCingulate",
+#     "RightCorticospinal",
+#     "RightInferiorFrontooccipital",
+#     "RightInferiorLongitudinal",
+#     "RightPosteriorArcuate",
+#     "RightSuperiorLongitudinal",
+#     "RightUncinate",
+#     "RightVerticalOccipital"}
 n_subj = len(participants)
 n_tracts = len(tract_names)
 rows = []
@@ -101,14 +144,14 @@ for p, participant in enumerate(participants):
         # participant = 'sub-EBxGxCCx1986'
         # tract_name = 'RightMTmaskxLGN'
         # pyAFQ_path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/pyAFQ/wmgmi/RightMTxLGN'
-        tdi_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant, 'pyAFQ_default_atlas')
+        tdi_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant, 'pyAFQ33_wb_red')
         os.makedirs(tdi_path, exist_ok=True)
     
-        tract_path = Path(os.path.join(pyAFQ_path, f"afq-Left", participant, 'bundles', participant+'_ses-concat_acq-HCPdir99_desc-' + tract + '_tractography.trx'))
+        tract_path = Path(os.path.join(pyAFQ_path, participant, 'bundles', participant+'_ses-concat_acq-HCPdir99_desc-' + tract + '_tractography.trx'))
         
         if tract_path.exists():
             tract_tdi_map = os.path.join(tdi_path, participant+'_ses-concat_desc-' + tract + '_tdi_map.nii.gz')
-            template = op.join(pyAFQ_path, f"afq-Left", participant, participant+'_ses-concat_acq-HCPdir99_b0ref.nii.gz')
+            template = op.join(pyAFQ_path, participant, participant+'_ses-concat_acq-HCPdir99_b0ref.nii.gz')
 
             streamline2dipy_density(tract_path, template, tract_tdi_map)
 

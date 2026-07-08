@@ -18,11 +18,11 @@ from dipy.tracking.streamline import transform_streamlines
 # ------------------------------------------------------------
 # 1. Define paths
 # ------------------------------------------------------------
-participant = 'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990'#'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990' #'sub-EBxLxTZx1956'
+participant = 'sub-NSxLxYKx1964' #'sub-EBxGxZAx1990'#'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990' #'sub-EBxLxTZx1956'
 
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research',
                     'ampb_mt_tractometry_analysis', 'ampb')
-afq_TR_path = op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi_wb', 'afq33-wb_15rounds') ##op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
+afq_TR_path = op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi_wb', 'afq33-wb_6rounds') ##op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
 afq_julich_path = op.join('/Volumes','cos-lab-wpark78','LoicDaumail','ampb','derivatives','pyafq','wmgmi_wang')
 qsiprep_path = op.join(bids_path, 'derivatives', 'qsiprep', participant)
 
@@ -138,7 +138,7 @@ roi_defs = {
      "LGNxPU":    ("analysis/ROIs/julich_space-ACPC_rois", "LGNxPU_mask", (0.2, 0.6, 1)),
     #  "PTxSTS1":   ("analysis/ROIs/julich_space-ACPC_rois", "PTxSTS1_mask", (0.2, 0.6, 1)),
     #  "FEF":   ("analysis/ROIs/julich_space-ACPC_rois", "FEF_mask", (0.2, 0.6, 1)),
-    # "thalamus":  ("analysis/ROIs/AICHA_space-ACPC_rois", "thalamus_mask", (0, 0.8, 0.2)),
+    "thalamus":  ("analysis/ROIs/AICHA_space-ACPC_rois", "thalamus_mask", (0, 0.8, 0.2)),
 }
 roi_actors = []
 

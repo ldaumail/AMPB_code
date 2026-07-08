@@ -15,13 +15,13 @@ BUNDLES_KWARGS = {
 
 def main(dwi_data_file, bval_file, bvec_file, t1_file, template_dir, participant, output_dir):
   # define custom bundles dictionary
-  clean_rounds = 15
+  clean_rounds = 10
   distance_threshold = 3
   bundles = abd.BundleDict({
     "L_PTR": {
       "include": [
           op.join(template_dir, 'AICHA_space-ACPC_rois', participant, participant+'_hemi-L_space-ACPC_desc-thalamus_mask.nii.gz'),
-          op.join(template_dir, 'AICHA_space-ACPC_rois', participant, participant+'_hemi-L_space-ACPC_desc-posterior_mask.nii.gz')],
+          op.join(template_dir, 'AICHA_space-ACPC_rois', participant, participant+'_hemi-L_space-ACPC_desc-posteriorred_mask.nii.gz')],
     #   "exclude": [
     #       template_dir + 'SLFt_roi2_L.nii.gz'],
 
@@ -49,7 +49,7 @@ def main(dwi_data_file, bval_file, bvec_file, t1_file, template_dir, participant
   "R_PTR": {
       "include": [
           op.join(template_dir, 'AICHA_space-ACPC_rois', participant, participant+'_hemi-R_space-ACPC_desc-thalamus_mask.nii.gz'),
-          op.join(template_dir, 'AICHA_space-ACPC_rois', participant, participant+'_hemi-R_space-ACPC_desc-posterior_mask.nii.gz')],
+          op.join(template_dir, 'AICHA_space-ACPC_rois', participant, participant+'_hemi-R_space-ACPC_desc-posteriorred_mask.nii.gz')],
       # "exclude": [
       #     template_dir + 'SLFt_roi2_L.nii.gz'],
 
@@ -203,7 +203,7 @@ def main(dwi_data_file, bval_file, bvec_file, t1_file, template_dir, participant
   
   ## call export_all, starts tractography
   #myafq.clobber(dependent_on="track") #only remove things related to tractography
-  myafq.clobber(dependent_on="recog")
+  #myafq.clobber(dependent_on="recog")
   myafq.export_all(xforms = False)
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()

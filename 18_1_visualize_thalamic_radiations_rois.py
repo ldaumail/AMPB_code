@@ -51,7 +51,7 @@ lh_rois = [##-----ROIs for PTRs:
            133, 135, 137, 139, #G-Occipital mid (close to MT)
            141, 143, #Occipital inf
            #265, 267, 269, 271, 273, 275, 277, 279, 281, #Precuneus
-           283, 285, 287, 289, 291, 293, #Parietooccipital (towards the superior edge of hemisphere)
+           #283, 285, 287, 289, 291, 293, #Parietooccipital (towards the superior edge of hemisphere)
            299, 301, 303, #Calcarine gyrus
            
            ##-----Additional ROIs for hMT+ overlap
@@ -72,7 +72,7 @@ rh_rois = [
            134, 136, 138, 140, 
            142, 144, 
            #266, 268, 270, 272, 274, 276, 278, 280, 282, 
-           284, 286, 288, 290, 292, 294,
+           #284, 286, 288, 290, 292, 294,
            300, 302, 304,
 
            ##
