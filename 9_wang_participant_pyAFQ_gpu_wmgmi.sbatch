@@ -42,14 +42,13 @@ if [[ ! -d "${OUT_DIR}" ]]; then mkdir -p "${OUT_DIR}"; fi
 
 # define variables
 hemistr="${hemisphere:0:1}"
-start_roi="${roi%x*}"; end_roi="${roi#*x}"
-
+start_roi="${roi#*x}"; end_roi="${roi%%x*}"
 # define start file 
-start_file="${participant}_hemi-${hemistr}_space-ACPC_label-${start_roi}_mask_dilated.nii.gz"
+start_file="${participant}_hemi-${hemistr}_space-ACPC_label-${start_roi}_mask.nii.gz"
 
 # define stop file
-stop_file="${participant}_hemi-${hemistr}_space-ACPC_label-${end_roi}_mask.nii.gz"
-if [[ "${end_roi}" == "MT" ]]; then stop_file="${stop_file/MT}"; fi
+stop_file="${participant}_hemi-${hemistr}_space-ACPC_label-${end_roi}_mask_dilated.nii.gz"
+# if [[ "${end_roi}" == "MT" ]]; then stop_file="${stop_file/MT}"; fi
 
 # prepare output directory
 curr_afq="afq-${hemisphere}${roi}"
@@ -73,7 +72,7 @@ if [[ ! -f "${curr_out}/${fname}" ]]; then
     --bval_file "/data/ses-concat/dwi/${participant}_ses-concat_acq-HCPdir99_space-ACPC_desc-preproc_dwi.bval" \
     --bvec_file "/data/ses-concat/dwi/${participant}_ses-concat_acq-HCPdir99_space-ACPC_desc-preproc_dwi.bvec" \
     --t1_file "/data/anat/${participant}_space-ACPC_desc-preproc_T1w.nii.gz" \
-    --roi_files "/frois/${start_file}" "/jrois/${stop_file}" \
+    --roi_files "/jrois/${start_file}" "/frois/${stop_file}" \
     --output_dir "/out/${participant}"
 fi
 

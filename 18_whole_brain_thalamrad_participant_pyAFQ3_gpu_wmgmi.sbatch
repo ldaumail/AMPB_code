@@ -8,7 +8,7 @@
 #SBATCH -N1 			               # Number of nodes and cores per node
 #SBATCH --gres=gpu:V100:1
 #SBATCH --mem=128G                      #--mem-per-gpu=10G you can also adjust the cpu memory, however both parameters are mutually exclusive: --mem=64G
-#SBATCH -t150                                 # Duration of the job (8*60 = 480 mins; 900 = 15 hours)
+#SBATCH -t300                                 # Duration of the job (8*60 = 480 mins; 900 = 15 hours)
 #SBATCH -qinferno                              # QOS name embers = free, leftover  cpus / inferno = paid, credits usage
 #SBATCH -o/storage/home/hcoda1/0/ldaumail3/scratch/afq_ampb/derivatives/pyAFQ/outReports/Report-%j.out                       # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL            # Mail preferences
@@ -42,7 +42,7 @@ if [[ ! -d "${OUT_DIR}" ]]; then mkdir -p "${OUT_DIR}"; fi
 hemistr="${hemisphere:0:1}"
 
 # prepare output directory
-curr_afq="afq3-wb_TR"
+curr_afq="afq33-wb_6rounds"
 curr_out="${OUT_DIR}/${curr_afq}/${participant}"
 if [[ ! -d "${curr_out}" ]]; then mkdir -p "${curr_out}"; fi
 
@@ -55,7 +55,7 @@ if [[ ! -f "${curr_out}/${fname}" ]]; then
     --bind "${ANALYSIS_DIR}:/analysis" \
     --bind "${curr_out}/..:/out" \
     --nv \
-    "${APPTAINER_DIR}/pyafq_30_gpu2.sif" \
+    "${APPTAINER_DIR}/pyafq_33_gpu.sif" \
     "${DATA_HOME}/code/18_whole_brain_thalamrad_participant_pyAFQ3_gpu_wmgmi.py" \
     --dwi_data_file "/data/ses-concat/dwi/${participant}_ses-concat_acq-HCPdir99_space-ACPC_desc-preproc_dwi.nii.gz" \
     --bval_file "/data/ses-concat/dwi/${participant}_ses-concat_acq-HCPdir99_space-ACPC_desc-preproc_dwi.bval" \

@@ -15,7 +15,7 @@ BUNDLES_KWARGS = {
 
 def main(dwi_data_file, bval_file, bvec_file, t1_file, template_dir, participant, output_dir):
   # define custom bundles dictionary
-  clean_rounds = 10
+  clean_rounds = 6
   distance_threshold = 3
   bundles = abd.BundleDict({
     "L_PTR": {

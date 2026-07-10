@@ -8,11 +8,11 @@ paths_logs="${HOME}/scratch/logs"
 output_dir="pyAFQ/wmgmi_wb" 
 mkdir ${output_dir}
 
-hemisphere_list=("WB_pyAFQ3_TR") # "Right"  
+hemisphere_list=("WB_pyAFQ33") # "Right"  
 participant_list=("sub-EBxGxCCx1986" "sub-EBxGxEYx1965" "sub-EBxGxPEx1959" 
 "sub-EBxGxZAx1990" "sub-EBxLxHHx1949" "sub-EBxLxQPx1957" "sub-EBxLxTZx1956" 
- "sub-NSxGxBAx1970" "sub-NSxGxHKx1965" "sub-NSxGxHNx1952" "sub-NSxGxIFx1991" 
- "sub-NSxLxATx1954" "sub-NSxLxPQx1973" "sub-NSxLxQUx1953" "sub-NSxLxYKx1964")
+"sub-NSxGxBAx1970" "sub-NSxGxHKx1965" "sub-NSxGxHNx1952" "sub-NSxGxIFx1991" 
+"sub-NSxLxATx1954" "sub-NSxLxPQx1973" "sub-NSxLxQUx1953" "sub-NSxLxYKx1964")
 # "sub-EBxGxYZx1949"
 # -----------------------------------------------------------------------------
 
