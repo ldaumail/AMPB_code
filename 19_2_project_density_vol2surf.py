@@ -205,17 +205,18 @@ def project_density_vol2surf(participants_file, tract_list, bids_path, pyAFQ_pat
 participants_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'code', 'utils', 'study2_subjects_updated.txt')
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
 
-# tract_list= ['CallosumTemporal','CallosumPosteriorParietal', 'CallosumOccipital', 'LeftVerticalOccipital', 'LeftInferiorFrontooccipital', 'LeftInferiorLongitudinal', 'LeftSuperiorLongitudinal', 'LeftPosteriorArcuate',  'LeftArcuate']
-#tract_list= ['RightVerticalOccipital', 'RightInferiorFrontooccipital', 'RightInferiorLongitudinal', 'RightSuperiorLongitudinal', 'RightPosteriorArcuate',  'RightArcuate']
-tract_list=['LPTR', 'RPTR', 'LSTR', 'RSTR', 'LeftInferiorLongitudinal', 'RightInferiorLongitudinal', 
-    'LeftInferiorFrontooccipital', 'RightInferiorFrontooccipital', 
-    'LeftSuperiorLongitudinalI', 'RightSuperiorLongitudinalI',
-    'LeftSuperiorLongitudinalII', 'RightSuperiorLongitudinalII',
-    'LeftSuperiorLongitudinalIII', 'RightSuperiorLongitudinalIII',
-    'LeftAnteriorVerticalOccipital', 'RightAnteriorVerticalOccipital', 
-    'LeftPosteriorVerticalOccipital', 'RightPosteriorVerticalOccipital',
-    'LeftArcuate', 'RightArcuate',
-    'LeftPosteriorArcuate', 'RightPosteriorArcuate'] #'CallosumOccipital'
+
+# tract_list=['LPTR', 'RPTR', 'LSTR', 'RSTR', 'LeftInferiorLongitudinal', 'RightInferiorLongitudinal', 
+#     'LeftInferiorFrontooccipital', 'RightInferiorFrontooccipital', 
+#     'LeftSuperiorLongitudinalI', 'RightSuperiorLongitudinalI',
+#     'LeftSuperiorLongitudinalII', 'RightSuperiorLongitudinalII',
+#     'LeftSuperiorLongitudinalIII', 'RightSuperiorLongitudinalIII',
+#     'LeftAnteriorVerticalOccipital', 'RightAnteriorVerticalOccipital', 
+#     'LeftPosteriorVerticalOccipital', 'RightPosteriorVerticalOccipital',
+#     'LeftArcuate', 'RightArcuate',
+#     'LeftPosteriorArcuate', 'RightPosteriorArcuate'] #'CallosumOccipital'
+
+tract_list=['LeftEarlyVisual', 'RightEarlyVisual', 'LeftOpticRadiation', 'RightOpticRadiation', 'LeftTemporoparietal', 'RightTemporoparietal']
 
 pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb', 'afq33-wb_6rounds')
 

@@ -25,7 +25,9 @@ fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 # ✅ Fixed tract order (keep consistent across subjects!)
 #tract_order = ['CallosumOccipital', 'VerticalOccipital', 'InferiorFrontooccipital', 'InferiorLongitudinal'] 
 
-tract_order = ['PTR', 'STR', 'InferiorLongitudinal', 
+tract_order = [
+    'PTR', 
+    'InferiorLongitudinal', 
     'InferiorFrontooccipital', 
     'SuperiorLongitudinalI',
     'SuperiorLongitudinalII',
@@ -33,7 +35,11 @@ tract_order = ['PTR', 'STR', 'InferiorLongitudinal',
     'AnteriorVerticalOccipital', 
     'PosteriorVerticalOccipital',
     'Arcuate',
-    'PosteriorArcuate'] 
+    'PosteriorArcuate',
+    'EarlyVisual',
+    'OpticRadiation',
+    'Temporoparietal'
+    ] 
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
 
@@ -350,7 +356,7 @@ for h, hemi in enumerate(hemis):
                 print(f" Tract {tract_idx+1}/{n_tracts}")
 
             X = np.squeeze(norm_density_data[hemi][s][tract_idx,]).reshape(-1, 1)
-            y = np.squeeze(C_mean[s, :])
+            y = np.squeeze(C_mean[s, :]) #.reshape(-1, 1)
 
 
             # Train linear model (multi-output regression)
@@ -962,123 +968,9 @@ for h, hemi in enumerate(hemis):
         plt.close(display.figure)
 
 
-# #--------------------------------------------------------------
-# # Delta MSE
-# #----------------------------
-
-# import numpy as np
-# import pandas as pd
-# import seaborn as sns
-# import matplotlib.pyplot as plt
-# from scipy.stats import sem
-
-# # --------------------------------------
-# # Convert trained_coefs into long format
-# # trained_coefs shape = (6 runs, n_tracts, n_subj, 2 hemis)
-# # Requires subject_group: list of "EB" or "NS"
-# # --------------------------------------
-
-# n_tracts, n_subj, n_hemi = trained_coefs.shape
-# hemi_labels = ["L", "R"]
-
-# rows = []
-# for h in range(n_hemi):
-#     for t in range(n_tracts):
-#         for s, participant in enumerate(participants):
-#             gp = "EB" if "EB" in participant else "NS"
-            
-#             rows.append({
-#                 "Tract": tract_order[t],
-#                 "Participant": participant,
-#                 "Hemisphere": hemi_labels[h],
-#                 "Group": gp,    # EB or NS
-#                 "dMSE": delta_mse[t, s, h]
-#             }) # "Subject": s,
-
-# df = pd.DataFrame(rows)
-
-
-# # ------------------------------------------------
-# # Compute SEM per tract × hemisphere × group (EB/NS)
-# # ------------------------------------------------
-# std_df = (
-#     df.groupby(["Group", "Tract", "Hemisphere"])["dMSE"]
-#       .agg(["mean", "sem"])
-#       .reset_index()
-#       .rename(columns={"mean": "Mean", "sem": "SEM"})
-# )
-
-# # ------------------------------------------
-# # Create 2 subplots — one for each hemisphere
-# # ------------------------------------------
-# fig, axes = plt.subplots(1, 2, figsize=(18, 6), sharey=True)
-# group_labels = ["EB", "NS"]
-# group_offset = {"EB": -0.2, "NS": 0.2}   # shift inside each tract
-
-# for ax, hemi in zip(axes, hemi_labels):
-
-#     # Filter for hemisphere
-#     df_h = df[df["Hemisphere"] == hemi]
-#     std_h = std_df[std_df["Hemisphere"] == hemi]
-
-#     # Jitter dots per group (EB vs NS)
-#     sns.stripplot(
-#         data=df_h,
-#         x="Tract",
-#         y="dMSE",
-#         hue="Group",
-#         dodge=True,
-#         jitter=0.15,
-#         alpha=0.7,
-#         ax=ax
-#     )
-
-#     # ---------------------------------------
-#     # Plot Mean ± SEM for EB and NS separately
-#     # ---------------------------------------
-#     for _, row in std_h.iterrows():
-
-#         tract = row["Tract"]
-#         mean  = row["Mean"]
-#         se    = row["SEM"]
-#         group = row["Group"]
-
-#         # shift within tract index to match stripplot's dodge layout
-#         x_loc = tract_order.index(tract)  + group_offset[group]
-
-#         # Mean point
-#         ax.plot(x_loc, mean, "o", color="black", markersize=7)
-
-#         # SEM bar
-#         ax.errorbar(
-#             x=x_loc,
-#             y=mean,
-#             yerr=se,
-#             color="black",
-#             capsize=3,
-#             linewidth=2
-#         )
-
-#     # ------------------ Ax formatting ------------------
-#     ax.set_title(f"{hemi}-Hemisphere delta-MSE (Mean ± SEM within EB / NS)",fontsize=16)
-#     ax.set_xlabel("Tract",fontsize=14)
-#     ax.tick_params(axis="x", rotation=90)
-#     ax.set_xticks(np.arange(len(tract_order)))
-#     ax.set_xticklabels(tract_order, rotation=30, ha="right",fontsize=12)
-#     ax.axhline(0, color='gray', linestyle='--', linewidth=1)
-# axes[0].set_ylabel("delta-MSE", fontsize=14)
-# axes[1].legend(title="Group", labels=group_labels)
-# sns.despine()
-# plt.tight_layout()
-# saveDir = op.join(bids_path, 'analysis', 'plots')
-# os.makedirs(saveDir, exist_ok=True)
-# plt.savefig(op.join(saveDir, "wb_participants_dMSE_linearreg_combined_tracts_nested.png"),
-#             dpi=300, bbox_inches='tight')
-# plt.show()
-
 
 #----------------------------
-### Plot beta values of full model
+### Plot beta values of each model
 #----------------------------
 import numpy as np
 import pandas as pd
@@ -1124,6 +1016,7 @@ tract_labels = [
      .replace("SuperiorLongitudinalI", "SLFI")
      .replace("SuperiorLongitudinalII", "SLFII")
      .replace("SuperiorLongitudinalI", "SLFIII")
+     .replace("OpticRadiation", "OR")
     for t in tract_order
 ]
 # ------------------------------------------------
@@ -1350,6 +1243,7 @@ tract_labels = [
      .replace("SuperiorLongitudinalI", "SLFI")
      .replace("SuperiorLongitudinalII", "SLFII")
      .replace("SuperiorLongitudinalI", "SLFIII")
+     .replace("OpticRadiation", "OR")
     for t in tract_order
 ]
 
