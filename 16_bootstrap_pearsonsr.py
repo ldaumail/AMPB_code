@@ -1,4 +1,4 @@
-#Here, same approach as 15_3_participant_linear_reg_combined_tracts_nested.py
+#Here, same approach as 15_2_participant_linear_reg_combined_tracts_nested.py
 #In addition, we add a permutation analysis of pearson's r 
 
 import os

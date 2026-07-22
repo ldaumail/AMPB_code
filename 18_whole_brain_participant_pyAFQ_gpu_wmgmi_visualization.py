@@ -77,38 +77,50 @@ tracts = {
     # "CallosumOccipital": (1, 0.5, 0),
     # "LeftInferiorFrontooccipital": (0.8, 0.2, 1),
     # "LeftInferiorLongitudinal": (0.7, 0.7, 0.7),
-    # "LeftSuperiorLongitudinal": (0.2, 1, 1),
-    # "LeftVerticalOccipital": (0.2, 0, 1),
+    # "LeftSuperiorLongitudinalI": (0.2, 1, 1),
+    # "LeftSuperiorLongitudinalII": (0.2, 1, 1),
+    # "LeftSuperiorLongitudinalIII": (0.2, 1, 1),
+    # "LeftAnteriorVerticalOccipital": (0.2, 0, 1),
+    "LeftPosteriorVerticalOccipital": (0.2, 0, 1),
+    # "LeftEarlyVisual": (0.8, 0.2, 1),
+    # "LeftOpticRadiation": (1, 0.2, 0.2),
+    # "LeftTemporoparietal": (0.8, 0.2, 1),
+
     # "RightInferiorFrontooccipital": (0.7, 0.6, 1),
     # "RightInferiorLongitudinal": (0.9, 0.6, 0.9),
-    # "RightSuperiorLongitudinal": (0.2, 0.3, 1),
-    # "RightVerticalOccipital": (0.3, 0.3, 1),
-    "LPTR": (1, 1, 0.3),
-    "RPTR": (1, 1, 0.3),
+    # "RightSuperiorLongitudinalI": (0.2, 0.3, 1),
+    # "RightSuperiorLongitudinalII": (0.2, 0.3, 1),
+    # "RightSuperiorLongitudinalIII": (0.2, 0.3, 1),
+    # "RightAnteriorVerticalOccipital": (0.3, 0.3, 1),
+    "RightPosteriorVerticalOccipital": (0.3, 0.3, 1),
+    # "RightEarlyVisual": (0.8, 0.2, 1),
+    # "RightOpticRadiation": (1, 0.2, 0.2),
+    # "RightTemporoparietal": (0.8, 0.2, 1),
+
+    # "LPTR": (1, 1, 0.3),
+    # "RPTR": (1, 1, 0.3),
     # "LSTR": (0.3, 0.3, 1),
     # "RSTR": (0.3, 0.3, 1),
-    "LeftMTxLGNxPU": (0.8, 0.8, 1),
-    "RightMTxLGNxPU": (0.8, 0.8, 1),
+    # "LeftMTxLGNxPU": (0.8, 0.8, 1),
+    # "RightMTxLGNxPU": (0.8, 0.8, 1),
     # "LeftMTxFEF": (0.7, 0.7, 0.7),
     # "RightMTxFEF": (0.7, 0.7, 0.7),
     # "LeftMTxPTxSTS1": (0.2, 1, 1),
     # "RightMTxPTxSTS1": (0.2, 1, 1)
+
 }
 # -------------------------------------------------------------------------
 # 5. Load and transform tracts
 # -------------------------------------------------------------------------
 tract_actors = []
 for tract_name, color in tracts.items():
-    # hemi = "Left" if tract_name.startswith("Left") else "Right"
-    # mask_name = tract_name.replace("MT", "MTmask")
-    # mask_name = mask_name.replace("afq-", "")
-    if "TR" in tract_name:
-        tract_file = op.join(afq_TR_path, participant, "bundles",
+    # if "TR" in tract_name:
+    tract_file = op.join(afq_TR_path, participant, "bundles",
                             f"{participant}_ses-concat_acq-HCPdir99_desc-{tract_name}_tractography.trx")
-    else:
-        tract = tract_name.replace("MTx", "MTmaskx")
-        tract_file = op.join(afq_julich_path, f"afq-{tract_name}", participant, "bundles",
-                            f"{participant}_ses-concat_acq-HCPdir99_desc-{tract}_tractography.trx")
+    # else:
+    #     tract = tract_name.replace("MTx", "MTmaskx")
+    #     tract_file = op.join(afq_julich_path, f"afq-{tract_name}", participant, "bundles",
+    #                         f"{participant}_ses-concat_acq-HCPdir99_desc-{tract}_tractography.trx")
     if not op.exists(tract_file):
         print(f"⚠️ Missing: {tract_file}")
         continue
@@ -135,7 +147,7 @@ def roi_actor(roi_path, color):
 # -------------------------------------------------------------------------
 roi_defs = {
      "MT":    ("analysis/ROIs/wang_space-ACPC_rois", "MT_mask_dilated", (1, 0, 0)),
-     "LGNxPU":    ("analysis/ROIs/julich_space-ACPC_rois", "LGNxPU_mask", (0.2, 0.6, 1)),
+     #"LGNxPU":    ("analysis/ROIs/julich_space-ACPC_rois", "LGNxPU_mask", (0.2, 0.6, 1)),
     #  "PTxSTS1":   ("analysis/ROIs/julich_space-ACPC_rois", "PTxSTS1_mask", (0.2, 0.6, 1)),
     #  "FEF":   ("analysis/ROIs/julich_space-ACPC_rois", "FEF_mask", (0.2, 0.6, 1)),
     "thalamus":  ("analysis/ROIs/AICHA_space-ACPC_rois", "thalamus_mask", (0, 0.8, 0.2)),

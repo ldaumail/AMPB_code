@@ -23,10 +23,30 @@ fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
-tract_order = ['CallosumOccipital', 'VerticalOccipital', 'InferiorFrontooccipital', 'InferiorLongitudinal'] 
-# tract_order = ['CallosumOccipital', 'CallosumTemporal','CallosumPosteriorParietal',
-#                'VerticalOccipital', 'InferiorFrontooccipital', 'InferiorLongitudinal', 
-#                'SuperiorLongitudinal', 'PosteriorArcuate',  'Arcuate'] 
+tract_order = [ 
+    'InferiorLongitudinal', 
+    'InferiorFrontooccipital', 
+    'SuperiorLongitudinalII',
+    'SuperiorLongitudinalIII',
+    'AnteriorVerticalOccipital', 
+    'PosteriorVerticalOccipital',
+    'Arcuate',
+    'PosteriorArcuate',
+    'EarlyVisual'] 
+# tract_order = ['PTR', 
+#     'InferiorLongitudinal', 
+#     'InferiorFrontooccipital', 
+#     'SuperiorLongitudinalI',
+#     'SuperiorLongitudinalII',
+#     'SuperiorLongitudinalIII',
+#     'AnteriorVerticalOccipital', 
+#     'PosteriorVerticalOccipital',
+#     'Arcuate',
+#     'PosteriorArcuate',
+#     'EarlyVisual',
+#     'OpticRadiation',
+#     'Temporoparietal'] 
+
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
 
@@ -44,7 +64,8 @@ for participant in participants:
         # for tract in ['MTmaskxLGN', 'MTmaskxPT', 'MTmaskxSTS1', 'MTmaskxPU', 'MTmaskxFEF', 'MTmaskxhIP', 'MTmaskxV1']:
         print(f"   🧩 Hemisphere: {hemi}")
         hemi_fs = "lh" if hemi == "L" else "rh"
-        subj_dir = op.join(density_dir, participant, 'pyAFQ_default_atlas')
+        hemi_pyAFQ = "Left" if hemi == "L" else "Right"
+        subj_dir = op.join(density_dir, participant, 'pyAFQ33_wb_red')
         subj_densities = []
 
         # Loop through *tracts in fixed order*
