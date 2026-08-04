@@ -202,7 +202,7 @@ def project_density_vol2surf(participants_file, tract_list, bids_path, pyAFQ_pat
                     print("Running:", " ".join(cmd))
                     subprocess.run(cmd, check=True, env={**os.environ, "SUBJECTS_DIR": fs_path})
 
-participants_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'code', 'utils', 'subjects.txt')
+participants_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'code', 'utils', 'study2_subjects_updated.txt')
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
 
 
@@ -229,6 +229,6 @@ tract_list=['LeftEarlyVisual', 'RightEarlyVisual', 'LeftOpticRadiation', 'RightO
 
 pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb', 'afq33-wb_6rounds')
 
-projdist = '0'
+projdist = '3'
 
 project_density_vol2surf(participants_file, tract_list, bids_path, pyAFQ_path, projdist)

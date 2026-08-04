@@ -66,7 +66,7 @@ for participant in participants:
         # Loop through *tracts in fixed order*
         for tract in tract_order:
             # Find file matching this tract and hemisphere
-            matches = [f for f in os.listdir(subj_dir) if f"{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith("fsprojdensity0mm2.mgh")]
+            matches = [f for f in os.listdir(subj_dir) if f"{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith("fsprojdensity3mm2.mgh")]
 
             if not matches:
                 print(f"   ⚠️ Missing: {tract} ({hemi}) for {participant}")
@@ -972,19 +972,17 @@ for h, hemi in enumerate(hemis):
 #----------------------------
 ### Plot beta values of each model
 #----------------------------
-import numpy as np
+#==============================================================
+## Beta bar plot
+#==============================================================
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy.stats import sem
-
-# --------------------------------------
-# Convert trained_coefs into long format
-# trained_coefs shape = (6 runs, n_tracts, n_subj, 2 hemis)
-# Requires subject_group: list of "EB" or "NS"
-# --------------------------------------
-
-n_subj, n_tracts, n_hemi = trained_coefs.shape
+import matplotlib.patches as mpatches
+import numpy as np
+import os
+import os.path as op
+n_subj, n_tracts,n_hemi = trained_coefs.shape
 hemi_labels = ["L", "R"]
 
 rows = []
@@ -1019,6 +1017,7 @@ tract_labels = [
      .replace("OpticRadiation", "OR")
     for t in tract_order
 ]
+
 # ------------------------------------------------
 # Compute SEM per tract × hemisphere × group (EB/NS)
 # ------------------------------------------------
@@ -1028,100 +1027,6 @@ std_df = (
       .reset_index()
       .rename(columns={"mean": "Mean", "sem": "SEM"})
 )
-
-# ------------------------------------------
-# Create 2 subplots — one for each hemisphere
-# ------------------------------------------
-fig, axes = plt.subplots(2, 1, figsize=(18, 18), sharey=True)
-group_labels = ["EB", "NS"]
-group_offset = {"EB": -0.2, "NS": 0.2}   # shift inside each tract
-fig.suptitle(
-    r"$\beta$ coefficients by tract (Mean $\pm$ SEM)",
-    fontsize=24,
-    fontweight="bold",
-    y=0.98
-)
-for i, (ax, hemi) in enumerate(zip(axes, hemi_labels)):
-
-    # Filter for hemisphere
-    df_h = df[df["Hemisphere"] == hemi]
-    std_h = std_df[std_df["Hemisphere"] == hemi]
-
-    # Jitter dots per group (EB vs NS)
-    sns.stripplot(
-        data=df_h,
-        x="Tract",
-        y="Beta",
-        hue="Group",
-        dodge=True,
-        jitter=0.15,
-        alpha=0.7,
-        ax=ax
-    ) #legend=(i == 1)
-
-    # ---------------------------------------
-    # Plot Mean ± SEM for EB and NS separately
-    # ---------------------------------------
-    for _, row in std_h.iterrows():
-
-        tract = row["Tract"]
-        mean  = row["Mean"]
-        se    = row["SEM"]
-        group = row["Group"]
-
-        # shift within tract index to match stripplot's dodge layout
-        x_loc = tract_order.index(tract)  + group_offset[group]
-
-        # Mean point
-        ax.plot(x_loc, mean, "o", color="black", markersize=7)
-
-        # SEM bar
-        ax.errorbar(
-            x=x_loc,
-            y=mean,
-            yerr=se,
-            color="black",
-            capsize=3,
-            linewidth=2
-        )
-
-    # ------------------ Ax formatting ------------------
-    # ax.set_title(f"{hemi}-Hemisphere β-coefficients (Mean ± SEM within EB / NS)",fontsize=20)
-    ax.set_xlabel("Tract",fontsize=20,fontweight='bold')
-    ax.set_ylabel("Beta",fontsize=20,fontweight='bold')
-    ax.tick_params(axis="x", rotation=90, width=2)
-    ax.set_xticks(np.arange(len(tract_order)))
-    ax.set_xticklabels(tract_labels, rotation=30, ha="right",fontsize=18,fontweight='bold')
-    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
-    ax.spines['left'].set_linewidth(2) #axis thickness
-    ax.spines['bottom'].set_linewidth(2) #axis thickness
-    plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
-    # if i == 1:
-    leg = ax.legend(title="Group", fontsize=14, frameon=True,loc='upper right')
-    # This specifically bolds the labels and the title
-    plt.setp(leg.get_texts(), fontweight='bold')
-    plt.setp(leg.get_title(), fontweight='bold')
-# axes[0].set_ylabel("Beta", fontsize=14)
-# plt.legend(title="Group", labels=group_labels)
-
-sns.despine()
-plt.tight_layout(rect=[0, 0, 1, 0.96])
-saveDir = op.join(bids_path, 'analysis', 'plots')
-os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "wb_participants_betas_linearreg_separate_tracts.png"),
-            dpi=300, bbox_inches='tight')
-plt.show()
-
-#==============================================================
-## Beta bar plot
-#==============================================================
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import numpy as np
-import os
-import os.path as op
 
 # 1. Global styling for bold fonts
 plt.rcParams.update({'font.weight': 'bold', 'axes.labelweight': 'bold'})
@@ -1191,7 +1096,7 @@ plt.tight_layout()
 
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "wb_beta_barplot_linreg_participants_separate_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "wb_beta_barplot_linreg_participants_separate_tracts_3mm.png"), dpi=300, bbox_inches='tight')
 plt.show()
 
 

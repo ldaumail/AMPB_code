@@ -1,4 +1,6 @@
 
+#linear regression with all tracts that overlap with hMT+ together
+
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
@@ -27,6 +29,7 @@ fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 tract_order = ['CallosumOccipital', 'CallosumTemporal','CallosumPosteriorParietal',
                'VerticalOccipital', 'InferiorFrontooccipital', 'InferiorLongitudinal', 
                'SuperiorLongitudinal', 'PosteriorArcuate',  'Arcuate'] 
+
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
 

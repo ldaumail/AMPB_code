@@ -23,33 +23,36 @@ fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
-tract_order = [ 
-    'InferiorLongitudinal', 
-    'InferiorFrontooccipital', 
-    'SuperiorLongitudinalII',
-    'SuperiorLongitudinalIII',
-    'AnteriorVerticalOccipital', 
-    'PosteriorVerticalOccipital',
-    'Arcuate',
-    'PosteriorArcuate',
-    'EarlyVisual'] 
-# tract_order = ['PTR', 
+# tract_order = [ 
 #     'InferiorLongitudinal', 
 #     'InferiorFrontooccipital', 
-#     'SuperiorLongitudinalI',
 #     'SuperiorLongitudinalII',
 #     'SuperiorLongitudinalIII',
 #     'AnteriorVerticalOccipital', 
 #     'PosteriorVerticalOccipital',
 #     'Arcuate',
 #     'PosteriorArcuate',
-#     'EarlyVisual',
-#     'OpticRadiation',
-#     'Temporoparietal'] 
+#     'EarlyVisual'] 
+tract_order = ['PTR', 
+    'InferiorLongitudinal', 
+    'InferiorFrontooccipital', 
+    'SuperiorLongitudinalI',
+    'SuperiorLongitudinalII',
+    'SuperiorLongitudinalIII',
+    'AnteriorVerticalOccipital', 
+    'PosteriorVerticalOccipital',
+    'Arcuate',
+    'PosteriorArcuate',
+    'EarlyVisual',
+    'OpticRadiation',
+    'Temporoparietal'] 
 
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
 
+# hemis = ["L"]
+# tract_order = ['PTR']
+# participants = ['sub-EBxLxHHx1949']
 # Initialize storage dictionary
 density_data = {hemi: [] for hemi in hemis}
 
@@ -64,7 +67,6 @@ for participant in participants:
         # for tract in ['MTmaskxLGN', 'MTmaskxPT', 'MTmaskxSTS1', 'MTmaskxPU', 'MTmaskxFEF', 'MTmaskxhIP', 'MTmaskxV1']:
         print(f"   🧩 Hemisphere: {hemi}")
         hemi_fs = "lh" if hemi == "L" else "rh"
-        hemi_pyAFQ = "Left" if hemi == "L" else "Right"
         subj_dir = op.join(density_dir, participant, 'pyAFQ33_wb_red')
         subj_densities = []
 
@@ -72,7 +74,7 @@ for participant in participants:
         for tract in tract_order:
             
             # Find file matching this tract and hemisphere
-            matches = [f for f in os.listdir(subj_dir) if f"{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith("fsprojdensity0mm2.mgh")]
+            matches = [f for f in os.listdir(subj_dir) if f"{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith("fsprojdensity3mm2.mgh")]
 
             if not matches:
                 print(f"   ⚠️ Missing: {tract} ({hemi}) for {participant}")
@@ -607,7 +609,7 @@ from nilearn import plotting
 from nibabel.freesurfer import read_label
 import matplotlib.pyplot as plt
 from pathlib import Path
-
+tract_order =['SuperiorLongitudinalI']
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 empty_check = {}
 for h, hemi in enumerate(hemis):
@@ -636,6 +638,8 @@ for h, hemi in enumerate(hemis):
     surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
     wang_hmt_vertices = np.where(surf_roi > 0)[0]
 
+    os.makedirs(op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ33_wb_participants_linearreg", "surface_pngs_3mm"), exist_ok=True)
+
     for s, participant in enumerate(participants):
         # s =1
         # participant= 'sub-EBxGxEYx1965'
@@ -653,7 +657,8 @@ for h, hemi in enumerate(hemis):
         # ----------------------------
         # Density Map visualization
         # ----------------------------
-        img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "wb_participants_linearreg", "surface_pngs", participant)
+       
+        img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ33_wb_participants_linearreg", "surface_pngs_3mm", participant)
         os.makedirs(img_out_dir, exist_ok=True)
 
         vmin, vmax = -5.0, 5.0
@@ -1014,7 +1019,19 @@ for h in range(n_hemi):
 
 df = pd.DataFrame(rows)
 
-
+tract_labels = [
+    t.replace("InferiorLongitudinal", "ILF")
+     .replace("InferiorFrontooccipital", "IFOF")
+     .replace("AnteriorVerticalOccipital", "aVOF")
+     .replace("PosteriorVerticalOccipital", "pVOF")
+     .replace("PosteriorArcuate", "pArc")
+     .replace("Arcuate", "AF")
+     .replace("SuperiorLongitudinalI", "SLFI")
+     .replace("SuperiorLongitudinalII", "SLFII")
+     .replace("SuperiorLongitudinalI", "SLFIII")
+     .replace("OpticRadiation", "OR")
+    for t in tract_order
+]
 # ------------------------------------------------
 # Compute SEM per tract × hemisphere × group (EB/NS)
 # ------------------------------------------------
@@ -1024,6 +1041,8 @@ std_df = (
       .reset_index()
       .rename(columns={"mean": "Mean", "sem": "SEM"})
 )
+
+
 
 # ------------------------------------------
 # Create 2 subplots — one for each hemisphere
@@ -1089,7 +1108,7 @@ sns.despine()
 plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "wb_participants_dMSE_linearreg_combined_tracts_nested.png"),
+plt.savefig(op.join(saveDir, "wb_participants_dMSE_linearreg_combined_tracts_nested_3mm.png"),
             dpi=300, bbox_inches='tight')
 plt.show()
 
@@ -1097,18 +1116,17 @@ plt.show()
 #----------------------------
 ### Plot beta values of full model
 #----------------------------
-import numpy as np
+#==============================================================
+## Beta bar plot
+#==============================================================
+
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy.stats import sem
-
-# --------------------------------------
-# Convert trained_coefs into long format
-# trained_coefs shape = (6 runs, n_tracts, n_subj, 2 hemis)
-# Requires subject_group: list of "EB" or "NS"
-# --------------------------------------
-
+import matplotlib.patches as mpatches
+import numpy as np
+import os
+import os.path as op
 n_tracts, n_subj, n_hemi = trained_coefs.shape
 hemi_labels = ["L", "R"]
 
@@ -1142,99 +1160,10 @@ std_df = (
       .rename(columns={"mean": "Mean", "sem": "SEM"})
 )
 
-# ------------------------------------------
-# Create 2 subplots — one for each hemisphere
-# ------------------------------------------
-fig, axes = plt.subplots(1, 2, figsize=(18, 6), sharey=True)
-group_labels = ["EB", "NS"]
-group_offset = {"EB": -0.2, "NS": 0.2}   # shift inside each tract
-
-for i, (ax, hemi) in enumerate(zip(axes, hemi_labels)):
-
-    # Filter for hemisphere
-    df_h = df[df["Hemisphere"] == hemi]
-    std_h = std_df[std_df["Hemisphere"] == hemi]
-
-    # Jitter dots per group (EB vs NS)
-    sns.stripplot(
-        data=df_h,
-        x="Tract",
-        y="Beta",
-        hue="Group",
-        dodge=True,
-        jitter=0.15,
-        alpha=0.7,
-        ax=ax
-    ) #legend=(i == 1)
-
-    # ---------------------------------------
-    # Plot Mean ± SEM for EB and NS separately
-    # ---------------------------------------
-    for _, row in std_h.iterrows():
-
-        tract = row["Tract"]
-        mean  = row["Mean"]
-        se    = row["SEM"]
-        group = row["Group"]
-
-        # shift within tract index to match stripplot's dodge layout
-        x_loc = tract_order.index(tract)  + group_offset[group]
-
-        # Mean point
-        ax.plot(x_loc, mean, "o", color="black", markersize=7)
-
-        # SEM bar
-        ax.errorbar(
-            x=x_loc,
-            y=mean,
-            yerr=se,
-            color="black",
-            capsize=3,
-            linewidth=2
-        )
-
-    # ------------------ Ax formatting ------------------
-    ax.set_title(f"{hemi}-Hemisphere β-coefficients (Mean ± SEM within EB / NS)",fontsize=20)
-    ax.set_xlabel("Tract",fontsize=20,fontweight='bold')
-    ax.set_ylabel("Beta",fontsize=20,fontweight='bold')
-    ax.tick_params(axis="x", rotation=90, width=2)
-    ax.set_xticks(np.arange(len(tract_order)))
-    ax.set_xticklabels(tract_order, rotation=30, ha="right",fontsize=18,fontweight='bold')
-    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
-    ax.spines['left'].set_linewidth(2) #axis thickness
-    ax.spines['bottom'].set_linewidth(2) #axis thickness
-    plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
-    # if i == 1:
-    leg = ax.legend(title="Group", fontsize=14, frameon=True,loc='upper right')
-    # This specifically bolds the labels and the title
-    plt.setp(leg.get_texts(), fontweight='bold')
-    plt.setp(leg.get_title(), fontweight='bold')
-# axes[0].set_ylabel("Beta", fontsize=14)
-# plt.legend(title="Group", labels=group_labels)
-
-sns.despine()
-plt.tight_layout()
-saveDir = op.join(bids_path, 'analysis', 'plots')
-os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "wb_participants_betas_linearreg_combined_tracts.png"),
-            dpi=300, bbox_inches='tight')
-plt.show()
-
-#==============================================================
-## Beta bar plot
-#==============================================================
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import numpy as np
-import os
-import os.path as op
-
 # 1. Global styling for bold fonts
 plt.rcParams.update({'font.weight': 'bold', 'axes.labelweight': 'bold'})
 palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
-fig, axes = plt.subplots(1, 2, figsize=(18, 8), sharey=True)
+fig, axes = plt.subplots(2, 1, figsize=(18, 18), sharey=True)
 
 for ax, hemi in zip(axes, hemi_labels):
     df_h = df[df["Hemisphere"] == hemi]
@@ -1275,12 +1204,12 @@ for ax, hemi in zip(axes, hemi_labels):
         plt.setp(leg.get_title(), fontweight='bold')
 
     # Formatting and Bold Ticks
-    ax.set_ylim(-0.2, 0.4)
+    ax.set_ylim(-0.15, 0.3)
     ax.set_title(f"{hemi}-Hemisphere", fontsize=22, fontweight='bold', pad=20)
     
     # Ensure x-ticks are correctly placed for the tract labels
     ax.set_xticks(range(len(tract_order)))
-    ax.set_xticklabels(tract_order, rotation=35, ha="right", fontsize=16, fontweight='bold')
+    ax.set_xticklabels(tract_labels, rotation=35, ha="right", fontsize=16, fontweight='bold')
     
     ax.axhline(0, color='gray', linestyle='--', linewidth=1.5)
     ax.spines['left'].set_linewidth(2.5)
@@ -1291,17 +1220,16 @@ for ax, hemi in zip(axes, hemi_labels):
     for label in ax.get_xticklabels() + ax.get_yticklabels():
         label.set_fontweight('bold')
 
-axes[0].set_ylabel("Beta", fontsize=18, fontweight='bold')
-axes[0].set_xlabel("Tract", fontsize=18, fontweight='bold')
+    ax.set_ylabel("Beta", fontsize=18, fontweight='bold')
+    ax.set_xlabel("Tract", fontsize=18, fontweight='bold')
 axes[1].set_xlabel("Tract", fontsize=18, fontweight='bold')
 sns.despine()
 plt.tight_layout()
 
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "wb_beta_barplot_linreg_participants_combined_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "wb_beta_barplot_linreg_participants_combined_tracts_3mm.png"), dpi=300, bbox_inches='tight')
 plt.show()
-
 
 #--------------------------------------------------------------
 #Pearson's r
