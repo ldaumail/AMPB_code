@@ -18,7 +18,7 @@ from dipy.tracking.streamline import transform_streamlines
 # ------------------------------------------------------------
 # 1. Define paths
 # ------------------------------------------------------------
-participant = 'sub-NSxLxYKx1964' #'sub-EBxGxZAx1990'#'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990' #'sub-EBxLxTZx1956'
+participant = 'sub-NSxGxBAx1970' #'sub-EBxGxZAx1990'#'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990' #'sub-EBxLxTZx1956'
 
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research',
                     'ampb_mt_tractometry_analysis', 'ampb')
@@ -76,7 +76,7 @@ tracts = {
 
     # "CallosumOccipital": (1, 0.5, 0),
     # "LeftInferiorFrontooccipital": (0.8, 0.2, 1),
-    # "LeftInferiorLongitudinal": (0.7, 0.7, 0.7),
+    "LeftInferiorLongitudinal": (0.7, 0.7, 0.7),
     # "LeftSuperiorLongitudinalI": (0.2, 1, 1),
     # "LeftSuperiorLongitudinalII": (0.2, 1, 1),
     # "LeftSuperiorLongitudinalIII": (0.2, 1, 1),
@@ -87,7 +87,7 @@ tracts = {
     # "LeftTemporoparietal": (0.8, 0.2, 1),
 
     # "RightInferiorFrontooccipital": (0.7, 0.6, 1),
-    # "RightInferiorLongitudinal": (0.9, 0.6, 0.9),
+    "RightInferiorLongitudinal": (0.9, 0.6, 0.9),
     # "RightSuperiorLongitudinalI": (0.2, 0.3, 1),
     # "RightSuperiorLongitudinalII": (0.2, 0.3, 1),
     # "RightSuperiorLongitudinalIII": (0.2, 0.3, 1),
@@ -103,7 +103,7 @@ tracts = {
     # "RSTR": (0.3, 0.3, 1),
     # "LeftMTxLGNxPU": (0.8, 0.8, 1),
     # "RightMTxLGNxPU": (0.8, 0.8, 1),
-    "LeftMTxFEF": (0.8, 0.8, 1),
+    # "LeftMTxFEF": (0.8, 0.8, 1),
     # "RightMTxFEF": (0.7, 0.7, 0.7),
     # "LeftMTxPTxSTS1": (0.2, 1, 1),
     # "RightMTxPTxSTS1": (0.2, 1, 1)
@@ -115,12 +115,12 @@ tracts = {
 tract_actors = []
 for tract_name, color in tracts.items():
     # if "TR" in tract_name:
-    # tract_file = op.join(afq_TR_path, participant, "bundles",
-    #                         f"{participant}_ses-concat_acq-HCPdir99_desc-{tract_name}_tractography.trx")
+    tract_file = op.join(afq_TR_path, participant, "bundles",
+                            f"{participant}_ses-concat_acq-HCPdir99_desc-{tract_name}_tractography.trx")
     # # else:
-    tract = tract_name.replace("MTx", "MTmaskx")
-    tract_file = op.join(afq_julich_path, f"afq-{tract_name}", participant, "bundles",
-                        f"{participant}_ses-concat_acq-HCPdir99_desc-{tract}_tractography.trx")
+    # tract = tract_name.replace("MTx", "MTmaskx")
+    # tract_file = op.join(afq_julich_path, f"afq-{tract_name}", participant, "bundles",
+    #                     f"{participant}_ses-concat_acq-HCPdir99_desc-{tract}_tractography.trx")
     if not op.exists(tract_file):
         print(f"⚠️ Missing: {tract_file}")
         continue

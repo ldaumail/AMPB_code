@@ -43,7 +43,7 @@ tract_order = [
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 # participants = ['sub-EBxLxQPx1957','sub-EBxLxTZx1956']
 hemis = ["L", "R"]
-
+projdist = '10'
 # Initialize storage dictionary
 density_data = {hemi: [] for hemi in hemis}
 density_mask = {hemi: [] for hemi in hemis}
@@ -66,7 +66,7 @@ for participant in participants:
         # Loop through *tracts in fixed order*
         for tract in tract_order:
             # Find file matching this tract and hemisphere
-            matches = [f for f in os.listdir(subj_dir) if f"{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith("fsprojdensity3mm2.mgh")]
+            matches = [f for f in os.listdir(subj_dir) if f"{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith(f"fsprojdensity{projdist}mm2.mgh")]
 
             if not matches:
                 print(f"   ⚠️ Missing: {tract} ({hemi}) for {participant}")
@@ -1096,7 +1096,7 @@ plt.tight_layout()
 
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "wb_beta_barplot_linreg_participants_separate_tracts_3mm.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, f"wb_beta_barplot_linreg_participants_separate_tracts_{projdist}mm.png"), dpi=300, bbox_inches='tight')
 plt.show()
 
 

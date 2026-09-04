@@ -1,4 +1,6 @@
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ33_wb_participants_linearreg/betas_contrast-motionXstationary_independent_tracts.csv'
+#Perform stats on linear regression models fit separately on each tract.
+
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ33_wb_participants_linearreg/betas_contrast-motionXstationary_separate_tracts_0mm.csv'
 file = file.path(path)
 data = read.csv(file)
 

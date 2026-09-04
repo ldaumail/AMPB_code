@@ -23,16 +23,17 @@ fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
-# tract_order = [ 
+# tract_order = [ 'PTR',
 #     'InferiorLongitudinal', 
 #     'InferiorFrontooccipital', 
-#     'SuperiorLongitudinalII',
 #     'SuperiorLongitudinalIII',
 #     'AnteriorVerticalOccipital', 
 #     'PosteriorVerticalOccipital',
 #     'Arcuate',
 #     'PosteriorArcuate',
-#     'EarlyVisual'] 
+#     'EarlyVisual',
+#     'Temporoparietal'
+#     ] 
 tract_order = ['PTR', 
     'InferiorLongitudinal', 
     'InferiorFrontooccipital', 
@@ -49,7 +50,7 @@ tract_order = ['PTR',
 
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
-
+projdist = '0'
 # hemis = ["L"]
 # tract_order = ['PTR']
 # participants = ['sub-EBxLxHHx1949']
@@ -74,7 +75,7 @@ for participant in participants:
         for tract in tract_order:
             
             # Find file matching this tract and hemisphere
-            matches = [f for f in os.listdir(subj_dir) if f"{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith("fsprojdensity3mm2.mgh")]
+            matches = [f for f in os.listdir(subj_dir) if f"{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith(f"fsprojdensity{projdist}mm2.mgh")]
 
             if not matches:
                 print(f"   ⚠️ Missing: {tract} ({hemi}) for {participant}")
@@ -609,7 +610,6 @@ from nilearn import plotting
 from nibabel.freesurfer import read_label
 import matplotlib.pyplot as plt
 from pathlib import Path
-tract_order =['SuperiorLongitudinalI']
 fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 empty_check = {}
 for h, hemi in enumerate(hemis):
@@ -751,13 +751,25 @@ for h, hemi in enumerate(hemis):
     surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
     wang_hmt_vertices = np.where(surf_roi > 0)[0]
 
-    vmin, vmax = -5.0, 5.0
+    vmin, vmax = 0, 3.0
 
     # ----------------------------
     # Loop over groups
     # ----------------------------
     for group in groups:
+        #-----------------------------
+        # Load avg func MT ROI
+        #-----------------------------
+        label_file = op.join(
+            bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi',
+            'group_averages',
+            f"group-{group}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
+        )
 
+        func_mt_vertices = read_label(label_file)
+
+        func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
+        func_mt_roi[func_mt_vertices] = 1
         # find participant indices for this group
         group_idx = [i for i, p in enumerate(participants) if group in p]
 
@@ -793,8 +805,8 @@ for h, hemi in enumerate(hemis):
             img_out_dir = op.join(
                 bids_path,
                 "analysis",
-                "diff2func_model_fits",
-                "group_surface_pngs"
+                "diff2func_model_fits", "pyAFQ33_wb_participants_linearreg",
+                f"group_surface_pngs_{projdist}mm"
             )
             os.makedirs(img_out_dir, exist_ok=True)
 
@@ -820,7 +832,16 @@ for h, hemi in enumerate(hemis):
                 bg_on_data=True,
                 darkness=0.6,
             )
-
+            # ---- MT boundary overlay ----
+            plotting.plot_surf_contours(
+                surf_mesh=infl_surf,
+                roi_map=func_mt_roi,
+                levels=[1],
+                colors=["lightgray"],
+                linewidths=2.0,
+                figure=display.figure,
+                axes=display.axes[0]
+            )
             display.savefig(out_png, dpi=300)
             plt.close(display.figure)
 
@@ -1108,7 +1129,7 @@ sns.despine()
 plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "wb_participants_dMSE_linearreg_combined_tracts_nested_3mm.png"),
+plt.savefig(op.join(saveDir, f"wb_participants_dMSE_linearreg_combined_tracts_nested_{projdist}mm.png"),
             dpi=300, bbox_inches='tight')
 plt.show()
 
@@ -1149,7 +1170,19 @@ for h in range(n_hemi):
 
 df = pd.DataFrame(rows)
 
-
+tract_labels = [
+    t.replace("InferiorLongitudinal", "ILF")
+     .replace("InferiorFrontooccipital", "IFOF")
+     .replace("AnteriorVerticalOccipital", "aVOF")
+     .replace("PosteriorVerticalOccipital", "pVOF")
+     .replace("PosteriorArcuate", "pArc")
+     .replace("Arcuate", "AF")
+     .replace("SuperiorLongitudinalI", "SLFI")
+     .replace("SuperiorLongitudinalII", "SLFII")
+     .replace("SuperiorLongitudinalI", "SLFIII")
+     .replace("OpticRadiation", "OR")
+    for t in tract_order
+]
 # ------------------------------------------------
 # Compute SEM per tract × hemisphere × group (EB/NS)
 # ------------------------------------------------
@@ -1228,7 +1261,7 @@ plt.tight_layout()
 
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "wb_beta_barplot_linreg_participants_combined_tracts_3mm.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, f"wb_beta_barplot_linreg_participants_combined_10tracts_{projdist}mm.png"), dpi=300, bbox_inches='tight')
 plt.show()
 
 #--------------------------------------------------------------
@@ -1237,175 +1270,175 @@ plt.show()
 # SCATTER + JITTER PLOT BY GROUP × HEMI × TRACT
 # =====================================
 
-import numpy as np
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from scipy.stats import sem
+# import numpy as np
+# import pandas as pd
+# import seaborn as sns
+# import matplotlib.pyplot as plt
+# from scipy.stats import sem
 
-#First compute noise ceiling 95% CI
-hemi_labels = ["L", "R"]
-nc_rows = []
+# #First compute noise ceiling 95% CI
+# hemi_labels = ["L", "R"]
+# nc_rows = []
 
-for h in range(2):     # left/right hemispheres
-    for s, participant in enumerate(participants):
-        gp = "EB" if "EB" in participant else "NS"
+# for h in range(2):     # left/right hemispheres
+#     for s, participant in enumerate(participants):
+#         gp = "EB" if "EB" in participant else "NS"
 
-        nc_rows.append({
-            "Subject": s,
-            "Hemisphere": hemi_labels[h],
-            "Group": gp,
-            "Correlation": reliability[s,h] #r_all[s, h] #
-        })
+#         nc_rows.append({
+#             "Subject": s,
+#             "Hemisphere": hemi_labels[h],
+#             "Group": gp,
+#             "Correlation": reliability[s,h] #r_all[s, h] #
+#         })
 
-nc_df = pd.DataFrame(nc_rows)
-nc_sem_df = (
-    nc_df.groupby(["Group", "Hemisphere"])["Correlation"]
-      .agg(["mean", sem])
-      .reset_index()
-      .rename(columns={"mean": "Mean", "sem": "SEM"})
-)
-nc_sem_df["CI95_upper"] = nc_sem_df["Mean"] + 1.96 * nc_sem_df["SEM"]
-nc_sem_df["CI95_lower"] = nc_sem_df["Mean"] - 1.96 * nc_sem_df["SEM"]
+# nc_df = pd.DataFrame(nc_rows)
+# nc_sem_df = (
+#     nc_df.groupby(["Group", "Hemisphere"])["Correlation"]
+#       .agg(["mean", sem])
+#       .reset_index()
+#       .rename(columns={"mean": "Mean", "sem": "SEM"})
+# )
+# nc_sem_df["CI95_upper"] = nc_sem_df["Mean"] + 1.96 * nc_sem_df["SEM"]
+# nc_sem_df["CI95_lower"] = nc_sem_df["Mean"] - 1.96 * nc_sem_df["SEM"]
 
-# --------------------------------------
-# Organize Pearson's r in table
-# --------------------------------------
+# # --------------------------------------
+# # Organize Pearson's r in table
+# # --------------------------------------
 
-hemi_labels = ["L", "R"]
-rows = []
+# hemi_labels = ["L", "R"]
+# rows = []
 
-for h in range(2):     # left/right hemispheres
-    for s, participant in enumerate(participants):
-        gp = "EB" if "EB" in participant else "NS"
-        # pearson = rs[:, s, h]
+# for h in range(2):     # left/right hemispheres
+#     for s, participant in enumerate(participants):
+#         gp = "EB" if "EB" in participant else "NS"
+#         # pearson = rs[:, s, h]
 
-        rows.append({
-            "Subject": s,
-            "Hemisphere": hemi_labels[h],
-            "Group": gp,
-            "Correlation": rs[s,h] #r_all[s, h] #
-        })
+#         rows.append({
+#             "Subject": s,
+#             "Hemisphere": hemi_labels[h],
+#             "Group": gp,
+#             "Correlation": rs[s,h] #r_all[s, h] #
+#         })
 
-df = pd.DataFrame(rows)
+# df = pd.DataFrame(rows)
 
-# ------------------------------------------------
-# Compute SEM per Group × Hemisphere
-# ------------------------------------------------
-sem_df = (
-    df.groupby(["Group", "Hemisphere"])["Correlation"]
-      .agg(["mean", sem])
-      .reset_index()
-      .rename(columns={"mean": "Mean", "sem": "SEM"})
-)
+# # ------------------------------------------------
+# # Compute SEM per Group × Hemisphere
+# # ------------------------------------------------
+# sem_df = (
+#     df.groupby(["Group", "Hemisphere"])["Correlation"]
+#       .agg(["mean", sem])
+#       .reset_index()
+#       .rename(columns={"mean": "Mean", "sem": "SEM"})
+# )
 
-# ------------------------------------------------
-# Color palette: EB = blue, NS = orange
-# ------------------------------------------------
-palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
+# # ------------------------------------------------
+# # Color palette: EB = blue, NS = orange
+# # ------------------------------------------------
+# palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
 
-# ------------------------------------------------
-# Create 2 subplots — one per hemisphere
-# ------------------------------------------------
-fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
-text_plotted = False  # Flag to ensure we only plot the label once
-for ax, hemi in zip(axes, hemi_labels):
-    # ---- Noise ceiling 95% CI upper bound ----
-    nc_h = nc_sem_df[nc_sem_df["Hemisphere"] == hemi]
+# # ------------------------------------------------
+# # Create 2 subplots — one per hemisphere
+# # ------------------------------------------------
+# fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+# text_plotted = False  # Flag to ensure we only plot the label once
+# for ax, hemi in zip(axes, hemi_labels):
+#     # ---- Noise ceiling 95% CI upper bound ----
+#     nc_h = nc_sem_df[nc_sem_df["Hemisphere"] == hemi]
 
-    df_h = df[df["Hemisphere"] == hemi]
-    sem_h = sem_df[sem_df["Hemisphere"] == hemi]
+#     df_h = df[df["Hemisphere"] == hemi]
+#     sem_h = sem_df[sem_df["Hemisphere"] == hemi]
 
-    # Jittered dots
-    sns.stripplot(
-        data=df_h,
-        x="Group",
-        y="Correlation",
-        hue="Group",
-        dodge=False,
-        jitter=0.15,
-        alpha=0.7,
-        palette=palette,
-        ax=ax
-    )
+#     # Jittered dots
+#     sns.stripplot(
+#         data=df_h,
+#         x="Group",
+#         y="Correlation",
+#         hue="Group",
+#         dodge=False,
+#         jitter=0.15,
+#         alpha=0.7,
+#         palette=palette,
+#         ax=ax
+#     )
 
-    # ---- Mean ± SEM (model performance) ----
-    for _, row in sem_h.iterrows():
-        group = row["Group"]
-        mean = row["Mean"]
-        se = row["SEM"]
+#     # ---- Mean ± SEM (model performance) ----
+#     for _, row in sem_h.iterrows():
+#         group = row["Group"]
+#         mean = row["Mean"]
+#         se = row["SEM"]
 
-        x_loc = 0 if group == "EB" else 1
+#         x_loc = 0 if group == "EB" else 1
 
-        ax.errorbar(
-            x=x_loc,
-            y=mean,
-            yerr=se,
-            fmt="o",
-            color="black",
-            markersize=8,
-            capsize=3,
-            linewidth=2
-        )
-    # ---- Noise ceiling 95% CI upper/lower bound/mean ----
-    for _, row in nc_h.iterrows():
-        group = row["Group"]
-        up_ci = row["CI95_upper"]
-        low_ci = row["CI95_lower"]
-        mean = row["Mean"]
+#         ax.errorbar(
+#             x=x_loc,
+#             y=mean,
+#             yerr=se,
+#             fmt="o",
+#             color="black",
+#             markersize=8,
+#             capsize=3,
+#             linewidth=2
+#         )
+#     # ---- Noise ceiling 95% CI upper/lower bound/mean ----
+#     for _, row in nc_h.iterrows():
+#         group = row["Group"]
+#         up_ci = row["CI95_upper"]
+#         low_ci = row["CI95_lower"]
+#         mean = row["Mean"]
 
-        x_center = 0 if group == "EB" else 1
+#         x_center = 0 if group == "EB" else 1
 
-        ax.hlines(
-            y=[low_ci, up_ci, mean],
-            xmin=x_center - 0.25,
-            xmax=x_center + 0.25,
-            colors="gray",
-            linestyles=["--","--", ":"],
-            linewidth=3,
-            alpha=0.9
-        )
-        ax.fill_between(
-        [x_center - 0.25, x_center + 0.25],
-        low_ci,
-        up_ci,
-        color="pink",
-        alpha=0.2,
-        linewidth=0
-        )
-        # ADD THIS BLOCK:
-        if not text_plotted:
-            ax.text(
-                x=x_center, 
-                y=mean + 0.02,          # Slightly above the mean line
-                s="Noise ceiling", 
-                ha='center',            # Center horizontally
-                va='bottom',            # Align bottom of text to the Y coordinate
-                fontsize=14, 
-                fontweight='bold', 
-                color='gray'
-            )
-            text_plotted = True         # Toggle flag so it doesn't repeat
+#         ax.hlines(
+#             y=[low_ci, up_ci, mean],
+#             xmin=x_center - 0.25,
+#             xmax=x_center + 0.25,
+#             colors="gray",
+#             linestyles=["--","--", ":"],
+#             linewidth=3,
+#             alpha=0.9
+#         )
+#         ax.fill_between(
+#         [x_center - 0.25, x_center + 0.25],
+#         low_ci,
+#         up_ci,
+#         color="pink",
+#         alpha=0.2,
+#         linewidth=0
+#         )
+#         # ADD THIS BLOCK:
+#         if not text_plotted:
+#             ax.text(
+#                 x=x_center, 
+#                 y=mean + 0.02,          # Slightly above the mean line
+#                 s="Noise ceiling", 
+#                 ha='center',            # Center horizontally
+#                 va='bottom',            # Align bottom of text to the Y coordinate
+#                 fontsize=14, 
+#                 fontweight='bold', 
+#                 color='gray'
+#             )
+#             text_plotted = True         # Toggle flag so it doesn't repeat
 
-    # Formatting
-    ax.set_ylim(-0.2, 1)
-    ax.set_title(f"{hemi}-Hemisphere", fontsize=20)
-    ax.set_xlabel("Group", fontsize=18, fontweight = 'bold')
-    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
-    ax.set_xticklabels(["EB", "NS"], fontsize=18, fontweight = 'bold')
-    # ax.set_yticklabels(ax.get_yticklabels(), fontsize=18, fontweight = 'bold')
-    plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
+#     # Formatting
+#     ax.set_ylim(-0.2, 1)
+#     ax.set_title(f"{hemi}-Hemisphere", fontsize=20)
+#     ax.set_xlabel("Group", fontsize=18, fontweight = 'bold')
+#     ax.axhline(0, color='gray', linestyle='--', linewidth=1)
+#     ax.set_xticklabels(["EB", "NS"], fontsize=18, fontweight = 'bold')
+#     # ax.set_yticklabels(ax.get_yticklabels(), fontsize=18, fontweight = 'bold')
+#     plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
 
-axes[0].set_ylabel("Pearson's r", fontsize=18, fontweight = 'bold')
-# axes[1].get_legend().remove()   # remove duplicated legend
-sns.despine()
-plt.tight_layout()
+# axes[0].set_ylabel("Pearson's r", fontsize=18, fontweight = 'bold')
+# # axes[1].get_legend().remove()   # remove duplicated legend
+# sns.despine()
+# plt.tight_layout()
 
-#Saving
-saveDir = op.join(bids_path, "analysis", "plots")
-os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "wb_pearson_linreg_participants_combined_tracts.png"), dpi=300, bbox_inches='tight')
-plt.show()
+# #Saving
+# saveDir = op.join(bids_path, "analysis", "plots")
+# os.makedirs(saveDir, exist_ok=True)
+# plt.savefig(op.join(saveDir, "wb_pearson_linreg_participants_combined_tracts.png"), dpi=300, bbox_inches='tight')
+# plt.show()
 
 
 
@@ -1501,5 +1534,5 @@ sns.despine()
 plt.tight_layout()
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "wb_pearson_barplot_linreg_participants_combined_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, "wb_pearson_barplot_linreg_participants_combined_10tracts.png"), dpi=300, bbox_inches='tight')
 plt.show()

@@ -9,7 +9,7 @@ output_dir="pyAFQ/wmgmi_targ"
 mkdir ${output_dir}
 
 hemisphere_list=("Left" "Right") # "Right"  
-roi_list=("MTxLGNxPU") #"MTxPTxSTS1" "MTxFEF"
+roi_list=("MTxPTxSTS1") #"MTxPTxSTS1" "MTxFEF" "MTxLGNxPU"
 participant_list=("sub-EBxGxCCx1986" "sub-EBxGxEYx1965" "sub-EBxGxPEx1959" 
 "sub-EBxGxZAx1990" "sub-EBxLxHHx1949" "sub-EBxLxQPx1957" "sub-EBxLxTZx1956" 
 "sub-NSxGxBAx1970" "sub-NSxGxHKx1965" "sub-NSxGxHNx1952" "sub-NSxGxIFx1991" 

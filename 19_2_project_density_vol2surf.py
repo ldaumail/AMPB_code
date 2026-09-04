@@ -202,19 +202,7 @@ def project_density_vol2surf(participants_file, tract_list, bids_path, pyAFQ_pat
                     print("Running:", " ".join(cmd))
                     subprocess.run(cmd, check=True, env={**os.environ, "SUBJECTS_DIR": fs_path})
 
-participants_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'code', 'utils', 'study2_subjects_updated.txt')
-bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
 
-
-# tract_list=['LPTR', 'RPTR', 'LSTR', 'RSTR', 'LeftInferiorLongitudinal', 'RightInferiorLongitudinal', 
-#     'LeftInferiorFrontooccipital', 'RightInferiorFrontooccipital', 
-#     'LeftSuperiorLongitudinalI', 'RightSuperiorLongitudinalI',
-#     'LeftSuperiorLongitudinalII', 'RightSuperiorLongitudinalII',
-#     'LeftSuperiorLongitudinalIII', 'RightSuperiorLongitudinalIII',
-#     'LeftAnteriorVerticalOccipital', 'RightAnteriorVerticalOccipital', 
-#     'LeftPosteriorVerticalOccipital', 'RightPosteriorVerticalOccipital',
-#     'LeftArcuate', 'RightArcuate',
-#     'LeftPosteriorArcuate', 'RightPosteriorArcuate'] #'CallosumOccipital'
 
 tract_list=['LeftEarlyVisual', 'RightEarlyVisual', 'LeftOpticRadiation', 'RightOpticRadiation', 'LeftTemporoparietal', 'RightTemporoparietal',
             'LPTR', 'RPTR', 'LSTR', 'RSTR', 'LeftInferiorLongitudinal', 'RightInferiorLongitudinal', 
@@ -227,8 +215,14 @@ tract_list=['LeftEarlyVisual', 'RightEarlyVisual', 'LeftOpticRadiation', 'RightO
             'LeftArcuate', 'RightArcuate',
             'LeftPosteriorArcuate', 'RightPosteriorArcuate']
 
+# tract_list=['LeftInferiorLongitudinal', 'RightInferiorLongitudinal', 
+# ]
+
+participants_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'code', 'utils', 'study2_subjects_updated.txt') #'study2_subjects_updated.txt' 'subjects.txt'
+bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
+
 pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb', 'afq33-wb_6rounds')
 
-projdist = '3'
+projdist = '10'
 
 project_density_vol2surf(participants_file, tract_list, bids_path, pyAFQ_path, projdist)
