@@ -44,7 +44,7 @@ tract_order = [
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 # participants = ['sub-EBxLxQPx1957','sub-EBxLxTZx1956']
 hemis = ["L", "R"]
-projdist = '10' #Projection depth relative to wmgmi
+projdist = '0' #Projection depth relative to wmgmi
 # Initialize storage dictionary
 density_data = {hemi: [] for hemi in hemis}
 density_mask = {hemi: [] for hemi in hemis}
@@ -452,4 +452,5 @@ from plots_utils_20_1 import pearsonr_plot, mse_plot
 savefilename = f"wb_pearson_barplot_loso_separate_tracts_{projdist}mm.png"
 pearsonr_plot(rs, reliability, participants, tract_order, bids_path, savefilename)
 
+savefilename = f"wb_mse_barplot_loso_separate_tracts_{projdist}mm.png"
 mse_plot(mses, participants, tract_order, bids_path, savefilename)
