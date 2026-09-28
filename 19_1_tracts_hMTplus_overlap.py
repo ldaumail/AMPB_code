@@ -22,7 +22,7 @@ participants_file = op.join('/Users','ldaumail3', 'Documents', 'research', 'ampb
 with open(participants_file, "r") as f:
     participants = [line.strip().lstrip("/") for line in f if line.strip()]
 
-pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb', 'afq33-wb_6rounds')
+pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb', 'afq3beta-wb_6rounds')
 
 #filenames = glob.glob(os.path.join(pyAFQ_path, "afq33-wb_6rounds", "sub-EBxGxCCx1986", "bundles","*.trx"))#
 # tract_names = [
@@ -30,55 +30,51 @@ pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb', 'afq33-wb_6r
 #     for f in filenames
 # ]
 
-# tract_names = ['CallosumOrbital',
-#  'RightInferiorFrontooccipital',
-#  'RightArcuate',
-#  'RightSuperiorLongitudinal',
-#  'RightUncinate',
-#  'RightInferiorLongitudinal',
-#  'CallosumOccipital',
-#  'LeftPosteriorArcuate',
-#  'RightPosteriorArcuate',
-#  'CallosumSuperiorFrontal',
-#  'RightCingulumCingulate',
-#  'CallosumAnteriorFrontal',
-#  'CallosumPosteriorParietal',
-#  'LeftVerticalOccipital',
-#  'LeftUncinate',
-#  'CallosumSuperiorParietal',
-#  'LeftInferiorFrontooccipital',
-#  'LeftInferiorLongitudinal',
-#  'RightCorticospinal',
-#  'RightAnteriorThalamic',
-#  'RightVerticalOccipital',
-#  'LeftCingulumCingulate',
-#  'LeftArcuate',
-#  'LeftCorticospinal',
-#  'LeftAnteriorThalamic',
-#  'LeftSuperiorLongitudinal']
-
 tract_names = [
-    'LPTR', 
-    'LeftInferiorLongitudinal', 
-    'LeftInferiorFrontooccipital',  
-    'LeftSuperiorLongitudinalI', 
-    'LeftSuperiorLongitudinalII', 
-    'LeftSuperiorLongitudinalIII', 
-    'LeftAnteriorVerticalOccipital', 
-    'LeftPosteriorVerticalOccipital', 
-    'LeftArcuate', 
-    'LeftPosteriorArcuate',
+ 'RightInferiorFrontooccipital',
+ 'RightArcuate',
+ 'RightSuperiorLongitudinal',
+ 'RightUncinate',
+ 'RightInferiorLongitudinal',
+ 'RightCorticospinal',
+ 'RightAnteriorThalamic',
+ 'RightVerticalOccipital',
+ 'RightPosteriorArcuate',
+ 'RightCingulumCingulate',
 
-    'LSTR', 
-    'LeftAnteriorThalamic',
-    'LeftCingulumCingulate',
-    'LeftCorticospinal',
-    'LeftEarlyVisual',
-    'LeftOpticRadiation',
-    'LeftTemporoparietal',
-    'LeftUncinate',
+ 'LeftPosteriorArcuate',
+ 'LeftVerticalOccipital',
+ 'LeftUncinate',
+ 'LeftInferiorFrontooccipital',
+ 'LeftInferiorLongitudinal',
+ 'LeftCingulumCingulate',
+ 'LeftArcuate',
+ 'LeftCorticospinal',
+ 'LeftAnteriorThalamic',
+ 'LeftSuperiorLongitudinal']
 
-    ]
+# tract_names = [
+#     'LPTR', 
+#     'LeftInferiorLongitudinal', 
+#     'LeftInferiorFrontooccipital',  
+#     'LeftSuperiorLongitudinalI', 
+#     'LeftSuperiorLongitudinalII', 
+#     'LeftSuperiorLongitudinalIII', 
+#     'LeftAnteriorVerticalOccipital', 
+#     'LeftPosteriorVerticalOccipital', 
+#     'LeftArcuate', 
+#     'LeftPosteriorArcuate',
+
+#     'LSTR', 
+#     'LeftAnteriorThalamic',
+#     'LeftCingulumCingulate',
+#     'LeftCorticospinal',
+#     'LeftEarlyVisual',
+#     'LeftOpticRadiation',
+#     'LeftTemporoparietal',
+#     'LeftUncinate',
+
+#     ]
 
 # tract_names = [
 #     'RPTR', 
@@ -144,7 +140,7 @@ for p, participant in enumerate(participants):
         # participant = 'sub-EBxGxCCx1986'
         # tract_name = 'RightMTmaskxLGN'
         # pyAFQ_path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/pyAFQ/wmgmi/RightMTxLGN'
-        tdi_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant, 'pyAFQ33_wb_red')
+        tdi_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant, 'afq3beta-wb_6rounds')
         os.makedirs(tdi_path, exist_ok=True)
     
         tract_path = Path(os.path.join(pyAFQ_path, participant, 'bundles', participant+'_ses-concat_acq-HCPdir99_desc-' + tract + '_tractography.trx'))

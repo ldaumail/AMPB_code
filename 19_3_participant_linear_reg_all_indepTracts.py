@@ -290,7 +290,7 @@ n_tracts = len(tract_order)
 rs   = np.full((n_subj, n_tracts, len(hemis)), np.nan)
 rsquared = np.full((n_subj, n_tracts, len(hemis)), np.nan) #goodness of fit
 reliability = np.full((n_subj, n_tracts, len(hemis)), np.nan)
-rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan)
+rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan) #storage of run indices of EB runs used for this analysis
 trained_coefs = np.zeros((n_subj, n_tracts, len(hemis)))  # scalar summary per tract/run
 delta_mse = np.full((n_subj, n_tracts, len(hemis)), np.nan) #
 predicted_maps = {hemi: [] for hemi in hemis}
@@ -332,7 +332,7 @@ for h, hemi in enumerate(hemis):
                 n_runs_available, size=3, replace=False
             )
 
-        rnd_run_idx[s, :, h] = run_idx
+        rnd_run_idx[s, :, h] = run_idx #store runs indices of runs used for this analysis
 
         # ---- extract runs ----
         C_sel = C_full[run_idx, :]     # (3, n_vertices)

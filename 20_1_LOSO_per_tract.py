@@ -23,9 +23,6 @@ fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 #1 Generate endpoint densities array
 #-------------------------
 
-# ✅ Fixed tract order (keep consistent across subjects!)
-#tract_order = ['CallosumOccipital', 'VerticalOccipital', 'InferiorFrontooccipital', 'InferiorLongitudinal'] 
-
 tract_order = [
     'PTR', 
     'InferiorLongitudinal', 
@@ -44,7 +41,7 @@ tract_order = [
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 # participants = ['sub-EBxLxQPx1957','sub-EBxLxTZx1956']
 hemis = ["L", "R"]
-projdist = '0' #Projection depth relative to wmgmi
+projdist = '3' #Projection depth relative to wmgmi
 # Initialize storage dictionary
 density_data = {hemi: [] for hemi in hemis}
 density_mask = {hemi: [] for hemi in hemis}
@@ -159,6 +156,8 @@ for participant in participants:
 #contrast_data[hemi][0][contrast][0].shape #dim 1 = hemisphere initial, dim 2 = participant number, dim 3 = contrast type, dim 4: run number of each contrast map
 
 #================== Prepare and Normalize X and Y data for model fit =============
+# Here each functional run is normalized independently based on mean and std of all vertices of hMT+
+# Then each density map is normalized independently as well based on mean and std of all vertices of hMT+
 hemis = ["L", "R"]
 contrast = contrast_order[0]   # e.g. "motionXstationary"
 n_subj = len(participants)
@@ -189,12 +188,11 @@ for h, hemi in enumerate(hemis):
     for s, participant in enumerate(participants):
         #Prepare subject's Y = functional maps
         # get this subject's run maps of the chosen contrast
-        subj_dict = subj_contrasts[s]
-        if contrast not in subj_dict:
+        if contrast not in subj_contrasts[s]:
             print(f"Subject {s} missing contrast {contrast} for hemi {hemi}, skipping")
             continue
         
-        C_full = subj_dict[contrast]              # (n_runs, n_vertices_fullspace)
+        C_full = subj_contrasts[s][contrast]              # (n_runs, n_vertices_fullspace)
  
         # mask ROI
         C = np.squeeze(C_full[:, wang_hmt_vertices] )         # (n_runs, n_masked)
@@ -291,14 +289,18 @@ contrast = contrast_order[0]   # e.g. "motionXstationary"
 # get n_subj, n_tracts
 n_subj = len(participants)
 n_tracts = len(tract_order)
+trained_coefs = np.zeros((n_subj, n_tracts, len(hemis)))  # scalar summary per tract/run
+trained_intercepts = np.zeros((n_subj, n_tracts, len(hemis))) 
+true_full = {hemi: [] for hemi in hemis}
+density_maps = {hemi: [] for hemi in hemis}
+predicted_maps = {hemi: [] for hemi in hemis}
+
 rs   = np.full((n_subj, n_tracts, len(hemis)), np.nan)
 mses = np.full((n_subj,  n_tracts, len(hemis)), np.nan) #
 rsquared = np.full(( n_subj, n_tracts, len(hemis)), np.nan) #goodness of fit
 reliability = np.full((n_subj, n_tracts, len(hemis)), np.nan)
-r_all = np.full((n_subj, len(hemis)), np.nan)
-rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan)
-trained_coefs = np.zeros((n_tracts, n_subj, n_tracts, len(hemis)))  # scalar summary per tract/run
-predicted_maps = {hemi: [] for hemi in hemis}
+rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan) #storage of run indices of EB runs used for this analysis
+
 for h, hemi in enumerate(hemis):
         #h = 0
         #hemi = "L"
@@ -337,7 +339,7 @@ for h, hemi in enumerate(hemis):
                 n_runs_available, size=3, replace=False
             )
 
-        rnd_run_idx[s, :, h] = run_idx
+        rnd_run_idx[s, :, h] = run_idx #storage of run indices of EB runs used for this analysis
 
         # ---- extract runs ----
         C_sel = C_full[run_idx, :]     # (3, n_vertices)
@@ -346,6 +348,7 @@ for h, hemi in enumerate(hemis):
     C_mean = all_C.mean(axis=1)
 
     for t in range(n_tracts):
+        # t = 0
         # -------------------------
         # main loop
         # -------------------------
@@ -363,33 +366,33 @@ for h, hemi in enumerate(hemis):
             y_train = np.hstack([C_mean[i,:] for i in train_idx])  # (n_train*n_masked,)
 
 
-            # Save X_train maps
+            # ## Save X_train maps
             # ref_img_for_save = nib.load(wang_hmt_path)
             # ref_affine = ref_img_for_save.affine
             # ref_header = ref_img_for_save.header
-            # map_dir = op.join(bids_path, 'analysis', 'example_maps', 'density_maps', participant)
+            # map_dir = op.join(bids_path, 'analysis', 'plots', 'sanity_check_maps', 'density_maps', participant)
             # os.makedirs(map_dir, exist_ok=True)
-            # dens_maps_all = np.vstack([zscored_densities for _r in train_idx]).reshape(n_tracts, len(train_idx), n_masked).transpose(2, 0, 1)
+            # # dens_maps_all = np.vstack([zscored_densities for _r in train_idx]).reshape(n_tracts, len(train_idx), n_masked).transpose(2, 0, 1)
             # idx = 0
             # for tr in range(len(train_idx)):
             #     for t, tract in enumerate(tract_order):
-            #         dens_map = dens_maps_all[:,t, tr] #dens_maps_all[idx, :]
+            #         dens_map = norm_density_data[hemi][tr][t] #dens_maps_all[:,t, tr] #dens_maps_all[idx, :]
             #         idx += 1 #
             #         dens_full = np.full((n_vertices), np.nan)
             #         dens_full[wang_hmt_vertices] = dens_map
             #         dens_map = dens_full.reshape((1, 1, n_vertices)).astype(np.float32)
             #         dens_out = op.join(map_dir, f"{participant}_hemi-{hemi}_label-{tract}_trrun-{tr+1}_desc-training_density.mgz")
             #         nib.save(nib.MGHImage(dens_map, ref_affine, ref_header), dens_out)
-            # Save y_train maps
+            # ## Save y_train maps
             # ref_img_for_save = nib.load(wang_hmt_path)
             # ref_affine = ref_img_for_save.affine
             # ref_header = ref_img_for_save.header
-            # map_dir = op.join(bids_path, 'analysis', 'example_maps', 'beta_maps', participant)
+            # map_dir = op.join(bids_path, 'analysis', 'plots', 'sanity_check_maps', 'beta_maps', participant)
             # os.makedirs(map_dir, exist_ok=True)
-            # beta_maps_all = np.squeeze(zscored_C[train_idx, :]).transpose(1,0)
+            # # beta_maps_all = np.squeeze(zscored_C[train_idx, :]).transpose(1,0)
             # idx = 0
             # for tr in range(len(train_idx)):
-            #     dens_map = beta_maps_all[:, tr] #dens_maps_all[idx, :]
+            #     dens_map = C_mean[tr,:]#beta_maps_all[:, tr] #dens_maps_all[idx, :]
             #     idx += 1 #
             #     dens_full = np.full((n_vertices), np.nan)
             #     dens_full[wang_hmt_vertices] = dens_map
@@ -402,8 +405,8 @@ for h, hemi in enumerate(hemis):
             linreg = LinearRegression()
             linreg.fit(X_train, y_train)
 
-            trained_coefs[:, test_idx, t, h] = linreg.coef_.copy() #[0:n_tracts-1]
-            # ridge.intercept_
+            trained_coefs[test_idx, t, h] = linreg.coef_[0].copy() 
+            trained_intercepts[test_idx, t, h] = linreg.intercept_
 
             X_test = norm_density_data[hemi][test_idx][t].reshape(-1, 1) 
             y_pred_std = linreg.predict(X_test)
@@ -421,25 +424,25 @@ for h, hemi in enumerate(hemis):
             mses[test_idx,t,h] = mse_participant
             print(f"Participant r:{r_participant:.4f}, MSE={mse_participant:.4e}, p={p_participant:.4e}")
 
+            # baseline_pred = np.full_like(y_participant_true, y_participant_true.mean())
+            # baseline_mse = mean_squared_error(y_participant_true, baseline_pred)
 
+            # print("Baseline MSE:", baseline_mse)
+            # print(
+            #     tract,
+            #     "MSE:", mses[test_idx, t, 0],
+            #     "improvement:", baseline_mse - mses[test_idx, t, 0]
+            # )
     #------------------
-    #Performance metrics
+    # Data
     #------------------
     #overall correlation across all participants (concatenated)
-    predicted_full = np.full((n_subj, n_vertices, n_tracts), np.nan)
-    predicted_full[:, wang_hmt_vertices, :] = predicted
+    # predicted_full = np.full((n_subj, n_vertices, n_tracts), np.nan)
+    # predicted_full[:, wang_hmt_vertices, :] = predicted
 
-    true_full = np.full((n_subj, n_vertices), np.nan)
-    true_full[:, wang_hmt_vertices] = C_mean
-
-    # Coefficients already organized: (n_subj, n_tracts)
-    coefs_arr = trained_coefs.copy()
-
-    # Mean coefficient per tract
-    mean_coefs = np.mean(coefs_arr, axis=0)
-
-    print("\nDone.")
-
+    print(f"\nDone for Hemi {hemi}.", )
+    true_full[hemi] = C_mean
+    density_maps[hemi] = norm_density_data[hemi]
     predicted_maps[hemi] = predicted
     print(f"\nFinished hemisphere {hemi}")
 
@@ -447,10 +450,34 @@ for h, hemi in enumerate(hemis):
 import sys
 current_dir = op.dirname(op.abspath(__file__))
 sys.path.append(current_dir)
-from plots_utils_20_1 import pearsonr_plot, mse_plot
+from plots_utils_20_1 import pearsonr_plot, mse_plot, beta_plot, intercept_plot, rsquared_plot, pred_func_plot, avg_pred_func_plot, avg_density_plot, avg_func_plot
 
+#Performance plots
 savefilename = f"wb_pearson_barplot_loso_separate_tracts_{projdist}mm.png"
 pearsonr_plot(rs, reliability, participants, tract_order, bids_path, savefilename)
 
 savefilename = f"wb_mse_barplot_loso_separate_tracts_{projdist}mm.png"
 mse_plot(mses, participants, tract_order, bids_path, savefilename)
+
+savefilename = f"wb_rsquared_barplot_loso_separate_tracts_{projdist}mm.png"
+rsquared_plot(rsquared, participants, tract_order, bids_path, savefilename)
+
+savefilename = f"wb_beta_barplot_loso_separate_tracts_{projdist}mm.png"
+beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename)
+
+savefilename = f"wb_intercepts_barplot_loso_separate_tracts_{projdist}mm.png"
+intercept_plot(trained_intercepts, participants, tract_order, bids_path, savefilename)
+
+
+#Data plots
+# img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "wb_participants_loso", "surface_pngs", participant)
+# pred_func_plot(predicted_maps, participants, tract_order, bids_path, img_out_dir)
+
+img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "wb_participants_loso",  "surface_pngs", "mean_predicted_func")
+avg_pred_func_plot(predicted_maps, participants, tract_order, bids_path, img_out_dir)
+
+# img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "wb_participants_loso",  "surface_pngs", "mean_density")
+# avg_density_plot(density_maps, participants, tract_order, bids_path, img_out_dir)
+
+img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "wb_participants_loso",  "surface_pngs", "mean_func")
+avg_func_plot(true_full, participants, bids_path, img_out_dir)

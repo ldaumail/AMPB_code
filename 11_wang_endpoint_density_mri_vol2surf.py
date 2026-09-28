@@ -12,11 +12,10 @@ project_dir = op.abspath(op.join(current_dir, '..'))  # main_script.py is inside
 sys.path.append(project_dir)
 from utils.overlap_masks import overlap_masks
 
-def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
+def main(participants_file, tract_name, bids_path, pyAFQ_path, density_path, density_folder, projfrac):
     '''
-        Ex usage: python 11_wang_endpoint_density_mri_vol2surf.py --participants_file ./utils/study2_subjects_updated.txt --tract_name MTxLGNxPU --bids_path /Use
-    rs/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --pyAFQ_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/deriva
-    tives/pyAFQ/wmgmi_wang --projdist 0
+        Ex usage: python 11_wang_endpoint_density_mri_vol2surf.py --participants_file ./utils/study2_subjects_updated.txt --tract_name MTxLGNxPU --bids_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb --pyAFQ_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/derivatives/pyAFQ/wmgmi_wang --density_path /Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/tdi_maps/dipy_wmgmi_tdi_maps --density_folder pve_pyAFQ33_targ --projfrac 0
+     
     '''
     for participant in participants_file:
         # participant = 'sub-EBxGxCCx1986' #sub-NSxGxBAx1970
@@ -25,8 +24,8 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
         analysis_path = op.join(bids_path, 'analysis')
         roi_path = op.join(analysis_path, 'ROIs','wang_space-ACPC_rois', participant)
         fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
-        out_path = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps', participant, 'wang_MT')
-        os.makedirs(out_path, exist_ok=True)
+        density_map_path = op.join(density_path, participant, density_folder)
+        os.makedirs(density_map_path, exist_ok=True)
 
         #Files 
 
@@ -49,7 +48,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
             verbose = True
         )
 
-        hemisphere = ["L", "R"]#"L" if "Left" in tract_name else "R" if "Right" in tract_name else None
+        hemisphere = ["L", "R"]# "L", "R" if "Left" in tract_name else "R" if "Right" in tract_name else None
         #new_tract_name = tract_name.replace("Left", "") if "Left" in tract_name else tract_name.replace("Right", "") if "Right" in tract_name else None
         # roi_names = [new_name] #, 'RightMTmaskxLGN'
         for h, hemi in enumerate(hemisphere):
@@ -74,8 +73,8 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
             ### --- STEP 3: load streamline density map
             # -----------------------------
              #roi_names[h] 
-            density_path = op.join(out_path, f"{participant}_ses-concat_desc-wang{side}{tract_name}_tdi_map2.nii.gz")
-            density_map_img = ants.image_read(density_path)
+            density_file_path = op.join(density_map_path, f"{participant}_ses-concat_desc-wang{side}{tract_name}_tdi_map2.nii.gz")
+            density_map_img = ants.image_read(density_file_path)
 
             # -----------------------------
             ### --- STEP 4: Resample overlapped mask and density into FS reference grid
@@ -126,7 +125,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
             # -----------------------------
             # STEP 6: Save as NIfTI (.nii.gz)
             # -----------------------------
-            mt_density_path = op.join(analysis_path, "tdi_maps", "wmgmi_voxels", participant,f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract_name}xWMGMI_density2.nii.gz")
+            mt_density_path = op.join(analysis_path, "tdi_maps", "voxel_files", f"wmgmi_voxels_{density_folder}", participant,f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract_name}xWMGMI_density.nii.gz")
             os.makedirs(op.dirname(mt_density_path), exist_ok=True)
             ants.image_write(out_img, mt_density_path)
 
@@ -159,7 +158,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
 
             ## STEP 7: Perform volume to surface projection of MTxWMGMI ROI density values
             # Output file name
-            out_fsnative_file = os.path.join(out_path, f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract_name}_desc-fsprojdensity{projdist}mm2.mgh")
+            out_fsnative_file = os.path.join(density_map_path, f"{participant}_hemi-{hemi}_space-fsnative_label-wang{tract_name}_desc-fsprojdensity{projfrac}frac.mgh")
 
             hemi_fs  = "lh" if hemi == "L" else "rh"
             # Build mri_vol2surf command
@@ -169,10 +168,10 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
                 "--regheader", participant,
                 "--hemi", hemi_fs,
                 "--surf", "white",
-                "--projdist", f"-{projdist}",
+                "--projfrac", f"-{projfrac}",
                 "--sd", fs_path,
                 "--out", out_fsnative_file
-            ] #"--projfrac", "-0.3",  "--regheader", participant
+            ] #"--projfrac", "-0.3",  "--regheader", participant "--projdist", f"-{projdist}",
 
             # Run the command
             print("Running:", " ".join(cmd))
@@ -180,7 +179,7 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, projdist):
 
             # Resample to fsaverage space
             source_density_file = out_fsnative_file
-            out_fsaverage_file = op.join(out_path, f"{participant}_hemi-{hemi_fs}_space-fsaverage_label-wang{tract_name}_desc-fsprojdensity{projdist}mm2.mgh")
+            out_fsaverage_file = op.join(density_map_path, f"{participant}_hemi-{hemi_fs}_space-fsaverage_label-wang{tract_name}_desc-fsprojdensity{projfrac}frac.mgh")
 
             cmd = ["mri_surf2surf",
             "--srcsubject", participant, 
@@ -221,7 +220,19 @@ if __name__ == "__main__":
         help="Path to pyAFQ output"
     )
     parser.add_argument(
-        "--projdist",
+        "--density_path",
+        type=str,
+        required=True,
+        help="Path to density maps folders"
+    )
+    parser.add_argument(
+        "--density_folder",
+        type=str,
+        required=True,
+        help="folder containing density maps"
+    )
+    parser.add_argument(
+        "--projfrac",
         type=str,
         required=True,
         help="density map distance from wmgmi to project on the wmgmi in mm"
@@ -232,7 +243,7 @@ if __name__ == "__main__":
     with open(args.participants_file, "r") as f:
         participants = [line.strip() for line in f if line.strip()]
 
-    main(participants, args.tract_name, args.bids_path, args.pyAFQ_path, args.projdist)
+    main(participants, args.tract_name, args.bids_path, args.pyAFQ_path,args.density_path,args.density_folder, args.projfrac)
 
 
 

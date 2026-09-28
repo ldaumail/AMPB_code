@@ -24,10 +24,10 @@ fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 #-------------------------
 
 # ✅ Fixed tract order (keep consistent across subjects!)
-tract_order = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] #'MTxLGNxPU', 'MTxPTxSTS1', 
+tract_order = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] #'MTxPTxSTS1', 'MTxFEF' 
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
-hemis = ["L", "R"]
-
+hemis = ["L", "R"]# "R"
+projfrac = '1'
 # Initialize storage dictionary
 density_data = {hemi: [] for hemi in hemis}
 
@@ -42,14 +42,14 @@ for participant in participants:
         # for tract in ['MTmaskxLGN', 'MTmaskxPT', 'MTmaskxSTS1', 'MTmaskxPU', 'MTmaskxFEF', 'MTmaskxhIP', 'MTmaskxV1']:
         print(f"   🧩 Hemisphere: {hemi}")
         hemi_fs = "lh" if hemi == "L" else "rh"
-        subj_dir = op.join(density_dir, participant, 'wang_MT')
+        subj_dir = op.join(density_dir, participant, 'wang_MT') #wang_MT
         subj_densities = []
 
         # Loop through *tracts in fixed order*
         for tract in tract_order:
             
             # Find file matching this tract and hemisphere
-            matches = [f for f in os.listdir(subj_dir) if f"wang{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith("fsprojdensity0mm2.mgh")]
+            matches = [f for f in os.listdir(subj_dir) if f"wang{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith(f"fsprojdensity{projfrac}frac.mgh")]
 
             if not matches:
                 print(f"   ⚠️ Missing: {tract} ({hemi}) for {participant}")
@@ -136,7 +136,7 @@ for participant in participants:
 #contrast_data[hemi][0][contrast][0].shape #dim 1 = hemisphere initial, dim 2 = participant number, dim 3 = contrast type, dim 4: run number of each contrast map
 
 #================== Prepare and Normalize X and Y data for model fit =============
-hemis = ["L", "R"]
+hemis = ["L", "R"] #"R"
 contrast = contrast_order[0]   # e.g. "motionXstationary"
 n_subj = len(participants)
 n_tracts = len(tract_order)
@@ -272,6 +272,7 @@ rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan)
 trained_coefs = np.zeros((n_tracts, n_subj, len(hemis)))  # scalar summary per tract/run
 delta_mse = np.full((n_tracts, n_subj, len(hemis)), np.nan) #
 predicted_maps = {hemi: [] for hemi in hemis}
+density_maps = {hemi: [] for hemi in hemis}
 for h, hemi in enumerate(hemis):
         #h = 0
         #hemi = "L"
@@ -293,7 +294,7 @@ for h, hemi in enumerate(hemis):
     # Predicted and coef storage preallocation
     predicted = np.full((n_subj, n_masked), np.nan)  # predicted maps per run
     _, _, n_vertices  = density_data[hemi].shape #get total number of vertices within fsaverage hemisphere
-    
+
     n_target_runs = 3
     all_C = []              # will store (n_subj, 3, n_vertices)
     rnd_run_idx = np.full((n_subj, n_target_runs, len(hemis)), np.nan)
@@ -368,474 +369,501 @@ for h, hemi in enumerate(hemis):
             mse_red = mean_squared_error(y, y_train_pred_red)
             delta_mse[t, s, h] = mse_red - mse_full
     predicted_maps[hemi] = predicted
-
-
-#--------------------------------------------------------------
-# FIGURES
-#--------------------------------------------------------------
-#--------------------------
-#Save Plot of predicted contrast map for each subject
-#--------------------------
-from nilearn import plotting
-from nibabel.freesurfer import read_label
-import matplotlib.pyplot as plt
-
-fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
-
-for h, hemi in enumerate(hemis):
-    hemi_fs = "lh" if hemi == "L" else "rh"
-    infl_surf = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.inflated")
-    # ----------------------------
-    # Load curvature map (sulci/gyri)
-    # ----------------------------
-    curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
-    curv = nib.freesurfer.read_morph_data(curv_file)
-
-    # normalize curvature for nicer background display
-    curv_norm = (curv - np.percentile(curv, 5)) / (
-        np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
-    )
-    curv_norm = np.clip(curv_norm, 0, 1)
-
-        # ----------------------------
-    # Load Wang MT ROI
-    # ----------------------------
-    wang_hmt_path = op.join(
-        '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
-        f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
-    )
-    surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
-    wang_hmt_vertices = np.where(surf_roi > 0)[0]
-
-    for s, participant in enumerate(participants):
-    # s =1
-    # participant= 'sub-EBxGxEYx1965'
-    # # ----------------------------
-    # Functional MT ROI (binary surface map)
-    # ----------------------------
-        label_file = op.join(bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi', participant,
-            f"{participant}_hemi-{hemi}_space-fsaverage_label-MT_mask.label")
-
-        func_mt_vertices = read_label(label_file)
-
-        func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
-        func_mt_roi[func_mt_vertices] = 1
-
-        # ----------------------------
-        # Predicted Map visualization
-        # ----------------------------
-        img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "participants_linearreg", "surface_pngs", participant)
-        os.makedirs(img_out_dir, exist_ok=True)
-
-        vmin, vmax = -1.0, 1.0
-
-        # Build full-surface vector 
-        surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
-        surf_map[wang_hmt_vertices] = predicted_maps[hemi][s, :]
-
-        # Output filename (no run index)
-        out_png = op.join(
-            img_out_dir,
-            f"{participant}_hemi-{hemi}_desc-pred-motionXstationary_inflated.png"
-        )
-
-        # -------------------------------------------------
-        # Plot only once
-        # -------------------------------------------------
-
-        display = plotting.plot_surf_stat_map(
-            surf_mesh=infl_surf,
-            stat_map=surf_map,
-            hemi="left" if hemi == "L" else "right",
-            view="lateral",
-            cmap="plasma",
-            colorbar=True,
-            vmin=vmin,
-            vmax=vmax,
-            threshold=None,
-            bg_map=curv_norm,
-            bg_on_data=True,
-            darkness=0.6,
-        )
-
-        # ---- MT boundary overlay ----
-        plotting.plot_surf_contours(
-            surf_mesh=infl_surf,
-            roi_map=func_mt_roi,
-            levels=[1],
-            colors=["lightgray"],
-            linewidths=2.0,
-            figure=display.figure,
-            axes=display.axes[0]
-        )
-
-        # ---- save + close ----
-        display.savefig(out_png, dpi=300)
-        plt.close(display.figure)
-
-#========================================
-#Save plot of average predicted contrast map for each group
-#========================================
-
-hemis = ["L", "R"]
-groups = ["EB", "NS"]
-for h, hemi in enumerate(hemis):
-    for g, group in enumerate(groups):
-        infl_surf = op.join(fs_path, "fsaverage", "surf", f"{'lh' if hemi == 'L' else 'rh'}.inflated")
-        _, _, n_vertices  = density_data[hemi].shape
-        #-----------------------------
-        # Load func MT ROI
-        #-----------------------------
-        label_file = op.join(
-            bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi',
-            'group_averages',
-            f"group-{group}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
-        )
-
-        func_mt_vertices = read_label(label_file)
-
-        func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
-        func_mt_roi[func_mt_vertices] = 1
-        # ----------------------------
-        # Load Wang MT ROI 
-        # ----------------------------
-        wang_hmt_path = op.join(
-            '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
-            f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
-        )
-        surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
-        wang_hmt_vertices = np.where(surf_roi > 0)[0]
-        print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
-        # ----------------------------
-        # Load curvature map (sulci/gyri)
-        # ----------------------------
-        hemi_fs = "lh" if hemi == "L" else "rh"
-        curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
-        curv = nib.freesurfer.read_morph_data(curv_file)
-
-        # normalize curvature for nicer background display
-        curv_norm = (curv - np.percentile(curv, 5)) / (
-            np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
-        )
-        curv_norm = np.clip(curv_norm, 0, 1)
-
-        # ----------------------------
-        # Functional Contrast Map visualization
-        # ----------------------------
-        img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "participants_linearreg",  "surface_pngs", "mean")
-        os.makedirs(img_out_dir, exist_ok=True)
-
-        vmin, vmax = -.5, 0.5
-        # -------------------------------------------------
-        # Compute average functional map across runs FIRST
-        # -------------------------------------------------
-        hemi_maps = predicted_maps[hemi]
-        mean_vals = np.nanmean(hemi_maps[[group in p for p in participants],:], axis = 0)
-        # mean_vals = np.nanmean(sub_mean_maps, axis=0)
-
-        # Build full-surface vector once
-        surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
-        surf_map[wang_hmt_vertices] = mean_vals
-
-        # Output filename (no run index)
-        out_png = op.join(
-            img_out_dir,
-            f"{group}-mean_hemi-{hemi}_desc-pred-motionXstationary_mean_inflated.png"
-        )
-
-        # -------------------------------------------------
-        # Plot average participant map
-        # -------------------------------------------------
-
-        display = plotting.plot_surf_stat_map(
-            surf_mesh=infl_surf,
-            stat_map=surf_map,
-            hemi="left" if hemi == "L" else "right",
-            view="lateral",
-            cmap="plasma",
-            colorbar=True,
-            vmin=vmin,
-            vmax=vmax,
-            threshold=None,
-            bg_map=curv_norm,
-            bg_on_data=True,
-            darkness=0.6,
-        )
-        # ---- MT boundary overlay ----
-        plotting.plot_surf_contours(
-            surf_mesh=infl_surf,
-            roi_map=func_mt_roi,
-            levels=[1],
-            colors=["lightgray"],
-            linewidths=2.0,
-            figure=display.figure,
-            axes=display.axes[0]
-        )
-
-        # ---- save + close ----
-        display.savefig(out_png, dpi=300)
-        plt.close(display.figure)
-
-#-------------------------------------
-## Plot density map
-#-------------------------------------
-from nilearn import plotting
-from nibabel.freesurfer import read_label
-import matplotlib.pyplot as plt
-
-fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
-
-for h, hemi in enumerate(hemis):
-    hemi_fs = "lh" if hemi == "L" else "rh"
-    infl_surf = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.inflated")
-    # ----------------------------
-    # Load curvature map (sulci/gyri)
-    # ----------------------------
-    curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
-    curv = nib.freesurfer.read_morph_data(curv_file)
-
-    # normalize curvature for nicer background display
-    curv_norm = (curv - np.percentile(curv, 5)) / (
-        np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
-    )
-    curv_norm = np.clip(curv_norm, 0, 1)
-
-        # ----------------------------
-    # Load Wang MT ROI
-    # ----------------------------
-    wang_hmt_path = op.join(
-        '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
-        f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
-    )
-    surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
-    wang_hmt_vertices = np.where(surf_roi > 0)[0]
-
-    # for s, participant in enumerate(participants):
-    s =1
-    participant= 'sub-EBxGxEYx1965'
-    # # ----------------------------
-    # Functional MT ROI (binary surface map)
-    # ----------------------------
-    label_file = op.join(bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi', participant,
-        f"{participant}_hemi-{hemi}_space-fsaverage_label-MT_mask.label")
-
-    func_mt_vertices = read_label(label_file)
-
-    func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
-    func_mt_roi[func_mt_vertices] = 1
-
-    # ----------------------------
-    # Density Map visualization
-    # ----------------------------
-    img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "participants_linearreg", "surface_pngs", participant)
-    os.makedirs(img_out_dir, exist_ok=True)
-
-    vmin, vmax = -5.0, 5.0
-
-    for t, tract in enumerate(tract_order):
-        # Build full-surface vector 
-        surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
-        surf_map[wang_hmt_vertices] = norm_density_data[hemi][s][t]#predicted_maps[hemi][s, :]
-
-        # Output filename (no run index)
-        out_png = op.join(
-            img_out_dir,
-            f"{participant}_hemi-{hemi}_desc-{tract}_inflated.png"
-        )
-
-        # -------------------------------------------------
-        # Plot only once
-        # -------------------------------------------------
-
-        display = plotting.plot_surf_stat_map(
-            surf_mesh=infl_surf,
-            stat_map=surf_map,
-            hemi="left" if hemi == "L" else "right",
-            view="lateral",
-            cmap="plasma",
-            colorbar=True,
-            vmin=vmin,
-            vmax=vmax,
-            threshold=None,
-            bg_map=curv_norm,
-            bg_on_data=True,
-            darkness=0.6,
-        )
-
-        # ---- MT boundary overlay ----
-        # plotting.plot_surf_contours(
-        #     surf_mesh=infl_surf,
-        #     roi_map=func_mt_roi,
-        #     levels=[1],
-        #     colors=["lightgray"],
-        #     linewidths=2.0,
-        #     figure=display.figure,
-        #     axes=display.axes[0]
-        # )
-
-        # ---- save + close ----
-        display.savefig(out_png, dpi=300)
-        plt.close(display.figure)
-
-
-#-----------------------------------------------
-# Plot average true functional map
-#-----------------------------------------------
-from nilearn import plotting
-from nibabel.freesurfer import read_label
-import matplotlib.pyplot as plt
-
-fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
-groups = ["EB", "NS"]
-hemis = ["L", "R"]
-for h, hemi in enumerate(hemis):
-    hemi_fs = "lh" if hemi == "L" else "rh"
-    infl_surf = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.inflated")
-    # ----------------------------
-    # Load curvature map (sulci/gyri)
-    # ----------------------------
-    curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
-    curv = nib.freesurfer.read_morph_data(curv_file)
-
-    # normalize curvature for nicer background display
-    curv_norm = (curv - np.percentile(curv, 5)) / (
-        np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
-    )
-    curv_norm = np.clip(curv_norm, 0, 1)
-
-        # ----------------------------
-    # Load Wang MT ROI
-    # ----------------------------
-    wang_hmt_path = op.join(
-        '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
-        f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
-    )
-    surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
-    wang_hmt_vertices = np.where(surf_roi > 0)[0]
-
-    #---------------------
-    #Prepare func maps
-    #---------------------
-    n_target_runs = 3
-    all_C = []              # will store (n_subj, 3, n_vertices)
-    rnd_run_idx = np.full((n_subj, n_target_runs, len(hemis)), np.nan)
-    for s, participant in enumerate(participants):
-
-        C_full = norm_contrast_data[hemi][s][contrast]   # (n_runs_available, n_vertices)
-        n_runs_available = C_full.shape[0]
-
-        # ---- choose runs ----
-        if "NS" in participant:
-            run_idx = np.arange(3)
-        elif "EB" in participant:
-            run_idx = np.random.choice(
-                n_runs_available, size=3, replace=False
-            )
-
-        rnd_run_idx[s, :, h] = run_idx
-
-        # ---- extract runs ----
-        C_sel = C_full[run_idx, :]     # (3, n_vertices)
-        all_C.append(C_sel)
-    all_C = np.stack(all_C, axis=0)
-    C_mean = all_C.mean(axis=1)
-
-
-    for g, group in enumerate(groups):
-        infl_surf = op.join(fs_path, "fsaverage", "surf", f"{'lh' if hemi == 'L' else 'rh'}.inflated")
-        _, _, n_vertices  = density_data[hemi].shape
-        # #-----------------------------
-        # # Load func MT ROI
-        # #-----------------------------
-        # label_file = op.join(
-        #     bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi',
-        #     'group_averages',
-        #     f"group-{group}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
-        # )
-
-        # func_mt_vertices = read_label(label_file)
-
-        # func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
-        # func_mt_roi[func_mt_vertices] = 1
-        # ----------------------------
-        # Load Wang MT ROI 
-        # ----------------------------
-        wang_hmt_path = op.join(
-            '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
-            f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
-        )
-        surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
-        wang_hmt_vertices = np.where(surf_roi > 0)[0]
-        print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
-        # ----------------------------
-        # Load curvature map (sulci/gyri)
-        # ----------------------------
-        hemi_fs = "lh" if hemi == "L" else "rh"
-        curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
-        curv = nib.freesurfer.read_morph_data(curv_file)
-
-        # normalize curvature for nicer background display
-        curv_norm = (curv - np.percentile(curv, 5)) / (
-            np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
-        )
-        curv_norm = np.clip(curv_norm, 0, 1)
-
-        # ----------------------------
-        # Functional Contrast Map visualization
-        # ----------------------------
-        img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "participants_linearreg",  "surface_pngs", "mean")
-        os.makedirs(img_out_dir, exist_ok=True)
-
-        vmin, vmax = -0.5, 0.5
-        # -------------------------------------------------
-        # Compute average functional map across runs FIRST
-        # -------------------------------------------------
-        hemi_maps = C_mean #predicted_maps[hemi]
-        mean_vals = np.nanmean(hemi_maps[[group in p for p in participants],:], axis = 0)
-        # mean_vals = np.nanmean(sub_mean_maps, axis=0)
-
-        # Build full-surface vector once
-        surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
-        surf_map[wang_hmt_vertices] = mean_vals
-
-        # Output filename (no run index)
-        out_png = op.join(
-            img_out_dir,
-            f"{group}-mean_hemi-{hemi}_desc-true-motionXstationary_mean_inflated.png"
-        )
-
-        # -------------------------------------------------
-        # Plot average participant map
-        # -------------------------------------------------
-
-        display = plotting.plot_surf_stat_map(
-            surf_mesh=infl_surf,
-            stat_map=surf_map,
-            hemi="left" if hemi == "L" else "right",
-            view="lateral",
-            cmap="plasma",
-            colorbar=True,
-            vmin=vmin,
-            vmax=vmax,
-            threshold=None,
-            bg_map=curv_norm,
-            bg_on_data=True,
-            darkness=0.6,
-        )
-        # ---- MT boundary overlay ----
-        # plotting.plot_surf_contours(
-        #     surf_mesh=infl_surf,
-        #     roi_map=func_mt_roi,
-        #     levels=[1],
-        #     colors=["lightgray"],
-        #     linewidths=2.0,
-        #     figure=display.figure,
-        #     axes=display.axes[0]
-        # )
-
-        # ---- save + close ----
-        display.savefig(out_png, dpi=300)
-        plt.close(display.figure)
+    density_maps[hemi] = norm_density_data[hemi]
+
+
+
+#Plots and Figures
+import sys
+current_dir = op.dirname(op.abspath(__file__))
+sys.path.append(current_dir)
+from plots_utils_15_2 import avg_density_plot, pearsonr_plot, beta_plot, dmse_plot
+
+#Performance plots
+savefilename = op.join(bids_path, "analysis", "plots", f"pyAFQ3beta_pearson_nc_barplot_linreg_participants_combined_tracts_{projfrac}.png")
+pearsonr_plot(rs, reliability, participants, tract_order, bids_path, savefilename)
+
+savefilename = op.join(f"pyAFQ3beta_dMSE_barplot_linreg_participants_combined_tracts_{projfrac}.png")
+ylim = [0, 0.1]
+dmse_plot(delta_mse, participants, tract_order, bids_path, savefilename, ylim)
+
+savefilename = op.join(f"pyAFQ3beta_beta_barplot_linreg_participants_combined_tracts_{projfrac}.png")
+beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename)
+
+
+#Data plots
+# img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "targ_participants_linearreg",  "surface_pngs", f"mean_density_{projdist}mm")
+img_out_dir = op.join(bids_path, "analysis", "plots",  "surface_pngs", f"pyafq3beta_mean_density_{projfrac}frac")
+avg_density_plot(norm_density_data, participants, tract_order, bids_path, img_out_dir)
+
+
+
+# #--------------------------------------------------------------
+# # FIGURES
+# #--------------------------------------------------------------
+# #--------------------------
+# #Save Plot of predicted contrast map for each subject
+# #--------------------------
+# from nilearn import plotting
+# from nibabel.freesurfer import read_label
+# import matplotlib.pyplot as plt
+
+# fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
+
+# for h, hemi in enumerate(hemis):
+#     hemi_fs = "lh" if hemi == "L" else "rh"
+#     infl_surf = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.inflated")
+#     # ----------------------------
+#     # Load curvature map (sulci/gyri)
+#     # ----------------------------
+#     curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
+#     curv = nib.freesurfer.read_morph_data(curv_file)
+
+#     # normalize curvature for nicer background display
+#     curv_norm = (curv - np.percentile(curv, 5)) / (
+#         np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
+#     )
+#     curv_norm = np.clip(curv_norm, 0, 1)
+
+#         # ----------------------------
+#     # Load Wang MT ROI
+#     # ----------------------------
+#     wang_hmt_path = op.join(
+#         '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
+#         f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+#     )
+#     surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+#     wang_hmt_vertices = np.where(surf_roi > 0)[0]
+
+#     for s, participant in enumerate(participants):
+#     # s =1
+#     # participant= 'sub-EBxGxEYx1965'
+#     # # ----------------------------
+#     # Functional MT ROI (binary surface map)
+#     # ----------------------------
+#         label_file = op.join(bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi', participant,
+#             f"{participant}_hemi-{hemi}_space-fsaverage_label-MT_mask.label")
+
+#         func_mt_vertices = read_label(label_file)
+
+#         func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
+#         func_mt_roi[func_mt_vertices] = 1
+
+#         # ----------------------------
+#         # Predicted Map visualization
+#         # ----------------------------
+#         img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "participants_linearreg", "surface_pngs", participant)
+#         os.makedirs(img_out_dir, exist_ok=True)
+
+#         vmin, vmax = -1.0, 1.0
+
+#         # Build full-surface vector 
+#         surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
+#         surf_map[wang_hmt_vertices] = predicted_maps[hemi][s, :]
+
+#         # Output filename (no run index)
+#         out_png = op.join(
+#             img_out_dir,
+#             f"{participant}_hemi-{hemi}_desc-pred-motionXstationary_inflated.png"
+#         )
+
+#         # -------------------------------------------------
+#         # Plot only once
+#         # -------------------------------------------------
+
+#         display = plotting.plot_surf_stat_map(
+#             surf_mesh=infl_surf,
+#             stat_map=surf_map,
+#             hemi="left" if hemi == "L" else "right",
+#             view="lateral",
+#             cmap="plasma",
+#             colorbar=True,
+#             vmin=vmin,
+#             vmax=vmax,
+#             threshold=None,
+#             bg_map=curv_norm,
+#             bg_on_data=True,
+#             darkness=0.6,
+#         )
+
+#         # ---- MT boundary overlay ----
+#         plotting.plot_surf_contours(
+#             surf_mesh=infl_surf,
+#             roi_map=func_mt_roi,
+#             levels=[1],
+#             colors=["lightgray"],
+#             linewidths=2.0,
+#             figure=display.figure,
+#             axes=display.axes[0]
+#         )
+
+#         # ---- save + close ----
+#         display.savefig(out_png, dpi=300)
+#         plt.close(display.figure)
+
+# #========================================
+# #Save plot of average predicted contrast map for each group
+# #========================================
+
+# hemis = ["L", "R"]
+# groups = ["EB", "NS"]
+# for h, hemi in enumerate(hemis):
+#     for g, group in enumerate(groups):
+#         infl_surf = op.join(fs_path, "fsaverage", "surf", f"{'lh' if hemi == 'L' else 'rh'}.inflated")
+#         _, _, n_vertices  = density_data[hemi].shape
+#         #-----------------------------
+#         # Load func MT ROI
+#         #-----------------------------
+#         label_file = op.join(
+#             bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi',
+#             'group_averages',
+#             f"group-{group}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
+#         )
+
+#         func_mt_vertices = read_label(label_file)
+
+#         func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
+#         func_mt_roi[func_mt_vertices] = 1
+#         # ----------------------------
+#         # Load Wang MT ROI 
+#         # ----------------------------
+#         wang_hmt_path = op.join(
+#             '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
+#             f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+#         )
+#         surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+#         wang_hmt_vertices = np.where(surf_roi > 0)[0]
+#         print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
+#         # ----------------------------
+#         # Load curvature map (sulci/gyri)
+#         # ----------------------------
+#         hemi_fs = "lh" if hemi == "L" else "rh"
+#         curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
+#         curv = nib.freesurfer.read_morph_data(curv_file)
+
+#         # normalize curvature for nicer background display
+#         curv_norm = (curv - np.percentile(curv, 5)) / (
+#             np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
+#         )
+#         curv_norm = np.clip(curv_norm, 0, 1)
+
+#         # ----------------------------
+#         # Functional Contrast Map visualization
+#         # ----------------------------
+#         img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "participants_linearreg",  "surface_pngs", "mean")
+#         os.makedirs(img_out_dir, exist_ok=True)
+
+#         vmin, vmax = -.5, 0.5
+#         # -------------------------------------------------
+#         # Compute average functional map across runs FIRST
+#         # -------------------------------------------------
+#         hemi_maps = predicted_maps[hemi]
+#         mean_vals = np.nanmean(hemi_maps[[group in p for p in participants],:], axis = 0)
+#         # mean_vals = np.nanmean(sub_mean_maps, axis=0)
+
+#         # Build full-surface vector once
+#         surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
+#         surf_map[wang_hmt_vertices] = mean_vals
+
+#         # Output filename (no run index)
+#         out_png = op.join(
+#             img_out_dir,
+#             f"{group}-mean_hemi-{hemi}_desc-pred-motionXstationary_mean_inflated.png"
+#         )
+
+#         # -------------------------------------------------
+#         # Plot average participant map
+#         # -------------------------------------------------
+
+#         display = plotting.plot_surf_stat_map(
+#             surf_mesh=infl_surf,
+#             stat_map=surf_map,
+#             hemi="left" if hemi == "L" else "right",
+#             view="lateral",
+#             cmap="plasma",
+#             colorbar=True,
+#             vmin=vmin,
+#             vmax=vmax,
+#             threshold=None,
+#             bg_map=curv_norm,
+#             bg_on_data=True,
+#             darkness=0.6,
+#         )
+#         # ---- MT boundary overlay ----
+#         plotting.plot_surf_contours(
+#             surf_mesh=infl_surf,
+#             roi_map=func_mt_roi,
+#             levels=[1],
+#             colors=["lightgray"],
+#             linewidths=2.0,
+#             figure=display.figure,
+#             axes=display.axes[0]
+#         )
+
+#         # ---- save + close ----
+#         display.savefig(out_png, dpi=300)
+#         plt.close(display.figure)
+
+# #-------------------------------------
+# ## Plot density map
+# #-------------------------------------
+# from nilearn import plotting
+# from nibabel.freesurfer import read_label
+# import matplotlib.pyplot as plt
+
+# fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
+
+# for h, hemi in enumerate(hemis):
+#     hemi_fs = "lh" if hemi == "L" else "rh"
+#     infl_surf = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.inflated")
+#     # ----------------------------
+#     # Load curvature map (sulci/gyri)
+#     # ----------------------------
+#     curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
+#     curv = nib.freesurfer.read_morph_data(curv_file)
+
+#     # normalize curvature for nicer background display
+#     curv_norm = (curv - np.percentile(curv, 5)) / (
+#         np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
+#     )
+#     curv_norm = np.clip(curv_norm, 0, 1)
+
+#         # ----------------------------
+#     # Load Wang MT ROI
+#     # ----------------------------
+#     wang_hmt_path = op.join(
+#         '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
+#         f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+#     )
+#     surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+#     wang_hmt_vertices = np.where(surf_roi > 0)[0]
+
+#     # for s, participant in enumerate(participants):
+#     s =1
+#     participant= 'sub-EBxGxEYx1965'
+#     # # ----------------------------
+#     # Functional MT ROI (binary surface map)
+#     # ----------------------------
+#     label_file = op.join(bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi', participant,
+#         f"{participant}_hemi-{hemi}_space-fsaverage_label-MT_mask.label")
+
+#     func_mt_vertices = read_label(label_file)
+
+#     func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
+#     func_mt_roi[func_mt_vertices] = 1
+
+#     # ----------------------------
+#     # Density Map visualization
+#     # ----------------------------
+#     img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "participants_linearreg", "surface_pngs", participant)
+#     os.makedirs(img_out_dir, exist_ok=True)
+
+#     vmin, vmax = -5.0, 5.0
+
+#     for t, tract in enumerate(tract_order):
+#         # Build full-surface vector 
+#         surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
+#         surf_map[wang_hmt_vertices] = norm_density_data[hemi][s][t]#predicted_maps[hemi][s, :]
+
+#         # Output filename (no run index)
+#         out_png = op.join(
+#             img_out_dir,
+#             f"{participant}_hemi-{hemi}_desc-{tract}_inflated.png"
+#         )
+
+#         # -------------------------------------------------
+#         # Plot only once
+#         # -------------------------------------------------
+
+#         display = plotting.plot_surf_stat_map(
+#             surf_mesh=infl_surf,
+#             stat_map=surf_map,
+#             hemi="left" if hemi == "L" else "right",
+#             view="lateral",
+#             cmap="plasma",
+#             colorbar=True,
+#             vmin=vmin,
+#             vmax=vmax,
+#             threshold=None,
+#             bg_map=curv_norm,
+#             bg_on_data=True,
+#             darkness=0.6,
+#         )
+
+#         # ---- MT boundary overlay ----
+#         # plotting.plot_surf_contours(
+#         #     surf_mesh=infl_surf,
+#         #     roi_map=func_mt_roi,
+#         #     levels=[1],
+#         #     colors=["lightgray"],
+#         #     linewidths=2.0,
+#         #     figure=display.figure,
+#         #     axes=display.axes[0]
+#         # )
+
+#         # ---- save + close ----
+#         display.savefig(out_png, dpi=300)
+#         plt.close(display.figure)
+
+
+# #-----------------------------------------------
+# # Plot average true functional map
+# #-----------------------------------------------
+# from nilearn import plotting
+# from nibabel.freesurfer import read_label
+# import matplotlib.pyplot as plt
+
+# fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
+# groups = ["EB", "NS"]
+# hemis = ["L", "R"]
+# for h, hemi in enumerate(hemis):
+#     hemi_fs = "lh" if hemi == "L" else "rh"
+#     infl_surf = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.inflated")
+#     # ----------------------------
+#     # Load curvature map (sulci/gyri)
+#     # ----------------------------
+#     curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
+#     curv = nib.freesurfer.read_morph_data(curv_file)
+
+#     # normalize curvature for nicer background display
+#     curv_norm = (curv - np.percentile(curv, 5)) / (
+#         np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
+#     )
+#     curv_norm = np.clip(curv_norm, 0, 1)
+
+#         # ----------------------------
+#     # Load Wang MT ROI
+#     # ----------------------------
+#     wang_hmt_path = op.join(
+#         '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
+#         f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+#     )
+#     surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+#     wang_hmt_vertices = np.where(surf_roi > 0)[0]
+
+#     #---------------------
+#     #Prepare func maps
+#     #---------------------
+#     n_target_runs = 3
+#     all_C = []              # will store (n_subj, 3, n_vertices)
+#     rnd_run_idx = np.full((n_subj, n_target_runs, len(hemis)), np.nan)
+#     for s, participant in enumerate(participants):
+
+#         C_full = norm_contrast_data[hemi][s][contrast]   # (n_runs_available, n_vertices)
+#         n_runs_available = C_full.shape[0]
+
+#         # ---- choose runs ----
+#         if "NS" in participant:
+#             run_idx = np.arange(3)
+#         elif "EB" in participant:
+#             run_idx = np.random.choice(
+#                 n_runs_available, size=3, replace=False
+#             )
+
+#         rnd_run_idx[s, :, h] = run_idx
+
+#         # ---- extract runs ----
+#         C_sel = C_full[run_idx, :]     # (3, n_vertices)
+#         all_C.append(C_sel)
+#     all_C = np.stack(all_C, axis=0)
+#     C_mean = all_C.mean(axis=1)
+
+
+#     for g, group in enumerate(groups):
+#         infl_surf = op.join(fs_path, "fsaverage", "surf", f"{'lh' if hemi == 'L' else 'rh'}.inflated")
+#         _, _, n_vertices  = density_data[hemi].shape
+#         # #-----------------------------
+#         # # Load func MT ROI
+#         # #-----------------------------
+#         # label_file = op.join(
+#         #     bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi',
+#         #     'group_averages',
+#         #     f"group-{group}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
+#         # )
+
+#         # func_mt_vertices = read_label(label_file)
+
+#         # func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
+#         # func_mt_roi[func_mt_vertices] = 1
+#         # ----------------------------
+#         # Load Wang MT ROI 
+#         # ----------------------------
+#         wang_hmt_path = op.join(
+#             '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
+#             f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+#         )
+#         surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+#         wang_hmt_vertices = np.where(surf_roi > 0)[0]
+#         print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
+#         # ----------------------------
+#         # Load curvature map (sulci/gyri)
+#         # ----------------------------
+#         hemi_fs = "lh" if hemi == "L" else "rh"
+#         curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
+#         curv = nib.freesurfer.read_morph_data(curv_file)
+
+#         # normalize curvature for nicer background display
+#         curv_norm = (curv - np.percentile(curv, 5)) / (
+#             np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
+#         )
+#         curv_norm = np.clip(curv_norm, 0, 1)
+
+#         # ----------------------------
+#         # Functional Contrast Map visualization
+#         # ----------------------------
+#         img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "participants_linearreg",  "surface_pngs", "mean")
+#         os.makedirs(img_out_dir, exist_ok=True)
+
+#         vmin, vmax = -0.5, 0.5
+#         # -------------------------------------------------
+#         # Compute average functional map across runs FIRST
+#         # -------------------------------------------------
+#         hemi_maps = C_mean #predicted_maps[hemi]
+#         mean_vals = np.nanmean(hemi_maps[[group in p for p in participants],:], axis = 0)
+#         # mean_vals = np.nanmean(sub_mean_maps, axis=0)
+
+#         # Build full-surface vector once
+#         surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
+#         surf_map[wang_hmt_vertices] = mean_vals
+
+#         # Output filename (no run index)
+#         out_png = op.join(
+#             img_out_dir,
+#             f"{group}-mean_hemi-{hemi}_desc-true-motionXstationary_mean_inflated.png"
+#         )
+
+#         # -------------------------------------------------
+#         # Plot average participant map
+#         # -------------------------------------------------
+
+#         display = plotting.plot_surf_stat_map(
+#             surf_mesh=infl_surf,
+#             stat_map=surf_map,
+#             hemi="left" if hemi == "L" else "right",
+#             view="lateral",
+#             cmap="plasma",
+#             colorbar=True,
+#             vmin=vmin,
+#             vmax=vmax,
+#             threshold=None,
+#             bg_map=curv_norm,
+#             bg_on_data=True,
+#             darkness=0.6,
+#         )
+#         # ---- MT boundary overlay ----
+#         # plotting.plot_surf_contours(
+#         #     surf_mesh=infl_surf,
+#         #     roi_map=func_mt_roi,
+#         #     levels=[1],
+#         #     colors=["lightgray"],
+#         #     linewidths=2.0,
+#         #     figure=display.figure,
+#         #     axes=display.axes[0]
+#         # )
+
+#         # ---- save + close ----
+#         display.savefig(out_png, dpi=300)
+#         plt.close(display.figure)
 
 
 #--------------------------------------------------------------
@@ -948,25 +976,24 @@ sns.despine()
 plt.tight_layout()
 saveDir = op.join(bids_path, 'analysis', 'plots')
 os.makedirs(saveDir, exist_ok=True)
-# plt.savefig(op.join(saveDir, "participants_dMSE_linearreg_combined_tracts_nested.png"),
-#             dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, f"participants_dMSE_linearreg_combined_tracts_nested_{projdist}mm.png"),
+            dpi=300, bbox_inches='tight')
 plt.show()
 
 
 #----------------------------
 ### Plot beta values of full model
 #----------------------------
-import numpy as np
+#==============================================================
+## Beta bar plot
+#==============================================================
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy.stats import sem
-
-# --------------------------------------
-# Convert trained_coefs into long format
-# trained_coefs shape = (6 runs, n_tracts, n_subj, 2 hemis)
-# Requires subject_group: list of "EB" or "NS"
-# --------------------------------------
+import matplotlib.patches as mpatches
+import numpy as np
+import os
+import os.path as op
 
 n_tracts, n_subj, n_hemi = trained_coefs.shape
 hemi_labels = ["L", "R"]
@@ -1000,95 +1027,6 @@ std_df = (
       .reset_index()
       .rename(columns={"mean": "Mean", "sem": "SEM"})
 )
-
-# ------------------------------------------
-# Create 2 subplots — one for each hemisphere
-# ------------------------------------------
-fig, axes = plt.subplots(1, 2, figsize=(18, 6), sharey=True)
-group_labels = ["EB", "NS"]
-group_offset = {"EB": -0.2, "NS": 0.2}   # shift inside each tract
-
-for i, (ax, hemi) in enumerate(zip(axes, hemi_labels)):
-
-    # Filter for hemisphere
-    df_h = df[df["Hemisphere"] == hemi]
-    std_h = std_df[std_df["Hemisphere"] == hemi]
-
-    # Jitter dots per group (EB vs NS)
-    sns.stripplot(
-        data=df_h,
-        x="Tract",
-        y="Beta",
-        hue="Group",
-        dodge=True,
-        jitter=0.15,
-        alpha=0.7,
-        ax=ax
-    ) #legend=(i == 1)
-
-    # ---------------------------------------
-    # Plot Mean ± SEM for EB and NS separately
-    # ---------------------------------------
-    for _, row in std_h.iterrows():
-
-        tract = row["Tract"]
-        mean  = row["Mean"]
-        se    = row["SEM"]
-        group = row["Group"]
-
-        # shift within tract index to match stripplot's dodge layout
-        x_loc = tract_order.index(tract)  + group_offset[group]
-
-        # Mean point
-        ax.plot(x_loc, mean, "o", color="black", markersize=7)
-
-        # SEM bar
-        ax.errorbar(
-            x=x_loc,
-            y=mean,
-            yerr=se,
-            color="black",
-            capsize=3,
-            linewidth=2
-        )
-
-    # ------------------ Ax formatting ------------------
-    ax.set_title(f"{hemi}-Hemisphere β-coefficients (Mean ± SEM within EB / NS)",fontsize=20)
-    ax.set_xlabel("Tract",fontsize=20,fontweight='bold')
-    ax.set_ylabel("Beta",fontsize=20,fontweight='bold')
-    ax.tick_params(axis="x", rotation=90, width=2)
-    ax.set_xticks(np.arange(len(tract_order)))
-    ax.set_xticklabels(tract_order, rotation=30, ha="right",fontsize=18,fontweight='bold')
-    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
-    ax.spines['left'].set_linewidth(2) #axis thickness
-    ax.spines['bottom'].set_linewidth(2) #axis thickness
-    plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
-    # if i == 1:
-    leg = ax.legend(title="Group", fontsize=14, frameon=True,loc='upper right')
-    # This specifically bolds the labels and the title
-    plt.setp(leg.get_texts(), fontweight='bold')
-    plt.setp(leg.get_title(), fontweight='bold')
-# axes[0].set_ylabel("Beta", fontsize=14)
-# plt.legend(title="Group", labels=group_labels)
-
-sns.despine()
-plt.tight_layout()
-saveDir = op.join(bids_path, 'analysis', 'plots')
-os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "participants_betas_linearreg_combined_tracts.png"),
-            dpi=300, bbox_inches='tight')
-plt.show()
-
-#==============================================================
-## Beta bar plot
-#==============================================================
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import numpy as np
-import os
-import os.path as op
 
 # 1. Global styling for bold fonts
 plt.rcParams.update({'font.weight': 'bold', 'axes.labelweight': 'bold'})
@@ -1158,187 +1096,12 @@ plt.tight_layout()
 
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "beta_barplot_linreg_participants_combined_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, f"beta_barplot_linreg_participants_combined_tracts_{projdist}mm.png"), dpi=300, bbox_inches='tight')
 plt.show()
 
 
 #--------------------------------------------------------------
 #Pearson's r
-# =====================================
-# SCATTER + JITTER PLOT BY GROUP × HEMI × TRACT
-# =====================================
-
-import numpy as np
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from scipy.stats import sem
-
-#First compute noise ceiling 95% CI
-hemi_labels = ["L", "R"]
-nc_rows = []
-
-for h in range(2):     # left/right hemispheres
-    for s, participant in enumerate(participants):
-        gp = "EB" if "EB" in participant else "NS"
-
-        nc_rows.append({
-            "Subject": s,
-            "Hemisphere": hemi_labels[h],
-            "Group": gp,
-            "Correlation": reliability[s,h] #r_all[s, h] #
-        })
-
-nc_df = pd.DataFrame(nc_rows)
-nc_sem_df = (
-    nc_df.groupby(["Group", "Hemisphere"])["Correlation"]
-      .agg(["mean", sem])
-      .reset_index()
-      .rename(columns={"mean": "Mean", "sem": "SEM"})
-)
-nc_sem_df["CI95_upper"] = nc_sem_df["Mean"] + 1.96 * nc_sem_df["SEM"]
-nc_sem_df["CI95_lower"] = nc_sem_df["Mean"] - 1.96 * nc_sem_df["SEM"]
-
-# --------------------------------------
-# Organize Pearson's r in table
-# --------------------------------------
-
-hemi_labels = ["L", "R"]
-rows = []
-
-for h in range(2):     # left/right hemispheres
-    for s, participant in enumerate(participants):
-        gp = "EB" if "EB" in participant else "NS"
-        # pearson = rs[:, s, h]
-
-        rows.append({
-            "Subject": s,
-            "Hemisphere": hemi_labels[h],
-            "Group": gp,
-            "Correlation": rs[s,h] #r_all[s, h] #
-        })
-
-df = pd.DataFrame(rows)
-
-# ------------------------------------------------
-# Compute SEM per Group × Hemisphere
-# ------------------------------------------------
-sem_df = (
-    df.groupby(["Group", "Hemisphere"])["Correlation"]
-      .agg(["mean", sem])
-      .reset_index()
-      .rename(columns={"mean": "Mean", "sem": "SEM"})
-)
-
-# ------------------------------------------------
-# Color palette: EB = blue, NS = orange
-# ------------------------------------------------
-palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
-
-# ------------------------------------------------
-# Create 2 subplots — one per hemisphere
-# ------------------------------------------------
-fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
-text_plotted = False  # Flag to ensure we only plot the label once
-for ax, hemi in zip(axes, hemi_labels):
-    # ---- Noise ceiling 95% CI upper bound ----
-    nc_h = nc_sem_df[nc_sem_df["Hemisphere"] == hemi]
-
-    df_h = df[df["Hemisphere"] == hemi]
-    sem_h = sem_df[sem_df["Hemisphere"] == hemi]
-
-    # Jittered dots
-    sns.stripplot(
-        data=df_h,
-        x="Group",
-        y="Correlation",
-        hue="Group",
-        dodge=False,
-        jitter=0.15,
-        alpha=0.7,
-        palette=palette,
-        ax=ax
-    )
-
-    # ---- Mean ± SEM (model performance) ----
-    for _, row in sem_h.iterrows():
-        group = row["Group"]
-        mean = row["Mean"]
-        se = row["SEM"]
-
-        x_loc = 0 if group == "EB" else 1
-
-        ax.errorbar(
-            x=x_loc,
-            y=mean,
-            yerr=se,
-            fmt="o",
-            color="black",
-            markersize=8,
-            capsize=3,
-            linewidth=2
-        )
-    # ---- Noise ceiling 95% CI upper/lower bound/mean ----
-    for _, row in nc_h.iterrows():
-        group = row["Group"]
-        up_ci = row["CI95_upper"]
-        low_ci = row["CI95_lower"]
-        mean = row["Mean"]
-
-        x_center = 0 if group == "EB" else 1
-
-        ax.hlines(
-            y=[low_ci, up_ci, mean],
-            xmin=x_center - 0.25,
-            xmax=x_center + 0.25,
-            colors="gray",
-            linestyles=["--","--", ":"],
-            linewidth=3,
-            alpha=0.9
-        )
-        ax.fill_between(
-        [x_center - 0.25, x_center + 0.25],
-        low_ci,
-        up_ci,
-        color="pink",
-        alpha=0.2,
-        linewidth=0
-        )
-        # ADD THIS BLOCK:
-        if not text_plotted:
-            ax.text(
-                x=x_center, 
-                y=mean + 0.02,          # Slightly above the mean line
-                s="Noise ceiling", 
-                ha='center',            # Center horizontally
-                va='bottom',            # Align bottom of text to the Y coordinate
-                fontsize=14, 
-                fontweight='bold', 
-                color='gray'
-            )
-            text_plotted = True         # Toggle flag so it doesn't repeat
-
-    # Formatting
-    ax.set_ylim(-0.2, 1)
-    ax.set_title(f"{hemi}-Hemisphere", fontsize=20)
-    ax.set_xlabel("Group", fontsize=18, fontweight = 'bold')
-    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
-    ax.set_xticklabels(["EB", "NS"], fontsize=18, fontweight = 'bold')
-    # ax.set_yticklabels(ax.get_yticklabels(), fontsize=18, fontweight = 'bold')
-    plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
-
-axes[0].set_ylabel("Pearson's r", fontsize=18, fontweight = 'bold')
-# axes[1].get_legend().remove()   # remove duplicated legend
-sns.despine()
-plt.tight_layout()
-
-#Saving
-saveDir = op.join(bids_path, "analysis", "plots")
-os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "pearson_linreg_participants_combined_tracts.png"), dpi=300, bbox_inches='tight')
-plt.show()
-
-
 
 #=======================================================
 # Pearson's r in a bar plot
@@ -1432,5 +1195,5 @@ sns.despine()
 plt.tight_layout()
 saveDir = op.join(bids_path, "analysis", "plots")
 os.makedirs(saveDir, exist_ok=True)
-plt.savefig(op.join(saveDir, "pearson_barplot_linreg_participants_combined_tracts.png"), dpi=300, bbox_inches='tight')
+plt.savefig(op.join(saveDir, f"pyAFQ3beta_pearson_barplot_linreg_participants_combined_tracts_{projfrac}.png"), dpi=300, bbox_inches='tight')
 plt.show()
