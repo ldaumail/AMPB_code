@@ -397,6 +397,56 @@ img_out_dir = op.join(bids_path, "analysis", "plots",  "surface_pngs", f"pyafq3b
 avg_density_plot(norm_density_data, participants, tract_order, bids_path, img_out_dir)
 
 
+#------------------------------------------------------------
+# Save tables for statistical analyses
+#------------------------------------------------------------
+
+#-----------------------------
+# Organize Beta coefs in table
+#-----------------------------
+import pandas as pd
+n_tracts = len(tract_order)
+hemi_labels = ["L", "R"]
+rows = []
+
+for h in range(2):     # left/right hemispheres
+    for t in range(n_tracts):
+        for s, participant in enumerate(participants):
+            gp = "EB" if "EB" in participant else "NS"
+            # pearson = rs[:, s, h]
+
+            rows.append({
+                "Subject": s,
+                "Tract": tract_order[t],
+                "Hemisphere": hemi_labels[h],
+                "Group": gp,
+                "Beta": trained_coefs[t,s,h] #r_all[s, h] #
+            })
+
+df = pd.DataFrame(rows)
+
+# --------------------------------------
+# Organize Pearson's r in table
+# --------------------------------------
+
+hemi_labels = ["L", "R"]
+rows = []
+
+for h in range(2):     # left/right hemispheres
+    for t in range(n_tracts):
+        for s, participant in enumerate(participants):
+            gp = "EB" if "EB" in participant else "NS"
+            # pearson = rs[:, s, h]
+
+            rows.append({
+                "Subject": s,
+                "Tract": tract_order[t],
+                "Hemisphere": hemi_labels[h],
+                "Group": gp,
+                "Correlation": rs[s,h] #r_all[s, h] #
+            })
+
+df = pd.DataFrame(rows)
 
 # #--------------------------------------------------------------
 # # FIGURES

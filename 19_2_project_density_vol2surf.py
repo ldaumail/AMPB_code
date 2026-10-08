@@ -21,8 +21,10 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, density_path, den
     '''
     for participant in participants_file:
         # participant = 'sub-EBxGxCCx1986' #sub-NSxGxBAx1970
-        # tract_name = 'LeftMTxLGN'
+        # tract_name = 'InferiorLongitudinal'
         # bids_path = op.join('/Users','ldaumail3','Documents','research', 'ampb_mt_tractometry_analysis', 'ampb')
+        # density_path = op.join('/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/tdi_maps/dipy_wmgmi_tdi_maps')
+        # density_folder = 'pve_pyAFQ33_targ'
         analysis_path = op.join(bids_path, 'analysis')
         roi_path = op.join(analysis_path, 'ROIs','wang_space-ACPC_rois', participant)
         fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
@@ -57,13 +59,16 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, density_path, den
             # ----------------------------
             # STEP 1: Load volumetric ROI 
             # ----------------------------
+            # hemilong = "Left" if hemi == "L" else "Right" 
+            side = "Left" if hemi == "L" else "Right" #"Left" if tract_name.startswith("L") else "Right"
+            # if hemilong == side:
             mt_mask_file = op.join(roi_path, participant+'_hemi-'+hemi+'_space-ACPC_label-MT_mask_dilated.nii.gz')
             # mt_mask_img = ants.image_read(mt_mask_file)
             # wmgmi_mask_img = ants.image_read(wmgmi_mask_file)
 
             #--- STEP 2: Calculate overlap mask between MT mask and WMGMI from pyAFQ (used to catch endpoint values)
-            side = "Left" if hemi == "L" else "Right" 
-            afq_path = op.join(pyAFQ_path, f"afq-{side}{tract_name}", participant)
+            
+            afq_path = op.join(pyAFQ_path, participant)
             wmgmi_mask_file = op.join(afq_path, f"{participant}_ses-concat_acq-HCPdir99_desc-wmgmi_mask.nii.gz")
 
             input_files = [wmgmi_mask_file, mt_mask_file]
@@ -74,8 +79,12 @@ def main(participants_file, tract_name, bids_path, pyAFQ_path, density_path, den
             # -----------------------------
             ### --- STEP 3: load streamline density map
             # -----------------------------
-             #roi_names[h] 
-            density_file_path = op.join(density_map_path, f"{participant}_ses-concat_desc-wang{side}{tract_name}_tdi_map2.nii.gz")
+            #roi_names[h] 
+            if "PTR" in tract_name or "STR" in tract_name:
+                density_file_path = op.join(density_map_path, f"{participant}_ses-concat_desc-{tract_name}_tdi_map.nii.gz") #{side}
+            else:
+                density_file_path = op.join(density_map_path, f"{participant}_ses-concat_desc-{side}{tract_name}_tdi_map.nii.gz") #
+
             density_map_img = ants.image_read(density_file_path)
 
             # -----------------------------

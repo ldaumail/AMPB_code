@@ -45,13 +45,18 @@ def pearsonr_plot(rs, reliability, participants, tract_order, bids_path, savefil
         t.replace("InferiorLongitudinal", "ILF")
         .replace("InferiorFrontooccipital", "IFOF")
         .replace("AnteriorVerticalOccipital", "aVOF")
+        .replace("VerticalOccipital", "VOF")
         .replace("PosteriorVerticalOccipital", "pVOF")
         .replace("PosteriorArcuate", "pArc")
         .replace("Arcuate", "AF")
+        .replace("SuperiorLongitudinal", "SLF")
         .replace("SuperiorLongitudinalI", "SLFI")
         .replace("SuperiorLongitudinalII", "SLFII")
         .replace("SuperiorLongitudinalI", "SLFIII")
         .replace("OpticRadiation", "OR")
+        .replace("AnteriorThalamic", "ATR")
+        .replace("CingulumCingulate", "CC")
+        .replace("Corticospinal", "CST")
         for t in tract_order
     ]
 
@@ -1423,7 +1428,7 @@ def avg_pred_func_plot(predicted_maps, participants, tract_order, bids_path, img
 #========================================
 #Save plot of average density map for each group
 #========================================
-def avg_density_plot(density_maps, participants, tract_order, bids_path, img_out_dir):
+def avg_density_plot(density_maps, participants, tract_order, bids_path, img_out_dir, ylim):
     fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
     hemis = ["L", "R"]
     groups = ["EB", "NS"]
@@ -1475,7 +1480,7 @@ def avg_density_plot(density_maps, participants, tract_order, bids_path, img_out
                 # img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "wb_participants_linearreg",  "surface_pngs", "mean_predicted_func")
                 os.makedirs(img_out_dir, exist_ok=True)
 
-                vmin, vmax = -1, 1 
+                [vmin, vmax] = ylim 
 
                 # mean_vals = np.nanmean(sub_mean_maps, axis=0)
                 hemi_maps = np.array([density_maps[hemi][sub][t] for sub in density_maps[hemi]]) #density_maps[hemi][:][t]

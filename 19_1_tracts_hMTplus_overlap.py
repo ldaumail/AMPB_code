@@ -30,28 +30,37 @@ pyAFQ_path = op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wb', 'afq3beta-wb
 #     for f in filenames
 # ]
 
+#pyAFQ beta
 tract_names = [
- 'RightInferiorFrontooccipital',
- 'RightArcuate',
- 'RightSuperiorLongitudinal',
- 'RightUncinate',
+ 'RPTR', 
  'RightInferiorLongitudinal',
- 'RightCorticospinal',
- 'RightAnteriorThalamic',
+ 'RightInferiorFrontooccipital',
+ 'RightSuperiorLongitudinal',
  'RightVerticalOccipital',
+ 'RightArcuate',
  'RightPosteriorArcuate',
- 'RightCingulumCingulate',
 
- 'LeftPosteriorArcuate',
- 'LeftVerticalOccipital',
- 'LeftUncinate',
- 'LeftInferiorFrontooccipital',
+ 'RSTR', 
+ 'RightAnteriorThalamic',
+ 'RightCingulumCingulate',
+ 'RightCorticospinal',
+ 'RightUncinate',
+]
+tract_names = [
+ 'LPTR', 
  'LeftInferiorLongitudinal',
- 'LeftCingulumCingulate',
+ 'LeftInferiorFrontooccipital',
+ 'LeftSuperiorLongitudinal',
+ 'LeftVerticalOccipital',
  'LeftArcuate',
- 'LeftCorticospinal',
+ 'LeftPosteriorArcuate',
+
+ 'LSTR', 
  'LeftAnteriorThalamic',
- 'LeftSuperiorLongitudinal']
+ 'LeftCingulumCingulate',
+ 'LeftCorticospinal',
+ 'LeftUncinate',
+ ]
 
 # tract_names = [
 #     'LPTR', 
@@ -134,7 +143,7 @@ rows = []
 nnz_count = {}
 for p, participant in enumerate(participants): 
 
-    hmt_path = op.join(bids_path, 'analysis', 'ROIs', 'wang_space-ACPC_rois',participant, participant+'_hemi-L_space-ACPC_label-MT_mask_dilated.nii.gz')
+    hmt_path = op.join(bids_path, 'analysis', 'ROIs', 'wang_space-ACPC_rois',participant, participant+'_hemi-R_space-ACPC_label-MT_mask_dilated.nii.gz')
          
     for t, tract in enumerate(tract_names):
         # participant = 'sub-EBxGxCCx1986'

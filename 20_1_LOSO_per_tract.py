@@ -473,11 +473,12 @@ intercept_plot(trained_intercepts, participants, tract_order, bids_path, savefil
 # img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "wb_participants_loso", "surface_pngs", participant)
 # pred_func_plot(predicted_maps, participants, tract_order, bids_path, img_out_dir)
 
-img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "wb_participants_loso",  "surface_pngs", "mean_predicted_func")
+img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ33_wb_participants_loso",  "surface_pngs", "mean_predicted_func")
 avg_pred_func_plot(predicted_maps, participants, tract_order, bids_path, img_out_dir)
 
-# img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "wb_participants_loso",  "surface_pngs", "mean_density")
-# avg_density_plot(density_maps, participants, tract_order, bids_path, img_out_dir)
+img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ33_wb_participants_loso",  "surface_pngs", "mean_density")
+ylim = [-2, 2]
+avg_density_plot(density_maps, participants, tract_order, bids_path, img_out_dir, ylim)
 
-img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "wb_participants_loso",  "surface_pngs", "mean_func")
+img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ33_wb_participants_loso",  "surface_pngs", "mean_func")
 avg_func_plot(true_full, participants, bids_path, img_out_dir)

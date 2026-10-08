@@ -18,12 +18,12 @@ from dipy.tracking.streamline import transform_streamlines
 # ------------------------------------------------------------
 # 1. Define paths
 # ------------------------------------------------------------
-participant = 'sub-NSxGxBAx1970' #'sub-EBxGxZAx1990'#'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990' #'sub-EBxLxTZx1956'
+participant = 'sub-EBxGxZAx1990' #sub-NSxGxBAx1970' #'sub-EBxGxZAx1990'#'sub-EBxGxEYx1965' #'sub-EBxGxZAx1990' #'sub-EBxLxTZx1956'
 
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research',
                     'ampb_mt_tractometry_analysis', 'ampb')
-afq_TR_path = op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi_wb', 'afq33-wb_6rounds') ##op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
-afq_julich_path = op.join('/Volumes','cos-lab-wpark78','LoicDaumail','ampb','derivatives','pyafq','wmgmi_wang')
+afq_TR_path = op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi_wb', 'afq3beta-wb_6rounds') ##op.join('/Volumes', 'cos-lab-wpark78', 'LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_wang') #op.join(bids_path, 'derivatives', 'pyafq', 'wmgmi_wang')#
+# afq_julich_path = op.join('/Volumes','cos-lab-wpark78','LoicDaumail','ampb','derivatives','pyafq','wmgmi_wang')
 qsiprep_path = op.join(bids_path, 'derivatives', 'qsiprep', participant)
 
 # Files
@@ -62,21 +62,21 @@ tracts = {
     # "CallosumSuperiorParietal": (0.5, 0.5, 0.5),
     # "CallosumTemporal": (1, 0.2, 0.2),
     # "LeftAnteriorThalamic": (1, 0.5, 0),
-    # "LeftArcuate": (0.9, 0.8, 0),
+    "LeftArcuate": (0.9, 0.8, 0),
     # "LeftCingulumCingulate": (0, 0.8, 0.2),
     # "LeftCorticospinal": (0.2, 0.6, 1),
-    # "LeftPosteriorArcuate": (0.2, 0.6, 1),
+    "LeftPosteriorArcuate": (0.2, 0.6, 1),
     # "LeftUncinate": (0.2, 0.8, 1),
     # "RightAnteriorThalamic": (0.2, 0.6, 0),
-    # "RightArcuate": (0.2, 0.6, 0.9),
+    "RightArcuate": (0.2, 0.6, 0.9),
     # "RightCingulumCingulate": (0.4, 0.6, 0.8),
     # "RightCorticospinal": (0.5, 0.5, 0.9),
-    # "RightPosteriorArcuate": (0.8, 0.8, 1),
+    "RightPosteriorArcuate": (0.8, 0.8, 1),
     # "RightUncinate": (0.1, 0.1, 1),
 
     # "CallosumOccipital": (1, 0.5, 0),
     # "LeftInferiorFrontooccipital": (0.8, 0.2, 1),
-    "LeftInferiorLongitudinal": (0.7, 0.7, 0.7),
+    # "LeftInferiorLongitudinal": (0.7, 0.7, 0.7),
     # "LeftSuperiorLongitudinalI": (0.2, 1, 1),
     # "LeftSuperiorLongitudinalII": (0.2, 1, 1),
     # "LeftSuperiorLongitudinalIII": (0.2, 1, 1),
@@ -87,7 +87,7 @@ tracts = {
     # "LeftTemporoparietal": (0.8, 0.2, 1),
 
     # "RightInferiorFrontooccipital": (0.7, 0.6, 1),
-    "RightInferiorLongitudinal": (0.9, 0.6, 0.9),
+    # "RightInferiorLongitudinal": (0.9, 0.6, 0.9),
     # "RightSuperiorLongitudinalI": (0.2, 0.3, 1),
     # "RightSuperiorLongitudinalII": (0.2, 0.3, 1),
     # "RightSuperiorLongitudinalIII": (0.2, 0.3, 1),
@@ -149,12 +149,12 @@ roi_defs = {
      "MT":    ("analysis/ROIs/wang_space-ACPC_rois", "MT_mask_dilated", (1, 0, 0)),
      #"LGNxPU":    ("analysis/ROIs/julich_space-ACPC_rois", "LGNxPU_mask", (0.2, 0.6, 1)),
     #  "PTxSTS1":   ("analysis/ROIs/julich_space-ACPC_rois", "PTxSTS1_mask", (0.2, 0.6, 1)),
-     "FEF":   ("analysis/ROIs/julich_space-ACPC_rois", "FEF_mask", (0.2, 0.6, 1)),
+    # "FEF":   ("analysis/ROIs/julich_space-ACPC_rois", "FEF_mask", (0.2, 0.6, 1)),
     #"thalamus":  ("analysis/ROIs/AICHA_space-ACPC_rois", "thalamus_mask", (0, 0.8, 0.2)),
 }
 roi_actors = []
 
-for hemi in ["L",]: # "R"
+for hemi in ["L", "R"]: # "R"
     for roi_name, (subdir, label, color) in roi_defs.items():
         if roi_name == "MT":
             roi_path = op.join(bids_path, subdir, participant,

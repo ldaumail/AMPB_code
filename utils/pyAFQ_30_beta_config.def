@@ -28,8 +28,7 @@ From: nvidia/cuda:12.1.0-devel-ubuntu22.04
     # Use the env’s python for installs
     /opt/anaconda/envs/afq/bin/pip install numpy>=2.0.0 scipy>=1.13.0 cython nibabel dipy tqdm fslpy pingouin>=0.3 seaborn>=0.11.0 ipython
     /opt/anaconda/envs/afq/bin/pip install git+https://github.com/dipy/GPUStreamlines.git
-    /opt/anaconda/envs/afq/bin/pip install git+https://github.com/36000/pyAFQ.git@dam
-
+    /opt/anaconda/envs/afq/bin/pip install git+https://github.com/36000/pyAFQ.git@b2cebb2e1731e303db612e5065a9f344090e615a
     #Address read only to executable permissions
     # --- Fix niimath ---
     /opt/anaconda/envs/afq/bin/pip install -U git+https://github.com/spikedoanz/niimath.git@niimath-permissions

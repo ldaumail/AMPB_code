@@ -1,6 +1,6 @@
 #Perform stats on linear regression models fit separately on each tract.
 
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ33_wb_participants_linearreg/betas_contrast-motionXstationary_separate_tracts_0mm.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_targ_participants_linearreg/beta_contrast-motionXstationary_separate_1frac.csv'
 file = file.path(path)
 data = read.csv(file)
 
@@ -131,7 +131,7 @@ df_perm <- data %>%
 #---------------
 # Pearson's R
 #---------------
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/participants_linearreg/combined/pearsonsR_contrast-motionXstationary_combined_tracts.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_targ_participants_linearreg/pearsonr_contrast-motionXstationary_separate_1frac.csv'
 file = file.path(path)
 data = read.csv(file) #
 
@@ -159,16 +159,35 @@ result[[2]] =t.test(data$Correlation[data$Hemisphere == "R" & data$Group == "EB"
 library(dplyr)
 library(purrr)
 library(broom)
+# df_ttests <- data %>%
+#   group_by(Tract, Group, Hemisphere) %>%
+#   summarise(
+#     n = n(),
+#     ttest = list(t.test(Correlation, mu = 0)),
+#     .groups = "drop"
+#   ) %>%
+#   mutate(
+#     t_value = map_dbl(ttest, ~ .x$statistic),
+#     p_value = map_dbl(ttest, ~ .x$p.value)
+#   ) %>%
+#   select(Tract, Group, Hemisphere, n, t_value, p_value)
+
+
 df_ttests <- data %>%
-  group_by(Group, Hemisphere) %>%
+  group_by(Tract, Group, Hemisphere) %>%
   summarise(
-    n = n(),
-    ttest = list(t.test(Correlation, mu = 0)),
+    n = sum(!is.na(Correlation)),
+    ttest = list(
+      if (sum(!is.na(Correlation)) >= 2)
+        t.test(Correlation[!is.na(Correlation)], mu = 0)
+      else
+        NULL
+    ),
     .groups = "drop"
   ) %>%
   mutate(
-    t_value = map_dbl(ttest, ~ .x$statistic),
-    p_value = map_dbl(ttest, ~ .x$p.value)
+    t_value = map_dbl(ttest, ~ if (is.null(.x)) NA_real_ else unname(.x$statistic)),
+    p_value = map_dbl(ttest, ~ if (is.null(.x)) NA_real_ else .x$p.value)
   ) %>%
-  select(Group, Hemisphere, n, t_value, p_value)
-
+  select(Tract, Group, Hemisphere, n, t_value, p_value) %>%
+  arrange(Tract, Group, Hemisphere)
