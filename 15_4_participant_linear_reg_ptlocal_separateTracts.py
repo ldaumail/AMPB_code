@@ -288,17 +288,22 @@ verbose = True
 
 hemis = ["L", "R"]
 contrast = contrast_order[0]   # e.g. "motionXstationary"
+localizer_order = ["mtlocal", "ptlocal"]
 
 # get n_subj, n_tracts
 n_subj = len(participants)
 n_tracts = len(tract_order)
-rs   = np.full((n_subj, n_tracts, len(hemis)), np.nan)
-rsquared = np.full((n_subj, n_tracts, len(hemis)), np.nan) #goodness of fit
-reliability = np.full((n_subj, n_tracts, len(hemis)), np.nan)
-rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan) #storage of run indices of EB runs used for this analysis
-trained_coefs = np.zeros((n_subj, n_tracts, len(hemis)))  # scalar summary per tract/run
-delta_mse = np.full((n_subj, n_tracts, len(hemis)), np.nan) #
+n_localizers = len(localizer_order)
+n_hemis = len(hemis)
+n_target_runs = 3
+
+rs   = np.full((n_subj, n_tracts, n_localizers, n_hemis), np.nan)
+rsquared = np.full((n_subj, n_tracts, n_localizers, n_hemis), np.nan) #goodness of fit
+reliability = np.full((n_subj, n_tracts, n_localizers, n_hemis), np.nan)
+rnd_run_idx = np.full((n_subj, n_target_runs, n_localizers, n_hemis), np.nan) #storage of run indices of EB runs used for this analysis
+trained_coefs = np.zeros((n_subj, n_tracts, n_localizers, n_hemis))  # scalar summary per tract/run
 predicted_maps = {hemi: [] for hemi in hemis}
+
 for h, hemi in enumerate(hemis):
         #h = 0
         #hemi = "L"
@@ -318,32 +323,38 @@ for h, hemi in enumerate(hemis):
     n_masked = len(wang_hmt_vertices)
 
     # Predicted and coef storage preallocation
-    predicted = np.full((n_subj, n_tracts, n_masked), np.nan)  # predicted maps per run
+    predicted = np.full((n_localizers, n_subj, n_tracts, n_masked), np.nan)  # predicted maps per run
     _, _, n_vertices  = density_data[hemi].shape #get total number of vertices within fsaverage hemisphere
     
-    n_target_runs = 3
-    all_C = []              # will store (n_subj, 3, n_vertices)
-    rnd_run_idx = np.full((n_subj, n_target_runs, len(hemis)), np.nan)
+
+    all_C = np.full((n_localizers, n_subj, n_target_runs, n_masked), np.nan)             # will store (n_subj, 3, n_vertices)
     for s, participant in enumerate(participants):
+        # EB --> ptlocal only
+        # NS --> mtlocal + ptlocal
+        if "EB" in participant:
+                localizers = ["ptlocal"]
+        elif "NS" in participant:
+                localizers = ["mtlocal", "ptlocal"]
+        for l, localizer in enumerate(localizers):
+            
+            C_full = norm_contrast_data[hemi][s][localizer][contrast]   # (n_runs_available, n_vertices)
+            n_runs_available = C_full.shape[0]
 
-        C_full = norm_contrast_data[hemi][s][contrast]   # (n_runs_available, n_vertices)
-        n_runs_available = C_full.shape[0]
+            # ---- choose runs ----
+            if "NS" in participant:
+                run_idx = np.arange(n_target_runs)
+            elif "EB" in participant:
+                run_idx = np.random.choice(
+                    n_runs_available, size=n_target_runs, replace=False
+                )
 
-        # ---- choose runs ----
-        if "NS" in participant:
-            run_idx = np.arange(3)
-        elif "EB" in participant:
-            run_idx = np.random.choice(
-                n_runs_available, size=3, replace=False
-            )
+            rnd_run_idx[s, :, l, h] = run_idx #store runs indices of runs used for this analysis
 
-        rnd_run_idx[s, :, h] = run_idx #store runs indices of runs used for this analysis
-
-        # ---- extract runs ----
-        C_sel = C_full[run_idx, :]     # (3, n_vertices)
-        all_C.append(C_sel)
-    all_C = np.stack(all_C, axis=0)
-    C_mean = all_C.mean(axis=1)
+            # ---- extract runs ----
+            C_sel = C_full[run_idx, :]     # (3, n_vertices)
+            all_C[l,s,] = C_sel
+    # all_C = np.stack(all_C[localizer], axis=0)
+    C_mean = all_C.mean(axis=2)
 
 
     # -------------------------
@@ -354,36 +365,42 @@ for h, hemi in enumerate(hemis):
 
         if verbose:
             print(f"Fitting participant {participant}")
+        # EB --> ptlocal only
+        # NS --> mtlocal + ptlocal
+        if "EB" in participant:
+                localizers = ["ptlocal"]
+        elif "NS" in participant:
+                localizers = ["mtlocal", "ptlocal"]
+        for l, localizer in enumerate(localizers):
+            for tract_idx in range(n_tracts):
 
-        for tract_idx in range(n_tracts):
+                if verbose:
+                    print(f" Tract {tract_idx+1}/{n_tracts}")
 
-            if verbose:
-                print(f" Tract {tract_idx+1}/{n_tracts}")
-
-            X = np.squeeze(norm_density_data[hemi][s][tract_idx,]).reshape(-1, 1)
-            y = np.squeeze(C_mean[s, :]) #.reshape(-1, 1)
+                X = np.squeeze(norm_density_data[hemi][s][tract_idx,]).reshape(-1, 1)
+                y = np.squeeze(C_mean[l, s, :]) #.reshape(-1, 1)
 
 
-            # Train linear model (multi-output regression)
-            linreg = LinearRegression()
-            linreg.fit(X, y)
+                # Train linear model (multi-output regression)
+                linreg = LinearRegression()
+                linreg.fit(X, y)
 
-            trained_coefs[s, tract_idx, h] = linreg.coef_.copy()
-            # linreg.intercept_
+                trained_coefs[s, tract_idx, l, h] = linreg.coef_.copy()
+                # linreg.intercept_
 
-            # Predict (optional)
-            y_pred = linreg.predict(X)
-            predicted[s, tract_idx, :] = y_pred
-        
+                # Predict (optional)
+                y_pred = linreg.predict(X)
+                predicted[l, s, tract_idx, :] = y_pred
+            
 
-            # Reliability (if needed)
-            reliability[s, tract_idx, h] = vertex_bootstrap_reliability(all_C[s,:,:])
+                # Reliability (if needed)
+                reliability[s, tract_idx, l, h] = vertex_bootstrap_reliability(all_C[l,s,:,:])
 
-            # Optional evaluation
-            r, p = pearsonr(y, y_pred)
-            rs[s, tract_idx, h] = r
-            mse_full = mean_squared_error(y, y_pred)
-            print(f"r={r:.4f}, MSE={mse_full:.4e}, p={p:.4e}")
+                # Optional evaluation
+                r, p = pearsonr(y, y_pred)
+                rs[s, tract_idx, l, h] = r
+                mse_full = mean_squared_error(y, y_pred)
+                print(f"r={r:.4f}, MSE={mse_full:.4e}, p={p:.4e}")
 
     predicted_maps[hemi] = predicted
 
@@ -391,13 +408,13 @@ for h, hemi in enumerate(hemis):
 import sys
 current_dir = op.dirname(op.abspath(__file__))
 sys.path.append(current_dir)
-from plots_utils_19_3 import pearsonr_plot, beta_plot, avg_density_plot
+from plots_utils_15_4 import pearsonr_plot, beta_plot, avg_density_plot
 
 #Performance plots
-savefilename = f"wb_pearson_barplot_linearreg_separate_tracts_{projfrac}mm.png"
-pearsonr_plot(rs, reliability, participants, tract_order, bids_path, savefilename)
+savefilename = f"wb_pearson_linearreg_separate_tracts_{projfrac}frac.png"
+pearsonr_plot(rs, reliability, participants, tract_order, localizer_order, bids_path, savefilename)
 
-savefilename = f"wb_beta_barplot_linearreg_separate_tracts_{projfrac}mm.png"
+savefilename = f"wb_beta_barplot_linearreg_separate_tracts_{projfrac}frac.png"
 ylim = [-0.4, 0.4]
 beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename, ylim)
 
