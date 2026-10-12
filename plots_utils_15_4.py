@@ -14,16 +14,22 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from scipy.stats import sem
 
-def pearsonr_plot(rs, reliability, participants, tract_order, localizer_order, bids_path, savefilename):
+def pearsonr_plot(rs, reliability, participants, tract_order, bids_path, savefilename):
     #First compute noise ceiling 95% CI
     hemi_labels = ["L", "R"]
     nc_rows = []
 
     for h in range(2):     # left/right hemispheres
-        for l, localizer in enumerate(localizer_order):
-            for t, tract in enumerate(tract_order):
-                for s, participant in enumerate(participants):
-                    gp = "EB" if "EB" in participant else "NS"
+        for t, tract in enumerate(tract_order):
+            for s, participant in enumerate(participants):
+                gp = "EB" if "EB" in participant else "NS"
+                # EB --> ptlocal only
+                # NS --> mtlocal + ptlocal
+                if "EB" in participant:
+                        localizers = ["ptlocal"]
+                elif "NS" in participant:
+                        localizers = ["mtlocal", "ptlocal"]
+                for l, localizer in enumerate(localizers):
 
                     nc_rows.append({
                         "Tract": tract,
@@ -58,6 +64,9 @@ def pearsonr_plot(rs, reliability, participants, tract_order, localizer_order, b
         .replace("AnteriorThalamic", "ATR")
         .replace("CingulumCingulate", "CC")
         .replace("Corticospinal", "CST")
+        .replace("MTxLGNxPU", "Thalamocortical")
+        .replace("MTxPTxSTS1", "Temporal")
+        .replace("MTxFEF", "Frontal")
         for t in tract_order
     ]
 
@@ -72,11 +81,17 @@ def pearsonr_plot(rs, reliability, participants, tract_order, localizer_order, b
     rows = []
 
     for h in range(2):     # left/right hemispheres
-        for l, localizer in enumerate(localizer_order):
-            for t, tract in enumerate(tract_order):
-                for s, participant in enumerate(participants):
-                    gp = "EB" if "EB" in participant else "NS"
-                    # pearson = rs[:, s, h]
+        for t, tract in enumerate(tract_order):
+            for s, participant in enumerate(participants):
+                gp = "EB" if "EB" in participant else "NS"
+                # EB --> ptlocal only
+                # NS --> mtlocal + ptlocal
+                if "EB" in participant:
+                        localizers = ["ptlocal"]
+                elif "NS" in participant:
+                        localizers = ["mtlocal", "ptlocal"]
+                for l, localizer in enumerate(localizers):
+                # pearson = rs[:, s, h]
 
                     rows.append({
                         "Subject": s,
@@ -104,11 +119,10 @@ def pearsonr_plot(rs, reliability, participants, tract_order, localizer_order, b
     # ------------------------------------------------
 
     palette = {
-        ("EB", "mtlocal"): "#9ecae1",  # light blue
-        ("EB", "ptlocal"): "#1f4e79",  # dark blue
-        ("NS", "mtlocal"): "#fdae6b",  # light orange
-        ("NS", "ptlocal"): "#c45100",  # dark orange
-    }
+        ("EB", "ptlocal"): "#9ecae1",  # light blue 
+        ("NS", "mtlocal"): "#c45100",  # dark orange 
+        ("NS", "ptlocal"): "#fdae6b",  # light orange
+    } #        ("EB", "mtlocal"): "#1f4e79",  # dark blue
 
     # Create a combined categorical variable for hue
     for data_df in [df, nc_df]:
@@ -117,11 +131,10 @@ def pearsonr_plot(rs, reliability, participants, tract_order, localizer_order, b
         )
 
     hue_order = [
-        "EB_mtlocal",
         "EB_ptlocal",
         "NS_mtlocal",
         "NS_ptlocal",
-    ]
+    ] #        "EB_mtlocal",
 
     combined_palette = {
         f"{group}_{localizer}": color
@@ -331,218 +344,6 @@ def pearsonr_plot(rs, reliability, participants, tract_order, localizer_order, b
 
     plt.show()
 
-    # # ------------------------------------------------
-    # # Color palette: EB = blue, NS = orange
-    # # ------------------------------------------------
-    # palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
-
-    # # ------------------------------------------------
-    # # Create 2 subplots — one per hemisphere
-    # # ------------------------------------------------
-
-    # # text_plotted = False  # Flag to ensure we only plot the label once
-
-    # #  plt.rcParams.update({
-    # #     'font.weight': 'bold',
-    # #     'axes.labelweight': 'bold'
-    # # })
-
-    # palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
-
-    # fig, axes = plt.subplots(
-    #     2, 1,
-    #     figsize=(18,18),
-    #     sharey=True
-    # )
-
-    # group_offset = {"EB": -0.2, "NS": 0.2}
-
-    # for ax, hemi in zip(axes, hemi_labels):
-
-    #     df_h = df[df["Hemisphere"] == hemi]
-    #     sem_h = sem_df[sem_df["Hemisphere"] == hemi]
-    #     nc_h = nc_sem_df[nc_sem_df["Hemisphere"] == hemi]
-
-    #     # ---------------------------------------------------
-    #     # Bar plot (mean ± SE)
-    #     # ---------------------------------------------------
-
-    #     sns.barplot(
-    #         data=df_h,
-    #         x="Tract",
-    #         y="Correlation",
-    #         hue="Group",
-    #         palette=palette,
-    #         hue_order=["EB","NS"],
-    #         errorbar="se",
-    #         capsize=0.08,
-    #         alpha=0.65,
-    #         edgecolor="black",
-    #         linewidth=2,
-    #         ax=ax
-    #     )
-
-    #     # ---------------------------------------------------
-    #     # Participant dots
-    #     # ---------------------------------------------------
-
-    #     sns.stripplot(
-    #         data=df_h,
-    #         x="Tract",
-    #         y="Correlation",
-    #         hue="Group",
-    #         hue_order=["EB","NS"],
-    #         dodge=True,
-    #         jitter=0.12,
-    #         size=6,
-    #         palette=palette,
-    #         edgecolor="black",
-    #         linewidth=0.8,
-    #         alpha=0.9,
-    #         legend=False,
-    #         ax=ax
-    #     )
-
-    #     # ---------------------------------------------------
-    #     # Noise ceiling
-    #     # ---------------------------------------------------
-
-    #     for _, row in nc_h.iterrows():
-
-    #         x_center = (
-    #             tract_order.index(row["Tract"])
-    #             + group_offset[row["Group"]]
-    #         )
-
-    #         ax.fill_between(
-    #             [x_center-0.18, x_center+0.18],
-    #             row["CI95_lower"],
-    #             row["CI95_upper"],
-    #             color="lightgray",
-    #             alpha=0.35,
-    #             zorder=0
-    #         )
-
-    #         ax.hlines(
-    #             y=[row["CI95_lower"],
-    #             row["CI95_upper"],
-    #             row["Mean"]],
-    #             xmin=x_center-0.18,
-    #             xmax=x_center+0.18,
-    #             colors="gray",
-    #             linestyles=["--","--",":"],
-    #             linewidth=2
-    #         )
-
-    #     # ---------------------------------------------------
-    #     # Formatting
-    #     # ---------------------------------------------------
-
-    #     ax.set_ylim(-0.2,1)
-
-    #     ax.set_title(
-    #         f"{hemi}-Hemisphere",
-    #         fontsize=22,
-    #         fontweight="bold",
-    #         pad=15
-    #     )
-
-    #     ax.set_xlabel(
-    #         "Tract",
-    #         fontsize=18,
-    #         fontweight="bold"
-    #     )
-
-    #     ax.axhline(
-    #         0,
-    #         color="gray",
-    #         linestyle="--",
-    #         linewidth=1.5
-    #     )
-
-    #     ax.spines["left"].set_linewidth(2.5)
-    #     ax.spines["bottom"].set_linewidth(2.5)
-
-    #     ax.tick_params(
-    #         axis='both',
-    #         which='major',
-    #         labelsize=16,
-    #         width=2.5
-    #     )
-
-    #     ax.set_xticks(np.arange(len(tract_order)))
-    #     ax.set_xticklabels(
-    #         tract_labels,
-    #         rotation=35,
-    #         ha="right",
-    #         fontsize=16,
-    #         fontweight="bold"
-    #     )
-
-    #     for label in ax.get_yticklabels():
-    #         label.set_fontweight("bold")
-
-    #     # ---------------------------------------------------
-    #     # Manual legend
-    #     # ---------------------------------------------------
-
-    #     patch_eb = Patch(
-    #         color=palette["EB"],
-    #         alpha=0.65,
-    #         label="EB"
-    #     )
-
-    #     patch_ns = Patch(
-    #         color=palette["NS"],
-    #         alpha=0.65,
-    #         label="NS"
-    #     )
-
-    #     noise_patch = Patch(
-    #         facecolor="lightgray",
-    #         alpha=0.35,
-    #         label="95% noise ceiling CI"
-    #     )
-
-    #     leg = ax.legend(
-    #         handles=[patch_eb, patch_ns, noise_patch],
-    #         title="Group",
-    #         loc="upper right",
-    #         frameon=False,
-    #         fontsize=14
-    #     )
-
-    #     plt.setp(leg.get_texts(), fontweight="bold")
-    #     plt.setp(leg.get_title(), fontweight="bold")
-
-
-    # axes[0].set_ylabel(
-    #     "Pearson's r",
-    #     fontsize=18,
-    #     fontweight="bold"
-    # )
-
-    # axes[1].set_ylabel(
-    #     "Pearson's r",
-    #     fontsize=18,
-    #     fontweight="bold"
-    # )
-
-    # sns.despine()
-    # plt.tight_layout()
-
-    # saveDir = op.join(bids_path, "analysis", "plots")
-    # os.makedirs(saveDir, exist_ok=True)
-
-    # plt.savefig(
-    #     op.join(saveDir,
-    #     savefilename),
-    #     dpi=300,
-    #     bbox_inches="tight"
-    # )
-
-    # plt.show()
-
 
 def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
 
@@ -562,6 +363,9 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
         .replace("AnteriorThalamic", "ATR")
         .replace("CingulumCingulate", "CC")
         .replace("Corticospinal", "CST")
+        .replace("MTxLGNxPU", "Thalamocortical")
+        .replace("MTxPTxSTS1", "Temporal")
+        .replace("MTxFEF", "Frontal")
         for t in tract_order
     ]
 
@@ -576,15 +380,23 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
         for t in range(n_tracts):
             for s, participant in enumerate(participants):
                 gp = "EB" if "EB" in participant else "NS"
+                                # EB --> ptlocal only
+                # NS --> mtlocal + ptlocal
+                if "EB" in participant:
+                        localizers = ["ptlocal"]
+                elif "NS" in participant:
+                        localizers = ["mtlocal", "ptlocal"]
+                for l, localizer in enumerate(localizers):
                 # pearson = rs[:, s, h]
 
-                rows.append({
-                    "Subject": s,
-                    "Tract": tract_order[t],
-                    "Hemisphere": hemi_labels[h],
-                    "Group": gp,
-                    "Beta": betas[s,t,h] #r_all[s, h] #
-                })
+                    rows.append({
+                        "Subject": s,
+                        "Localizer": localizer,
+                        "Tract": tract_order[t],
+                        "Hemisphere": hemi_labels[h],
+                        "Group": gp,
+                        "Beta": betas[s,t,l,h] #r_all[s, h] #
+                    })
 
     df = pd.DataFrame(rows)
 
@@ -599,10 +411,32 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
     )
 
     # ------------------------------------------------
-    # Color palette: EB = blue, NS = orange
+    # Color palette: Group = color family,
+    # Localizer = shade within the family
     # ------------------------------------------------
-    palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
 
+    palette = {
+        ("EB", "ptlocal"): "#9ecae1",  # light blue 
+        ("NS", "mtlocal"): "#c45100",  # dark orange 
+        ("NS", "ptlocal"): "#fdae6b",  # light orange
+    } #        ("EB", "mtlocal"): "#1f4e79",  # dark blue
+
+    # Create a combined categorical variable for hue
+    for data_df in [df]:
+        data_df["GroupLocalizer"] = (
+            data_df["Group"] + "_" + data_df["Localizer"]
+        )
+
+    hue_order = [
+        "EB_ptlocal",
+        "NS_mtlocal",
+        "NS_ptlocal",
+    ] #        "EB_mtlocal",
+
+    combined_palette = {
+        f"{group}_{localizer}": color
+        for (group, localizer), color in palette.items()
+    }
     # ------------------------------------------------
     # Create 2 subplots — one per hemisphere
     # ------------------------------------------------
@@ -614,7 +448,6 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
     #     'axes.labelweight': 'bold'
     # })
 
-    palette = {"EB": "#1f77b4", "NS": "#ff7f0e"}
 
     fig, axes = plt.subplots(
         2, 1,
@@ -638,9 +471,9 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
             data=df_h,
             x="Tract",
             y="Beta",
-            hue="Group",
-            palette=palette,
-            hue_order=["EB","NS"],
+            hue="GroupLocalizer",
+            hue_order=hue_order,
+            palette=combined_palette,
             errorbar="se",
             capsize=0.08,
             alpha=0.65,
@@ -657,12 +490,12 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
             data=df_h,
             x="Tract",
             y="Beta",
-            hue="Group",
-            hue_order=["EB","NS"],
+            hue="GroupLocalizer",
+            hue_order=hue_order,
+            palette=combined_palette,
             dodge=True,
             jitter=0.12,
             size=6,
-            palette=palette,
             edgecolor="black",
             linewidth=0.8,
             alpha=0.9,
@@ -722,25 +555,26 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
         # Manual legend
         # ---------------------------------------------------
 
-        patch_eb = Patch(
-            color=palette["EB"],
-            alpha=0.65,
-            label="EB"
-        )
-
-        patch_ns = Patch(
-            color=palette["NS"],
-            alpha=0.65,
-            label="NS"
-        )
+        legend_handles = [
+            Patch(
+                facecolor=combined_palette[key],
+                edgecolor="black",
+                alpha=0.75,
+                label=(
+                    f"{key.split('_')[0]} — "
+                    f"{key.split('_')[1]}"
+                )
+            )
+            for key in hue_order
+        ]
 
 
         leg = ax.legend(
-            handles=[patch_eb, patch_ns],
-            title="Group",
+            handles=legend_handles,
+            title="Group — Localizer",
             loc="upper right",
             frameon=False,
-            fontsize=14
+            fontsize=12
         )
 
         plt.setp(leg.get_texts(), fontweight="bold")
