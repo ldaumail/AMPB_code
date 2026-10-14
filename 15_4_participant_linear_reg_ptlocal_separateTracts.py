@@ -411,10 +411,10 @@ sys.path.append(current_dir)
 from plots_utils_15_4 import pearsonr_plot, beta_plot, avg_density_plot
 
 #Performance plots
-savefilename = f"wb_pearson_linearreg_separate_tracts_{projfrac}frac.png"
+savefilename = f"targ_pearson_linearreg_separate_tracts_{projfrac}frac.png"
 pearsonr_plot(rs, reliability, participants, tract_order, bids_path, savefilename)
 
-savefilename = f"wb_beta_barplot_linearreg_separate_tracts_{projfrac}frac.png"
+savefilename = f"targ_beta_barplot_linearreg_separate_tracts_{projfrac}frac.png"
 ylim = [-0.4, 0.4]
 beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename, ylim)
 

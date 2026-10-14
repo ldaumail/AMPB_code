@@ -297,9 +297,9 @@ n_localizers = len(localizer_order)
 n_hemis = len(hemis)
 n_target_runs = 3
 
-rs   = np.full((n_subj, n_tracts, n_localizers, n_hemis), np.nan)
-rsquared = np.full((n_subj, n_tracts, n_localizers, n_hemis), np.nan) #goodness of fit
-reliability = np.full((n_subj, n_tracts, n_localizers, n_hemis), np.nan)
+rs   = np.full((n_subj, n_localizers, n_hemis), np.nan)
+rsquared = np.full((n_subj, n_localizers, n_hemis), np.nan) #goodness of fit
+reliability = np.full((n_subj, n_localizers, n_hemis), np.nan)
 rnd_run_idx = np.full((n_subj, n_target_runs, n_localizers, n_hemis), np.nan) #storage of run indices of EB runs used for this analysis
 trained_coefs = np.zeros((n_subj, n_tracts, n_localizers, n_hemis))  # scalar summary per tract/run
 delta_mse = np.full((n_tracts, n_subj, n_localizers, len(hemis)), np.nan) #
@@ -394,11 +394,11 @@ for h, hemi in enumerate(hemis):
         
 
             # Reliability (if needed)
-            reliability[s, :, l, h] = vertex_bootstrap_reliability(all_C[l,s,:,:])
+            reliability[s, l, h] = vertex_bootstrap_reliability(all_C[l,s,:,:])
 
             # Optional evaluation
             r, p = pearsonr(y, y_pred)
-            rs[s, :, l, h] = r
+            rs[s, l, h] = r
             mse_full = mean_squared_error(y, y_pred)
             print(f"r={r:.4f}, MSE={mse_full:.4e}, p={p:.4e}")
 
@@ -417,13 +417,13 @@ for h, hemi in enumerate(hemis):
 import sys
 current_dir = op.dirname(op.abspath(__file__))
 sys.path.append(current_dir)
-from plots_utils_15_4 import pearsonr_plot, beta_plot, avg_density_plot
+from plots_utils_15_4 import pearsonr_combined_plot, beta_plot, avg_density_plot
 
 #Performance plots
-savefilename = f"wb_pearson_linearreg_combined_tracts_{projfrac}frac.png"
-pearsonr_plot(rs, reliability, participants, tract_order, bids_path, savefilename)
+savefilename = f"targ_pearson_linearreg_combined_tracts_{projfrac}frac.png"
+pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path, savefilename)
 
-savefilename = f"wb_beta_barplot_linearreg_combined_tracts_{projfrac}frac.png"
+savefilename = f"targ_beta_barplot_linearreg_combined_tracts_{projfrac}frac.png"
 ylim = [-0.4, 0.4]
 beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename, ylim)
 
@@ -450,13 +450,21 @@ for h in range(2):     # left/right hemispheres
         for s, participant in enumerate(participants):
             gp = "EB" if "EB" in participant else "NS"
             # pearson = rs[:, s, h]
-
-            rows.append({
+            # pearson = rs[:, s, h]
+            # EB --> ptlocal only
+            # NS --> mtlocal + ptlocal
+            if "EB" in participant:
+                    localizers = ["ptlocal"]
+            elif "NS" in participant:
+                    localizers = ["mtlocal", "ptlocal"]
+            for l, localizer in enumerate(localizers):
+                rows.append({
                 "Subject": s,
+                "Localizer": localizer,
                 "Tract": tract_order[t],
                 "Hemisphere": hemi_labels[h],
                 "Group": gp,
-                "Beta": trained_coefs[s,t,h] #r_all[s, h] #
+                "Beta": trained_coefs[s,t,l,h] #r_all[s, h] #
             })
 
 df = pd.DataFrame(rows)
@@ -469,17 +477,23 @@ hemi_labels = ["L", "R"]
 rows = []
 
 for h in range(2):     # left/right hemispheres
-    for t in range(n_tracts):
-        for s, participant in enumerate(participants):
-            gp = "EB" if "EB" in participant else "NS"
-            # pearson = rs[:, s, h]
-
+    for s, participant in enumerate(participants):
+        gp = "EB" if "EB" in participant else "NS"
+        # pearson = rs[:, s, h]
+        # pearson = rs[:, s, h]
+        # EB --> ptlocal only
+        # NS --> mtlocal + ptlocal
+        if "EB" in participant:
+                localizers = ["ptlocal"]
+        elif "NS" in participant:
+                localizers = ["mtlocal", "ptlocal"]
+        for l, localizer in enumerate(localizers):
             rows.append({
-                "Subject": s,
-                "Tract": tract_order[t],
-                "Hemisphere": hemi_labels[h],
-                "Group": gp,
-                "Correlation": rs[s,t,h] #r_all[s, h] #
-            })
+            "Subject": s,
+            "Localizer": localizer,
+            "Hemisphere": hemi_labels[h],
+            "Group": gp,
+            "Correlation": rs[s,l,h] #r_all[s, h] #
+        })
 
 df = pd.DataFrame(rows)
