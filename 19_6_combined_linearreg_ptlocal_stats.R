@@ -175,7 +175,7 @@ df_ranksum <- data %>%
   ) %>%
   arrange(Hemisphere, Tract, Comparison)
 
-#2. Compare between tracts within groups and hemi ==> need to perform dependant samples test
+#2. Compare between localizer task within groups and hemi ==> need to perform dependent samples test
 #= Wilcoxon signed rank test
 
 library(dplyr)
@@ -249,11 +249,12 @@ df_signedrank <- data %>%
   ) %>%
   arrange(Hemisphere, Tract, Comparison)
 
-#---------------
-# Pearson's R
-#---------------
-#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_targ_participants_linearreg_ptlocal/pearsonr_contrast-motionXstationary_combined_1frac.csv'
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_wb_participants_linearreg_ptlocal/pearsonr_contrast-motionXstationary_combined_1frac.csv'
+#---------------------------------------------------------------------------------------------------------------------
+#----------------------------------------------- Pearson's R----------------------------------------------------------
+#---------------------------------------------------------------------------------------------------------------------
+
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_targ_participants_linearreg_ptlocal/pearsonr_contrast-motionXstationary_combined_1frac.csv'
+#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_wb_participants_linearreg_ptlocal/pearsonr_contrast-motionXstationary_combined_1frac.csv'
 
 file = file.path(path)
 data = read.csv(file) #
@@ -284,3 +285,156 @@ df_ttests <- data %>%
   select(Group, Localizer, Hemisphere, n, t_value, p_value) %>%
   arrange(Group, Localizer, Hemisphere)
 
+#------------------
+# Group comparisons
+#------------------
+
+# 1. Wilcoxon rank sum test (independant samples) ===
+#compare between EB and NS groups, within each hemi
+
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(tibble)
+
+# Define the two independent comparisons
+comparisons <- tribble(
+  ~Comparison,             ~Group1, ~Localizer1, ~Group2, ~Localizer2,
+  "NS_ptlocal_vs_EB_ptlocal", "NS",  "ptlocal",   "EB",   "ptlocal",
+  "EB_ptlocal_vs_NS_mtlocal", "EB",  "ptlocal",   "NS",   "mtlocal"
+) #  "NS_ptlocal_vs_NS_mtlocal", "NS",  "ptlocal",   "NS",   "mtlocal",
+
+# Function to run one Wilcoxon rank-sum test safely
+safe_wilcox <- function(d, group1, localizer1, group2, localizer2) {
+  
+  x <- d %>%
+    filter(Group == group1, Localizer == localizer1) %>%
+    pull(Correlation)
+  
+  y <- d %>%
+    filter(Group == group2, Localizer == localizer2) %>%
+    pull(Correlation)
+  
+  # Remove missing and non-finite values
+  x <- x[is.finite(x)]
+  y <- y[is.finite(y)]
+  
+  n1 <- length(x)
+  n2 <- length(y)
+  
+  test <- tryCatch(
+    wilcox.test(x, y),
+    error = function(e) NULL
+  )
+  
+  tibble(
+    n1 = n1,
+    n2 = n2,
+    W = unname(test$statistic),
+    p_value = test$p.value
+  )
+}
+
+# Run all comparisons for each Hemisphere 
+df_ranksum <- data %>%
+  group_by(Hemisphere) %>%
+  group_modify(~ {
+    d <- .x
+    
+    map_dfr(seq_len(nrow(comparisons)), function(i) {
+      
+      comp <- comparisons[i, ]
+      
+      result <- safe_wilcox(
+        d,
+        group1 = comp$Group1,
+        localizer1 = comp$Localizer1,
+        group2 = comp$Group2,
+        localizer2 = comp$Localizer2
+      )
+      
+      bind_cols(comp, result)
+    })
+  }) %>%
+  ungroup() %>%
+  select(
+    Hemisphere, Comparison,
+    Group1, Localizer1, n1,
+    Group2, Localizer2, n2,
+    W, p_value
+  ) %>%
+  arrange(Hemisphere, Comparison)
+
+#2. Compare between localizer tasks within groups and hemi ==> need to perform dependent samples test
+#= Wilcoxon signed rank test
+
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(tibble)
+
+# Define the the dependent comparison
+comparisons <- tribble(
+  ~Comparison,             ~Group1, ~Localizer1, ~Group2, ~Localizer2,
+  "NS_ptlocal_vs_NS_mtlocal", "NS",  "ptlocal",   "NS",   "mtlocal",
+) #  
+
+#function to run Wilcoxon signed rank test
+safe_wilcox <- function(d, group1, localizer1, group2, localizer2) {
+  
+  x <- d %>%
+    filter(Group == group1, Localizer == localizer1) %>%
+    pull(Correlation)
+  
+  y <- d %>%
+    filter(Group == group2, Localizer == localizer2) %>%
+    pull(Correlation)
+  
+  # Remove missing and non-finite values
+  x <- x[is.finite(x)]
+  y <- y[is.finite(y)]
+  
+  n1 <- length(x)
+  n2 <- length(y)
+  
+  test <- tryCatch(
+    wilcox.test(x, y, paired = TRUE),
+    error = function(e) NULL
+  )
+  
+  tibble(
+    n1 = n1,
+    n2 = n2,
+    W = unname(test$statistic),
+    p_value = test$p.value
+  )
+}
+# Run all comparisons for each Hemisphere × Tract
+df_signedrank <- data %>%
+  group_by(Hemisphere) %>%
+  group_modify(~ {
+    d <- .x
+    
+    map_dfr(seq_len(nrow(comparisons)), function(i) {
+      
+      comp <- comparisons[i, ]
+      
+      result <- safe_wilcox(
+        d,
+        group1 = comp$Group1,
+        localizer1 = comp$Localizer1,
+        group2 = comp$Group2,
+        localizer2 = comp$Localizer2
+      )
+      
+      bind_cols(comp, result)
+    })
+  }) %>%
+  ungroup() %>%
+  select(
+    Hemisphere, Comparison,
+    Group1, Localizer1, n1,
+    Group2, Localizer2, n2,
+    W, p_value
+  ) %>%
+  arrange(Hemisphere, Comparison)
