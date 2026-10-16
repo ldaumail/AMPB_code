@@ -429,9 +429,9 @@ beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename, yli
 
 
 #Data plots
-img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "mean_density")
-tract_order2 = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] 
-avg_density_plot(norm_density_data, participants, tract_order2, bids_path, img_out_dir, projfrac)
+# img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "mean_density")
+# tract_order2 = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] 
+# avg_density_plot(norm_density_data, participants, tract_order2, bids_path, img_out_dir, projfrac)
 
 #------------------------------------------------------------
 # Save tables for statistical analyses
@@ -459,7 +459,7 @@ for h in range(2):     # left/right hemispheres
                     localizers = ["mtlocal", "ptlocal"]
             for l, localizer in enumerate(localizers):
                 rows.append({
-                "Subject": s,
+                "Participant": participant,
                 "Localizer": localizer,
                 "Tract": tract_order[t],
                 "Hemisphere": hemi_labels[h],
@@ -489,7 +489,7 @@ for h in range(2):     # left/right hemispheres
                 localizers = ["mtlocal", "ptlocal"]
         for l, localizer in enumerate(localizers):
             rows.append({
-            "Subject": s,
+            "Participant": participant,
             "Localizer": localizer,
             "Hemisphere": hemi_labels[h],
             "Group": gp,

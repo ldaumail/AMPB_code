@@ -472,7 +472,7 @@ for h in range(2):     # left/right hemispheres
                     localizers = ["mtlocal", "ptlocal"]
             for l, localizer in enumerate(localizers):
                 rows.append({
-                "Subject": s,
+                "Participant": participant,
                 "Localizer": localizer,
                 "Tract": tract_order[t],
                 "Hemisphere": hemi_labels[h],
@@ -502,11 +502,45 @@ for h in range(2):     # left/right hemispheres
                 localizers = ["mtlocal", "ptlocal"]
         for l, localizer in enumerate(localizers):
             rows.append({
-            "Subject": s,
+            "Participant": participant,
             "Localizer": localizer,
             "Hemisphere": hemi_labels[h],
             "Group": gp,
             "Correlation": rs[s,l,h] #r_all[s, h] #
         })
+
+df = pd.DataFrame(rows)
+
+
+
+#-----------------------------
+# Organize dMSE in table
+#-----------------------------
+import pandas as pd
+n_tracts = len(tract_order)
+hemi_labels = ["L", "R"]
+rows = []
+
+for h in range(2):     # left/right hemispheres
+    for t in range(n_tracts):
+        for s, participant in enumerate(participants):
+            gp = "EB" if "EB" in participant else "NS"
+            # pearson = rs[:, s, h]
+            # pearson = rs[:, s, h]
+            # EB --> ptlocal only
+            # NS --> mtlocal + ptlocal
+            if "EB" in participant:
+                    localizers = ["ptlocal"]
+            elif "NS" in participant:
+                    localizers = ["mtlocal", "ptlocal"]
+            for l, localizer in enumerate(localizers):
+                rows.append({
+                "Participant": participant,
+                "Localizer": localizer,
+                "Tract": tract_order[t],
+                "Hemisphere": hemi_labels[h],
+                "Group": gp,
+                "dMSE": delta_mse[t,s,l,h] #r_all[s, h] #
+            })
 
 df = pd.DataFrame(rows)

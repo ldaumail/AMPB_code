@@ -1,58 +1,11 @@
-
-#Perform stats on linear regression model fits involving all tracts together
-
-#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_targ_participants_linearreg_ptlocal/dmse_contrast-motionXstationary_combined_1frac.csv'
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_wb_participants_linearreg_ptlocal/dmse_contrast-motionXstationary_combined_1frac.csv'
-file = file.path(path)
-data = read.csv(file)
-
-### ======= Testing the dMSE against a null hypothesis
-
-flip_test <- function(x, n_perm = 10000) {
-  
-  # remove NA
-  x <- x[!is.na(x)]
-  
-  # observed statistic (mean)
-  obs_stat <- mean(x)
-  
-  # generate permutation distribution
-  perm_stats <- replicate(n_perm, {
-    signs <- sample(c(-1, 1), length(x), replace = TRUE)
-    mean(x * signs)
-  })
-  
-  # two-sided p-value
-  p_val <- mean(abs(perm_stats) >= abs(obs_stat))
-  
-  list(
-    statistic = obs_stat,
-    p_value = p_val
-  )
-}
-
-library(dplyr)
-library(purrr)
-
-df_perm <- data %>%
-  group_by(Group, Hemisphere, Tract) %>%
-  summarise(
-    n = n(),
-    ptest = list(flip_test(dMSE)),
-    .groups = "drop"
-  ) %>%
-  mutate(
-    statistic = map_dbl(ptest, ~ .x$statistic),
-    p_value   = map_dbl(ptest, ~ .x$p_value)
-  ) %>%
-  select(Group, Hemisphere, Tract, n, statistic, p_value)
-
+#Perform stats on linear regression model fits 
+#Loic Daumail - last edited on 10/15/2026
 #----------------------------------------------------------------------------------------------------------
 #---------------------------------------------------Betas--------------------------------------------------
 #----------------------------------------------------------------------------------------------------------
 
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_targ_participants_linearreg_ptlocal/beta_contrast-motionXstationary_combined_1frac.csv'
-#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_wb_participants_linearreg_ptlocal/beta_contrast-motionXstationary_combined_1frac.csv'
+#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_targ_participants_linearreg_ptlocal/beta_contrast-motionXstationary_combined_1frac.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_wb_participants_linearreg_ptlocal/beta_contrast-motionXstationary_combined_1frac.csv'
 
 file = file.path(path)
 data = read.csv(file)
@@ -438,3 +391,53 @@ df_signedrank <- data %>%
     W, p_value
   ) %>%
   arrange(Hemisphere, Comparison)
+
+
+#---------------------------------------------------------------------------------------------------------------------
+### ======= Testing the dMSE against a null hypothesis
+#---------------------------------------------------------------------------------------------------------------------
+
+#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_targ_participants_linearreg_ptlocal/dmse_contrast-motionXstationary_combined_1frac.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_wb_participants_linearreg_ptlocal/dmse_contrast-motionXstationary_combined_1frac.csv'
+file = file.path(path)
+data = read.csv(file)
+
+flip_test <- function(x, n_perm = 10000) {
+  
+  # remove NA
+  x <- x[!is.na(x)]
+  
+  # observed statistic (mean)
+  obs_stat <- mean(x)
+  
+  # generate permutation distribution
+  perm_stats <- replicate(n_perm, {
+    signs <- sample(c(-1, 1), length(x), replace = TRUE)
+    mean(x * signs)
+  })
+  
+  # two-sided p-value
+  p_val <- mean(abs(perm_stats) >= abs(obs_stat))
+  
+  list(
+    statistic = obs_stat,
+    p_value = p_val
+  )
+}
+
+library(dplyr)
+library(purrr)
+
+df_perm <- data %>%
+  group_by(Group, Hemisphere, Tract) %>%
+  summarise(
+    n = n(),
+    ptest = list(flip_test(dMSE)),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    statistic = map_dbl(ptest, ~ .x$statistic),
+    p_value   = map_dbl(ptest, ~ .x$p_value)
+  ) %>%
+  select(Group, Hemisphere, Tract, n, statistic, p_value)
+
