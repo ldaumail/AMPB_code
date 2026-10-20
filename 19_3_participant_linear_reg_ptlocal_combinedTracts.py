@@ -430,7 +430,7 @@ for h, hemi in enumerate(hemis):
 import sys
 current_dir = op.dirname(op.abspath(__file__))
 sys.path.append(current_dir)
-from plots_utils_15_4 import pearsonr_combined_plot, beta_plot, avg_density_plot
+from plots_utils_15_4 import pearsonr_combined_plot, beta_plot, avg_density_plot, avg_func_plot
 
 #Performance plots
 savefilename = f"wb_pearson_linearreg_combined_tracts_{projfrac}frac.png"
@@ -442,9 +442,12 @@ beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename, yli
 
 
 #Data plots
-img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "mean_density")
+img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg_ptlocal",  "surface_pngs", "mean_density")
 tract_order2 = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] 
 avg_density_plot(norm_density_data, participants, tract_order2, bids_path, img_out_dir, projfrac)
+
+img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg_ptlocal",  "surface_pngs", "mean_contrast")
+avg_func_plot(norm_contrast_data, participants, bids_path, img_out_dir)
 
 #------------------------------------------------------------
 # Save tables for statistical analyses

@@ -377,7 +377,7 @@ for h, hemi in enumerate(hemis):
 import sys
 current_dir = op.dirname(op.abspath(__file__))
 sys.path.append(current_dir)
-from plots_utils_15_2 import avg_density_plot, pearsonr_plot, beta_plot, dmse_plot
+from unused_code.plots_utils_15_2 import avg_density_plot, pearsonr_plot, beta_plot, dmse_plot
 
 #Performance plots
 savefilename = op.join(bids_path, "analysis", "plots", f"pyAFQ3beta_pearson_nc_barplot_linreg_participants_combined_tracts_{projfrac}.png")
