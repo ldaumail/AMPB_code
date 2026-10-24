@@ -417,7 +417,7 @@ for h, hemi in enumerate(hemis):
 import sys
 current_dir = op.dirname(op.abspath(__file__))
 sys.path.append(current_dir)
-from plots_utils_15_4 import pearsonr_combined_plot, beta_plot, avg_density_plot
+from plots_utils_15_4 import pearsonr_combined_plot, beta_plot, avg_density_plot, participant_density_plot, participant_pred_plot
 
 #Performance plots
 savefilename = f"targ_pearson_linearreg_combined_tracts_{projfrac}frac.png"
@@ -429,10 +429,27 @@ beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename, yli
 
 
 #Data plots
-# img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "mean_density")
-# tract_order2 = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] 
-# avg_density_plot(norm_density_data, participants, tract_order2, bids_path, img_out_dir, projfrac)
 
+#Average plots
+img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "mean_density")
+# tract_order2 = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] 
+avg_density_plot(norm_density_data, participants, tract_order, bids_path, img_out_dir, projfrac)
+
+#Participant density plot
+img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "participant_density")
+participant = "sub-NSxLxATx1954"
+pidx = [i for i, p in enumerate(participants) if participant in p]
+ylim = [-3, 3]
+participant_density_plot(norm_density_data, participant, pidx, tract_order, bids_path, img_out_dir, ylim, projfrac)
+
+img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "participant_functional_pred")
+participant = "sub-NSxLxATx1954"
+pidx = [i for i, p in enumerate(participants) if participant in p]
+ylim = [-1, 1]
+participant_pred_plot(predicted_maps, participant, pidx, bids_path, img_out_dir, ylim)
+
+
+#-------------
 #------------------------------------------------------------
 # Save tables for statistical analyses
 #------------------------------------------------------------

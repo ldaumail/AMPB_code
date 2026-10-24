@@ -151,8 +151,38 @@ plot_tracts_svg(
 
 import re
 
+import os
+import os.path as op
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
+from dipy.io.streamline import load_tractogram
+
+
+def load_streamlines(path):
+    """Load a .trx/.trk/.tck file into RASMM streamlines."""
+    sft = load_tractogram(path, reference="same")
+    sft.to_rasmm()
+    return sft.streamlines
+
+
+def hemi_prefix(tract, hemi):
+    """PTR tracts use 'L'/'R'; all others use 'Left'/'Right' (as in your code)."""
+    if "PTR" in tract:
+        return hemi
+    return "Left" if hemi == "L" else "Right"
+
+
+def project_lateral(streamlines, hemi, step=1):
+    """Project RASMM streamlines to 2D for a lateral view.
+    Horizontal = y (flipped for L so anterior is on the left), vertical = z."""
+    flip = -1 if hemi == "L" else 1
+    return [np.column_stack([flip * np.asarray(s)[::step, 1],
+                             np.asarray(s)[::step, 2]])
+            for s in streamlines]
+
 def plot_tracts_svg(participant, tract_names, afq_TR_path,
-                    n_background=20000,
+                    whole_brain_path, n_background=20000,
                     hemis=("L", "R"), cmap="tab10", line_width=1.0,
                     bg_opacity=0.15, bg_color="0.5", bg_line_width=0.3,
                     figsize=(8, 6), step=2, hemi_only_background=True,
@@ -173,7 +203,7 @@ def plot_tracts_svg(participant, tract_names, afq_TR_path,
     for hemi in hemis:
         for tract in tract_names:
             # Whole-brain tractogram: load and subsample once
-            whole_brain_path=op.join(afq_TR_path, f"afq-{hemi_prefix(tract, hemi)}{tract}", participant, 'tractography', f"{participant}_ses-concat_acq-HCPdir99_tractography.trx")
+            # whole_brain_path=op.join(afq_TR_path, f"afq-{hemi_prefix(tract, hemi)}{tract}", participant, 'tractography', f"{participant}_ses-concat_acq-HCPdir99_tractography.trx")
             wb_sub, wb_meanx, center = None, None, None
 
             wb = load_streamlines(whole_brain_path)
@@ -230,7 +260,7 @@ def plot_tracts_svg(participant, tract_names, afq_TR_path,
 
             if save_path:
                 out = op.join(save_path,
-                              f"{participant}_hemi-{hemi}_label-{tract}.{fmt}")
+                              f"{participant}_hemi-{hemi}_label-{tract}_wb.{fmt}")
                 fig.savefig(out, format=fmt, bbox_inches="tight",
                             transparent=True, dpi=300)  # dpi sets raster background quality
             if show:
@@ -245,11 +275,12 @@ tract_list = list(['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'])    # or any list of tra
 participant = "sub-NSxLxATx1954"
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research',
                     'ampb_mt_tractometry_analysis', 'ampb')
-afq_TR_path = op.join('Volumes', 'cos-lab-wpark78','LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_targ' 'pyAFQ3beta')
+afq_TR_path = op.join('/Volumes', 'cos-lab-wpark78','LoicDaumail', 'ampb', 'derivatives', 'pyafq', 'wmgmi_targ', 'pyAFQ3beta')
  
 plot_tracts_svg(
     participant=participant,
     tract_names=tract_list,
     afq_TR_path=afq_TR_path,
+    whole_brain_path=op.join(bids_path, 'derivatives', 'pyAFQ', 'wmgmi_wb', 'afq3beta-wb_6rounds', participant, 'tractography', f"{participant}_ses-concat_acq-HCPdir99_tractography.trx"),
     save_path=op.join(bids_path, "analysis", "plots", "tracts_svg"),
 )

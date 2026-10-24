@@ -960,7 +960,7 @@ def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path
     plt.show()
 
 #========================================
-#Save plot of average density map for each group
+#Save plot of maps for each group
 #========================================
 from nilearn import plotting
 import nibabel as nib
@@ -1028,9 +1028,9 @@ def avg_density_plot(density_maps, participants, tract_order, bids_path, img_out
                 surf_map[wang_hmt_vertices] = mean_vals
 
                 # Output filename (no run index)
-                out_png = op.join(
+                out_base = op.join(
                     img_out_dir,
-                    f"{group}-mean_hemi-{hemi}_label-{tract}_desc-density_mean_inflated_{projfrac}frac.png"
+                    f"{group}-mean_hemi-{hemi}_label-{tract}_desc-density_mean_inflated_{projfrac}frac"
                 )
 
                 # -------------------------------------------------
@@ -1061,9 +1061,17 @@ def avg_density_plot(density_maps, participants, tract_order, bids_path, img_out
                     figure=display.figure,
                     axes=display.axes[0]
                 )
+                # before saving: rasterize the 3D surface only
+                for ax in display.axes:
+                    if ax.name == "3d":
+                        for coll in ax.collections:
+                            coll.set_rasterized(True)
+
+                plt.rcParams["svg.fonttype"] = "none"   # keep text editable (set once, at the top)
 
                 # ---- save + close ----
-                display.savefig(out_png, dpi=300)
+                for fmt in ("png", "svg"):
+                    display.savefig(f"{out_base}.{fmt}", dpi=600)
                 plt.close(display.figure)
 
 
@@ -1134,9 +1142,9 @@ def avg_func_plot(func_maps, participants, bids_path, img_out_dir):
                 surf_map[wang_hmt_vertices] = mean_vals
 
                 # Output filename (no run index)
-                out_png = op.join(
+                out_base = op.join(
                     img_out_dir,
-                    f"{group}-mean_hemi-{hemi}_label-{cont}_desc-motionXstationary_mean_inflated.png"
+                    f"{group}-mean_hemi-{hemi}_label-{cont}_desc-motionXstationary_mean_inflated"
                 )
 
                 # -------------------------------------------------
@@ -1168,6 +1176,239 @@ def avg_func_plot(func_maps, participants, bids_path, img_out_dir):
                     axes=display.axes[0]
                 )
 
+                # before saving: rasterize the 3D surface only
+                for ax in display.axes:
+                    if ax.name == "3d":
+                        for coll in ax.collections:
+                            coll.set_rasterized(True)
+
+                plt.rcParams["svg.fonttype"] = "none"   # keep text editable (set once, at the top)
+
                 # ---- save + close ----
-                display.savefig(out_png, dpi=300)
+                for fmt in ("png", "svg"):
+                    display.savefig(f"{out_base}.{fmt}", dpi=600)
+                # display.savefig(out_png, dpi=300)
                 plt.close(display.figure)
+
+
+def participant_density_plot(density_maps, participant, pidx, tract_order, bids_path, img_out_dir, ylim, projfrac):
+    fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
+    hemis = ["L", "R"]
+    groups = ["EB", "NS"]
+    for h, hemi in enumerate(hemis):
+        hemi_fs = "lh" if hemi == "L" else "rh"
+
+        # ----------------------------
+        # Load Wang MT ROI 
+        # ----------------------------
+        wang_hmt_path = op.join(
+            '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
+            f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+        )
+        surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+        n_vertices  = len(surf_roi)
+        wang_hmt_vertices = np.where(surf_roi > 0)[0]
+        print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
+    
+        #-----------------------------
+        # Load func MT ROI
+        #-----------------------------
+        label_file = op.join(
+            bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi',
+            participant,
+            f"{participant}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
+        )
+
+        func_mt_vertices = read_label(label_file)
+
+        func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
+        func_mt_roi[func_mt_vertices] = 1
+
+        # ----------------------------
+        # Load curvature map (sulci/gyri)
+        # ----------------------------
+        curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
+        curv = nib.freesurfer.read_morph_data(curv_file)
+
+        # normalize curvature for nicer background display
+        curv_norm = (curv - np.percentile(curv, 5)) / (
+            np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
+        )
+        curv_norm = np.clip(curv_norm, 0, 1)
+
+        for t, tract in enumerate(tract_order):
+            # ----------------------------
+            # Density Map visualization
+            # ----------------------------
+            # img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "wb_participants_linearreg",  "surface_pngs", "mean_predicted_func")
+            os.makedirs(img_out_dir, exist_ok=True)
+
+            vmin, vmax = ylim 
+
+            # mean_vals = np.nanmean(sub_mean_maps, axis=0)
+            hemi_maps = np.array([density_maps[hemi][sub][t] for sub in density_maps[hemi]]) #density_maps[hemi][:][t]
+            
+            density_vals = hemi_maps[pidx,:]
+            # Build full-surface vector once
+            surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
+            surf_map[wang_hmt_vertices] = density_vals
+
+            # Output filename (no run index)
+            out_base = op.join(
+                img_out_dir,
+                f"{participant}_hemi-{hemi}_label-{tract}_desc-density_inflated_{projfrac}frac"
+            )
+
+            # -------------------------------------------------
+            # Plot participant map
+            # -------------------------------------------------
+            infl_surf = op.join(fs_path, "fsaverage", "surf", f"{'lh' if hemi == 'L' else 'rh'}.inflated")
+            display = plotting.plot_surf_stat_map(
+                surf_mesh=infl_surf,
+                stat_map=surf_map,
+                hemi="left" if hemi == "L" else "right",
+                view="lateral",
+                cmap="plasma",
+                colorbar=True,
+                vmin=vmin,
+                vmax=vmax,
+                threshold=None,
+                bg_map=curv_norm,
+                bg_on_data=True,
+                darkness=0.6,
+            )
+            # ---- MT boundary overlay ----
+            # plotting.plot_surf_contours(
+            #     surf_mesh=infl_surf,
+            #     roi_map=func_mt_roi,
+            #     levels=[1],
+            #     colors=["lightgray"],
+            #     linewidths=2.0,
+            #     figure=display.figure,
+            #     axes=display.axes[0]
+            # )
+            # before saving: rasterize the 3D surface only
+            for ax in display.axes:
+                if ax.name == "3d":
+                    for coll in ax.collections:
+                        coll.set_rasterized(True)
+
+            plt.rcParams["svg.fonttype"] = "none"   # keep text editable (set once, at the top)
+
+            # ---- save + close ----
+            for fmt in ("png", "svg"):
+                display.savefig(f"{out_base}.{fmt}", dpi=600)
+            plt.close(display.figure)
+
+def participant_pred_plot(func_maps, participant, pidx, bids_path, img_out_dir, ylim):
+    fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
+    hemis = ["L", "R"]
+    for h, hemi in enumerate(hemis):
+        hemi_fs = "lh" if hemi == "L" else "rh"
+        # ----------------------------
+        # Load Wang MT ROI 
+        # ----------------------------
+        wang_hmt_path = op.join(
+            '/Users','ldaumail3','Documents','research','brain_atlases','Wang_2015','hmtplus',
+            f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+        )
+        surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+        n_vertices  = len(surf_roi)
+        wang_hmt_vertices = np.where(surf_roi > 0)[0]
+        print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
+    
+        #-----------------------------
+        # Load func MT ROI
+        #-----------------------------
+        label_file = op.join(
+            bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi',
+            participant,
+            f"{participant}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
+        )
+
+        func_mt_vertices = read_label(label_file)
+
+        func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
+        func_mt_roi[func_mt_vertices] = 1
+
+        # ----------------------------
+        # Load curvature map (sulci/gyri)
+        # ----------------------------
+        curv_file = op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
+        curv = nib.freesurfer.read_morph_data(curv_file)
+
+        # normalize curvature for nicer background display
+        curv_norm = (curv - np.percentile(curv, 5)) / (
+            np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
+        )
+        curv_norm = np.clip(curv_norm, 0, 1)
+        # EB --> ptlocal only
+        # NS --> mtlocal + ptlocal
+        if "EB" in participant:
+                localizers = ["ptlocal"]
+        elif "NS" in participant:
+                localizers = ["mtlocal", "ptlocal"]
+        for c, cont in enumerate(localizers):
+            # ----------------------------
+            # Density Map visualization
+            # ----------------------------
+            # img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "wb_participants_linearreg",  "surface_pngs", "mean_predicted_func")
+            os.makedirs(img_out_dir, exist_ok=True)
+
+            vmin, vmax = ylim 
+
+            # mean_vals = np.nanmean(sub_mean_maps, axis=0)
+            hemi_maps = np.array(np.nanmean(np.squeeze(func_maps[hemi][c][pidx]), axis = 0)) #density_maps[hemi][:][t]
+            func_vals = hemi_maps #[[group in p for p in participants],:]
+            # Build full-surface vector once
+            surf_map = np.full((n_vertices,), np.nan, dtype=np.float32)
+            surf_map[wang_hmt_vertices] = func_vals
+
+            # Output filename (no run index)
+            out_base = op.join(
+                img_out_dir,
+                f"{participant}_hemi-{hemi}_label-{cont}_desc-motionXstationary_inflated"
+            )
+
+            # -------------------------------------------------
+            # Plot average participant map
+            # -------------------------------------------------
+            infl_surf = op.join(fs_path, "fsaverage", "surf", f"{'lh' if hemi == 'L' else 'rh'}.inflated")
+            display = plotting.plot_surf_stat_map(
+                surf_mesh=infl_surf,
+                stat_map=surf_map,
+                hemi="left" if hemi == "L" else "right",
+                view="lateral",
+                cmap="plasma",
+                colorbar=True,
+                vmin=vmin,
+                vmax=vmax,
+                threshold=None,
+                bg_map=curv_norm,
+                bg_on_data=True,
+                darkness=0.6,
+            )
+            # ---- MT boundary overlay ----
+            # plotting.plot_surf_contours(
+            #     surf_mesh=infl_surf,
+            #     roi_map=func_mt_roi,
+            #     levels=[1],
+            #     colors=["lightgray"],
+            #     linewidths=2.0,
+            #     figure=display.figure,
+            #     axes=display.axes[0]
+            # )
+
+            # before saving: rasterize the 3D surface only
+            for ax in display.axes:
+                if ax.name == "3d":
+                    for coll in ax.collections:
+                        coll.set_rasterized(True)
+
+            plt.rcParams["svg.fonttype"] = "none"   # keep text editable (set once, at the top)
+
+            # ---- save + close ----
+            for fmt in ("png", "svg"):
+                display.savefig(f"{out_base}.{fmt}", dpi=600)
+            # display.savefig(out_png, dpi=300)
+            plt.close(display.figure)
