@@ -433,10 +433,11 @@ sys.path.append(current_dir)
 from plots_utils_15_4 import pearsonr_combined_plot, beta_plot, avg_density_plot, avg_func_plot
 
 #Performance plots
-savefilename = f"wb_pearson_linearreg_combined_tracts_{projfrac}frac.png"
-pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path, savefilename)
+savefilename = f"wb_pearson_linearreg_combined_tracts_{projfrac}frac"
+ylim = [-0.2, 1]
+pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path, savefilename,ylim)
 
-savefilename = f"wb_beta_barplot_linearreg_combined_tracts_{projfrac}frac.png"
+savefilename = f"wb_beta_barplot_linearreg_combined_tracts_{projfrac}frac"
 ylim = [-0.4, 0.4]
 beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename, ylim)
 
@@ -544,5 +545,36 @@ for h in range(2):     # left/right hemispheres
                 "Group": gp,
                 "dMSE": delta_mse[t,s,l,h] #r_all[s, h] #
             })
+
+df = pd.DataFrame(rows)
+
+
+#-----------------------------
+# Organize noise ceiling in table
+#-----------------------------
+import pandas as pd
+n_tracts = len(tract_order)
+hemi_labels = ["L", "R"]
+rows = []
+
+for h in range(2):     # left/right hemispheres
+    for s, participant in enumerate(participants):
+        gp = "EB" if "EB" in participant else "NS"
+        # pearson = rs[:, s, h]
+        # pearson = rs[:, s, h]
+        # EB --> ptlocal only
+        # NS --> mtlocal + ptlocal
+        if "EB" in participant:
+                localizers = ["ptlocal"]
+        elif "NS" in participant:
+                localizers = ["mtlocal", "ptlocal"]
+        for l, localizer in enumerate(localizers):
+            rows.append({
+            "Participant": participant,
+            "Localizer": localizer,
+            "Hemisphere": hemi_labels[h],
+            "Group": gp,
+            "NC": reliability[s,l,h] #r_all[s, h] #
+        })
 
 df = pd.DataFrame(rows)

@@ -206,8 +206,8 @@ df_signedrank <- data %>%
 #----------------------------------------------- Pearson's R----------------------------------------------------------
 #---------------------------------------------------------------------------------------------------------------------
 
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_targ_participants_linearreg_ptlocal/pearsonr_contrast-motionXstationary_combined_1frac.csv'
-#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_wb_participants_linearreg_ptlocal/pearsonr_contrast-motionXstationary_combined_1frac.csv'
+#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_targ_participants_linearreg_ptlocal/pearsonr_contrast-motionXstationary_combined_1frac.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_wb_participants_linearreg_ptlocal/pearsonr_contrast-motionXstationary_combined_1frac.csv'
 
 file = file.path(path)
 data = read.csv(file) #

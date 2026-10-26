@@ -13,6 +13,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from scipy.stats import sem
+import matplotlib as mpl
+mpl.rcParams["svg.fonttype"] = "none"
 
 def pearsonr_plot(rs, reliability, participants, tract_order, bids_path, savefilename):
     #First compute noise ceiling 95% CI
@@ -335,17 +337,19 @@ def pearsonr_plot(rs, reliability, participants, tract_order, bids_path, savefil
 
     saveDir = op.join(bids_path, "analysis", "plots")
     os.makedirs(saveDir, exist_ok=True)
-
-    plt.savefig(
-        op.join(saveDir, savefilename),
-        dpi=300,
-        bbox_inches="tight"
-    )
+    # ---- save + close ----
+    for fmt in ("png", "svg"):
+        plt.savefig(op.join(saveDir, savefilename, f".{fmt}"), dpi=600, bbox_inches="tight")
 
     plt.show()
 
 
 def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
+
+    # Keep text as real text (editable in Illustrator)
+    mpl.rcParams["svg.fonttype"] = "none"
+    mpl.rcParams["pdf.fonttype"] = 42
+    mpl.rcParams["ps.fonttype"] = 42
 
     tract_labels = [
         t.replace("InferiorLongitudinal", "ILF")
@@ -370,35 +374,36 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
     ]
 
     # --------------------------------------
-    # Organize MSE in table
+    # Organize Betas in table
     # --------------------------------------
     n_tracts = len(tract_order)
     hemi_labels = ["L", "R"]
-    rows = []
+    if isinstance(betas, np.ndarray):
+        rows = []
 
-    for h in range(2):     # left/right hemispheres
-        for t in range(n_tracts):
-            for s, participant in enumerate(participants):
-                gp = "EB" if "EB" in participant else "NS"
-                                # EB --> ptlocal only
-                # NS --> mtlocal + ptlocal
-                if "EB" in participant:
+        for h in range(2):     # left/right hemispheres
+            for t in range(n_tracts):
+                for s, participant in enumerate(participants):
+                    gp = "EB" if "EB" in participant else "NS"
+                    # EB --> ptlocal only
+                    # NS --> mtlocal + ptlocal
+                    if "EB" in participant:
                         localizers = ["ptlocal"]
-                elif "NS" in participant:
+                    elif "NS" in participant:
                         localizers = ["mtlocal", "ptlocal"]
-                for l, localizer in enumerate(localizers):
-                # pearson = rs[:, s, h]
+                    for l, localizer in enumerate(localizers):
+                        rows.append({
+                            "Subject": s,
+                            "Localizer": localizer,
+                            "Tract": tract_order[t],
+                            "Hemisphere": hemi_labels[h],
+                            "Group": gp,
+                            "Beta": betas[s, t, l, h]
+                        })
 
-                    rows.append({
-                        "Subject": s,
-                        "Localizer": localizer,
-                        "Tract": tract_order[t],
-                        "Hemisphere": hemi_labels[h],
-                        "Group": gp,
-                        "Beta": betas[s,t,l,h] #r_all[s, h] #
-                    })
-
-    df = pd.DataFrame(rows)
+        df = pd.DataFrame(rows)
+    else:
+        df = betas.copy()
 
     # ------------------------------------------------
     # Compute SEM per Group × Hemisphere
@@ -411,62 +416,45 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
     )
 
     # ------------------------------------------------
-    # Color palette: Group = color family,
-    # Localizer = shade within the family
+    # Color palette
     # ------------------------------------------------
-
     palette = {
-        ("EB", "ptlocal"): "#9ecae1",  # light blue 
-        ("NS", "mtlocal"): "#c45100",  # dark orange 
+        ("NS", "mtlocal"): "#c45100",  # dark orange
+        ("EB", "ptlocal"): "#9ecae1",  # light blue
         ("NS", "ptlocal"): "#fdae6b",  # light orange
-    } #        ("EB", "mtlocal"): "#1f4e79",  # dark blue
+    }
 
-    # Create a combined categorical variable for hue
-    for data_df in [df]:
-        data_df["GroupLocalizer"] = (
-            data_df["Group"] + "_" + data_df["Localizer"]
-        )
+    df["GroupLocalizer"] = df["Group"] + "_" + df["Localizer"]
 
     hue_order = [
-        "EB_ptlocal",
         "NS_mtlocal",
+        "EB_ptlocal",
         "NS_ptlocal",
-    ] #        "EB_mtlocal",
+    ]
 
     combined_palette = {
         f"{group}_{localizer}": color
         for (group, localizer), color in palette.items()
     }
+
     # ------------------------------------------------
     # Create 2 subplots — one per hemisphere
     # ------------------------------------------------
-
-    # text_plotted = False  # Flag to ensure we only plot the label once
-
-    #  plt.rcParams.update({
-    #     'font.weight': 'bold',
-    #     'axes.labelweight': 'bold'
-    # })
-
-
     fig, axes = plt.subplots(
         2, 1,
-        figsize=(18,18),
+        figsize=(18, 18),
         sharey=True
     )
 
-    group_offset = {"EB": -0.2, "NS": 0.2}
-
-    for ax, hemi in zip(axes, hemi_labels):
+    for i, (ax, hemi) in enumerate(zip(axes, hemi_labels)):
+        is_bottom = (i == len(axes) - 1)
 
         df_h = df[df["Hemisphere"] == hemi]
         sem_h = sem_df[sem_df["Hemisphere"] == hemi]
 
-
         # ---------------------------------------------------
         # Bar plot (mean ± SE)
         # ---------------------------------------------------
-
         sns.barplot(
             data=df_h,
             x="Tract",
@@ -485,7 +473,6 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
         # ---------------------------------------------------
         # Participant dots
         # ---------------------------------------------------
-
         sns.stripplot(
             data=df_h,
             x="Tract",
@@ -506,7 +493,6 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
         # ---------------------------------------------------
         # Formatting
         # ---------------------------------------------------
-
         ax.set_ylim(ylim)
 
         ax.set_title(
@@ -514,12 +500,6 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
             fontsize=22,
             fontweight="bold",
             pad=15
-        )
-
-        ax.set_xlabel(
-            "Tract",
-            fontsize=18,
-            fontweight="bold"
         )
 
         ax.axhline(
@@ -533,20 +513,26 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
         ax.spines["bottom"].set_linewidth(2.5)
 
         ax.tick_params(
-            axis='both',
-            which='major',
+            axis="both",
+            which="major",
             labelsize=16,
             width=2.5
         )
 
+        # x label and tick labels only on the bottom subplot
         ax.set_xticks(np.arange(len(tract_order)))
-        ax.set_xticklabels(
-            tract_labels,
-            rotation=35,
-            ha="right",
-            fontsize=16,
-            fontweight="bold"
-        )
+        if is_bottom:
+            ax.set_xlabel("Tract", fontsize=18, fontweight="bold")
+            ax.set_xticklabels(
+                tract_labels,
+                rotation=35,
+                ha="right",
+                fontsize=16,
+                fontweight="bold"
+            )
+        else:
+            ax.set_xlabel("")
+            ax.set_xticklabels([])   # keeps tick marks, removes text
 
         for label in ax.get_yticklabels():
             label.set_fontweight("bold")
@@ -554,20 +540,15 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
         # ---------------------------------------------------
         # Manual legend
         # ---------------------------------------------------
-
         legend_handles = [
             Patch(
                 facecolor=combined_palette[key],
                 edgecolor="black",
                 alpha=0.75,
-                label=(
-                    f"{key.split('_')[0]} — "
-                    f"{key.split('_')[1]}"
-                )
+                label=f"{key.split('_')[0]} — {key.split('_')[1]}"
             )
             for key in hue_order
         ]
-
 
         leg = ax.legend(
             handles=legend_handles,
@@ -580,18 +561,8 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
         plt.setp(leg.get_texts(), fontweight="bold")
         plt.setp(leg.get_title(), fontweight="bold")
 
-
-    axes[0].set_ylabel(
-        "Beta",
-        fontsize=18,
-        fontweight="bold"
-    )
-
-    axes[1].set_ylabel(
-        "Beta",
-        fontsize=18,
-        fontweight="bold"
-    )
+    axes[0].set_ylabel("Beta", fontsize=18, fontweight="bold")
+    axes[1].set_ylabel("Beta", fontsize=18, fontweight="bold")
 
     sns.despine()
     plt.tight_layout()
@@ -599,17 +570,14 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
     saveDir = op.join(bids_path, "analysis", "plots")
     os.makedirs(saveDir, exist_ok=True)
 
-    plt.savefig(
-        op.join(saveDir,
-        savefilename),
-        dpi=300,
-        bbox_inches="tight"
-    )
+    # ---- save + close ----
+    for fmt in ("eps", "svg"):
+        plt.savefig(op.join(saveDir, f"{savefilename}.{fmt}"),
+                    dpi=600, bbox_inches="tight")
 
     plt.show()
 
-
-def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path, savefilename):
+def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path, savefilename, ylim):
     #First compute noise ceiling 95% CI
     hemi_labels = ["L", "R"]
     nc_rows = []
@@ -671,29 +639,32 @@ def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path
     # --------------------------------------
 
     hemi_labels = ["L", "R"]
-    rows = []
+    if isinstance(rs, np.ndarray):
+        rows = []
 
-    for h in range(2):     # left/right hemispheres
-        for s, participant in enumerate(participants):
-            gp = "EB" if "EB" in participant else "NS"
-            # EB --> ptlocal only
-            # NS --> mtlocal + ptlocal
-            if "EB" in participant:
-                    localizers = ["ptlocal"]
-            elif "NS" in participant:
-                    localizers = ["mtlocal", "ptlocal"]
-            for l, localizer in enumerate(localizers):
-            # pearson = rs[:, s, h]
+        for h in range(2):     # left/right hemispheres
+            for s, participant in enumerate(participants):
+                gp = "EB" if "EB" in participant else "NS"
+                # EB --> ptlocal only
+                # NS --> mtlocal + ptlocal
+                if "EB" in participant:
+                        localizers = ["ptlocal"]
+                elif "NS" in participant:
+                        localizers = ["mtlocal", "ptlocal"]
+                for l, localizer in enumerate(localizers):
+                # pearson = rs[:, s, h]
 
-                rows.append({
-                    "Subject": s,
-                    "Localizer": localizer,
-                    "Hemisphere": hemi_labels[h],
-                    "Group": gp,
-                    "Correlation": rs[s,l,h] #r_all[s, h] #
-                })
+                    rows.append({
+                        "Subject": s,
+                        "Localizer": localizer,
+                        "Hemisphere": hemi_labels[h],
+                        "Group": gp,
+                        "Correlation": rs[s,l,h] #r_all[s, h] #
+                    })
 
-    df = pd.DataFrame(rows)
+        df = pd.DataFrame(rows)
+    else:
+         df = rs.copy()
 
     # ------------------------------------------------
     # Compute SEM per Group × Hemisphere
@@ -767,106 +738,86 @@ def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path
 
     for ax, hemi in zip(axes, hemi_labels):
 
-        df_h = df[df["Hemisphere"] == hemi].copy()
-        nc_h = nc_sem_df[nc_sem_df["Hemisphere"] == hemi].copy()
+        # Groups that actually exist at each localizer
+        groups_per_loc = {
+            "mtlocal": ["NS_mtlocal"],
+            "ptlocal": ["EB_ptlocal", "NS_ptlocal"],
+        }
+        bar_width = 0.4   # same width for every bar
 
         # ------------------------------------------------
-        # Bar plot: x-axis = Localizer
+        # Bars + dots, one localizer at a time
         # ------------------------------------------------
+        for loc, groups in groups_per_loc.items():
+            df_h = df[df["Hemisphere"] == hemi].copy()
+            nc_h = nc_sem_df[nc_sem_df["Hemisphere"] == hemi].copy()
 
-        sns.barplot(
-            data=df_h,
-            x="Localizer",
-            y="Correlation",
-            order=localizer_order,
-            hue="GroupLocalizer",
-            hue_order=hue_order,
-            palette=combined_palette,
-            errorbar="se",
-            capsize=0.06,
-            alpha=0.75,
-            edgecolor="black",
-            linewidth=1.5,
-            ax=ax
-        )
-
-        # ------------------------------------------------
-        # Participant dots
-        # ------------------------------------------------
-
-        sns.stripplot(
-            data=df_h,
-            x="Localizer",
-            y="Correlation",
-            order=localizer_order,
-            hue="GroupLocalizer",
-            hue_order=hue_order,
-            palette=combined_palette,
-            dodge=True,
-            jitter=0.12,
-            size=5,
-            edgecolor="black",
-            linewidth=0.6,
-            alpha=0.85,
-            legend=False,
-            ax=ax
-        )
-
-        # ------------------------------------------------
-        # Noise ceiling: align with each localizer category
-        # ------------------------------------------------
-
-        n_hue = len(hue_order)
-        bar_width = 0.8 / n_hue
-
-        for _, row in nc_h.iterrows():
-
-            key = row["GroupLocalizer"]
-            if key not in hue_order:
+            d = df_h[df_h["Localizer"] == loc]
+            if d.empty:
                 continue
 
-            localizer_idx = localizer_order.index(row["Localizer"])
-            hue_idx = hue_order.index(key)
-
-            x_center = (
-                localizer_idx - 0.4
-                + bar_width / 2
-                + hue_idx * bar_width
+            sns.barplot(
+                data=d,
+                x="Localizer",
+                y="Correlation",
+                order=localizer_order,        # keeps x positions 0 and 1
+                hue="GroupLocalizer",
+                hue_order=groups,
+                palette=combined_palette,
+                errorbar="se",
+                capsize=0.06,
+                alpha=0.75,
+                edgecolor="black",
+                linewidth=1.5,
+                width=bar_width * len(groups),  # per-bar width = bar_width
+                legend=False,
+                ax=ax
             )
 
-            ax.fill_between(
-                [x_center - bar_width / 2,
-                x_center + bar_width / 2],
-                row["CI95_lower"],
-                row["CI95_upper"],
-                color=combined_palette[key],
-                alpha=0.12,
-                zorder=0
+            sns.stripplot(
+                data=d,
+                x="Localizer",
+                y="Correlation",
+                order=localizer_order,
+                hue="GroupLocalizer",
+                hue_order=groups,
+                palette=combined_palette,
+                dodge=True,
+                jitter=0.08,
+                size=5,
+                edgecolor="black",
+                linewidth=0.6,
+                alpha=0.85,
+                legend=False,
+                ax=ax
             )
 
-            ax.hlines(
-                [row["CI95_lower"], row["CI95_upper"]],
-                xmin=x_center - bar_width / 2,
-                xmax=x_center + bar_width / 2,
-                colors=combined_palette[key],
-                linestyles="--",
-                linewidth=1.5
-            )
+        # ------------------------------------------------
+        # Noise ceiling: aligned with the new bar positions
+        # ------------------------------------------------
+        for _, row in nc_h.iterrows():
+            key = row["GroupLocalizer"]
+            loc = row["Localizer"]
+            if key not in groups_per_loc.get(loc, []):
+                continue
 
-            ax.hlines(
-                row["Mean"],
-                xmin=x_center - bar_width / 2,
-                xmax=x_center + bar_width / 2,
-                colors=combined_palette[key],
-                linestyles=":",
-                linewidth=2
-            )
+            groups = groups_per_loc[loc]
+            loc_idx = localizer_order.index(loc)
+            x_center = loc_idx + (groups.index(key) - (len(groups) - 1) / 2) * bar_width
+            x0, x1 = x_center - bar_width / 2, x_center + bar_width / 2
+
+            ax.fill_between([x0, x1], row["CI95_lower"], row["CI95_upper"],
+                            color=combined_palette[key], alpha=0.12, zorder=0)
+            ax.hlines([row["CI95_lower"], row["CI95_upper"]], xmin=x0, xmax=x1,
+                      colors=combined_palette[key], linestyles="--", linewidth=1.5)
+            ax.hlines(row["Mean"], xmin=x0, xmax=x1,
+                      colors=combined_palette[key], linestyles=":", linewidth=2)
 
         # ------------------------------------------------
         # Formatting
         # ------------------------------------------------
 
-        ax.set_ylim(-0.2, 1)
+        ax.set_ylim(ylim)
 
         ax.set_title(
             f"{hemi}-Hemisphere",
@@ -951,11 +902,9 @@ def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path
     saveDir = op.join(bids_path, "analysis", "plots")
     os.makedirs(saveDir, exist_ok=True)
 
-    plt.savefig(
-        op.join(saveDir, savefilename),
-        dpi=300,
-        bbox_inches="tight"
-    )
+    # ---- save + close ----
+    for fmt in ("eps", "svg"):
+        plt.savefig(op.join(saveDir, f"{savefilename}.{fmt}"), dpi=600, bbox_inches="tight")
 
     plt.show()
 
