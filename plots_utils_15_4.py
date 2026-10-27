@@ -580,34 +580,43 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
 def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path, savefilename, ylim):
     #First compute noise ceiling 95% CI
     hemi_labels = ["L", "R"]
-    nc_rows = []
+    if isinstance(reliability, np.ndarray):
+        nc_rows = []
 
-    for h in range(2):     # left/right hemispheres
-        for s, participant in enumerate(participants):
-            gp = "EB" if "EB" in participant else "NS"
-            # EB --> ptlocal only
-            # NS --> mtlocal + ptlocal
-            if "EB" in participant:
-                    localizers = ["ptlocal"]
-            elif "NS" in participant:
-                    localizers = ["mtlocal", "ptlocal"]
-            for l, localizer in enumerate(localizers):
+        for h in range(2):     # left/right hemispheres
+            for s, participant in enumerate(participants):
+                gp = "EB" if "EB" in participant else "NS"
+                # EB --> ptlocal only
+                # NS --> mtlocal + ptlocal
+                if "EB" in participant:
+                        localizers = ["ptlocal"]
+                elif "NS" in participant:
+                        localizers = ["mtlocal", "ptlocal"]
+                for l, localizer in enumerate(localizers):
 
-                nc_rows.append({
-                    "Localizer": localizer,
-                    "Subject": s,
-                    "Hemisphere": hemi_labels[h],
-                    "Group": gp,
-                    "Correlation": reliability[s,l,h] #r_all[s, h] #
-                })
-
-    nc_df = pd.DataFrame(nc_rows)
-    nc_sem_df = (
+                    nc_rows.append({
+                        "Localizer": localizer,
+                        "Subject": s,
+                        "Hemisphere": hemi_labels[h],
+                        "Group": gp,
+                        "Correlation": reliability[s,l,h] #r_all[s, h] #
+                    })
+        nc_df = pd.DataFrame(nc_rows)
+        nc_sem_df = (
         nc_df.groupby(["Group", "Localizer", "Hemisphere"])["Correlation"]
         .agg(["mean", sem])
         .reset_index()
         .rename(columns={"mean": "Mean", "sem": "SEM"})
     )
+    else:
+        nc_df = reliability.copy()
+
+        nc_sem_df = (
+            nc_df.groupby(["Group", "Localizer", "Hemisphere"])["NC"]
+            .agg(["mean", sem])
+            .reset_index()
+            .rename(columns={"mean": "Mean", "sem": "SEM"})
+        )
 
     tract_labels = [
         t.replace("InferiorLongitudinal", "ILF")

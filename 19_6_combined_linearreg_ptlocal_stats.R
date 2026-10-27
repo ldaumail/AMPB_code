@@ -4,10 +4,10 @@
 #---------------------------------------------------Betas--------------------------------------------------
 #----------------------------------------------------------------------------------------------------------
 
-#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_targ_participants_linearreg_ptlocal/beta_contrast-motionXstationary_combined_1frac.csv'
-path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_wb_participants_linearreg_ptlocal/beta_contrast-motionXstationary_combined_1frac.csv'
+path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_targ_participants_linearreg_ptlocal/beta_contrast-motionXstationary_combined_1frac_test9.csv'
+#path = '/Users/ldaumail3/Documents/research/ampb_mt_tractometry_analysis/ampb/analysis/diff2func_model_fits/pyAFQ3beta_wb_participants_linearreg_ptlocal/beta_contrast-motionXstationary_combined_1frac.csv'
 
-file = file.path(path)
+file = file.path(path)   
 data = read.csv(file)
 
 flip_test <- function(x, n_perm = 10000) {

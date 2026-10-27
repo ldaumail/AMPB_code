@@ -422,12 +422,18 @@ sys.path.append(current_dir)
 from plots_utils_15_4 import pearsonr_combined_plot, beta_plot, avg_density_plot, participant_density_plot, participant_pred_plot
 
 #Performance plots
-savefilename = f"targ_pearson_linearreg_combined_tracts_{projfrac}frac"
+savefilename = f"targ_pearson_linearreg_combined_tracts_{projfrac}frac_test9"
 ylim = [-0.2, 1]
+# rs_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'diff2func_model_fits', 'pyAFQ3beta_targ_participants_linearreg_ptlocal', 'pearsonr_contrast-motionXstationary_combined_1frac_test.csv')
+# rs = pd.read_csv(rs_file) 
+# nc_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'diff2func_model_fits', 'pyAFQ3beta_targ_participants_linearreg_ptlocal', 'noiseceiling_contrast-motionXstationary_combined_1frac_test.csv')
+# reliability = pd.read_csv(nc_file) 
 pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path, savefilename, ylim)
 
-savefilename = f"targ_beta_barplot_linearreg_combined_tracts_{projfrac}frac"
+savefilename = f"targ_beta_barplot_linearreg_combined_tracts_{projfrac}frac_test9"
 ylim = [-0.4, 0.4]
+# rs_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'diff2func_model_fits', 'pyAFQ3beta_targ_participants_linearreg_ptlocal', 'beta_contrast-motionXstationary_combined_1frac_test6.csv')
+# trained_coefs = pd.read_csv(rs_file) 
 beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename, ylim)
 
 
