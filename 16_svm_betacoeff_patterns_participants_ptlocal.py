@@ -160,7 +160,7 @@ n_tract = len(tracts)
 # Labels
 y = np.array([1 if "EB" in p else 0 for p in participants])
 
-df_use = df[~((df["Group"] == "NS") & (df["Localizer"] == "ptlocal"))].copy()
+df_use = df[~((df["Group"] == "NS") & (df["Localizer"] == "mtlocal"))].copy()
 selected_tracts = tracts.copy() #[[0, 2]]
 
 for hemi in hemis:
@@ -279,12 +279,12 @@ def plot_3d_with_plane(df, y, hemis, tracts, Cs, elev, azim,
 
     plt.show()
 
-C_left = 0.012
+C_left = 0.794
 C_right = 4.299
 plot_3d_with_plane(
     df=df_use, y=y, hemis=["L", "R"], tracts=tracts[:3],
     Cs=[C_left, C_right],                 # from a stated selection rule
-    elev=[15, 15], azim=[-40, -40],
+    elev=[15, 15], azim=[-50, -40],
     save_path=op.join(bids_path, "analysis", "plots"),
     savefilename = "pyAFQ3beta_targ_beta_weights_3d_linear_svm_EBptlocal_NSptlocaltest9"
 )   
@@ -401,7 +401,7 @@ plot_2d_slice_of_3d_svm(
     y=y,
     hemis=["L", "R"],
     tracts=tracts[:3],               # the SAME 3 tracts used in the 3D analysis
-    Cs=[0.012, 4.299],               # the same Cs as the 3D model
+    Cs=[0.794, 4.299],               # the same Cs as the 3D model
     dims=(0, 2),                     # which two features to display
     z_value="median",
     save_path=op.join(bids_path, "analysis", "plots"),

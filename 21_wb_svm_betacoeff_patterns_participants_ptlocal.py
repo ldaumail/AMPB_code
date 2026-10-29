@@ -152,16 +152,16 @@ df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits', 'pyAFQ3be
 
 participants = df["Participant"].unique()
 hemis = ["L", "R"]
-tracts = ["PTR", "SuperiorLongitudinal", "VerticalOccipital"] #df["Tract"].unique()
-
+#tracts = ["PTR", "SuperiorLongitudinal", "VerticalOccipital"] #df["Tract"].unique()
+tracts = ["PTR", "SuperiorLongitudinal", "InferiorFrontooccipital"]
 n_subj = len(participants)
 n_tract = len(tracts)
 
 # Labels
 y = np.array([1 if "EB" in p else 0 for p in participants])
 
-tract_matches = ["PTR", "SuperiorLongitudinal", "VerticalOccipital"]
-df_use = df[~((df["Group"] == "NS") & (df["Localizer"] == "ptlocal")) & df["Tract"].isin(tract_matches)].copy()
+tract_matches = tracts.copy() #["PTR", "SuperiorLongitudinal","InferiorFrontooccipital", "VerticalOccipital"]
+df_use = df[~((df["Group"] == "NS") & (df["Localizer"] == "mtlocal")) & df["Tract"].isin(tract_matches)].copy()
 selected_tracts = tracts.copy() #[[0, 2]]
 
 for hemi in hemis:
@@ -191,6 +191,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 from sklearn.model_selection import cross_val_predict, StratifiedKFold
+import matplotlib as mpl
+mpl.rcParams["svg.fonttype"] = "none"
 
 def fit_final_model(X, y, C):
     clf = make_pipeline(C)
@@ -209,7 +211,7 @@ def get_decision_plane_raw(clf):
 
     return w, b
 def plot_3d_with_plane(df, y, hemis, tracts, Cs, elev, azim,
-                       save_path=None, pad=0.05):
+                       save_path, savefilename, pad=0.05):
     assert len(tracts) == 3, "Decision plane only works for 3 features"
     fig = plt.figure(figsize=(14, 6))
 
@@ -274,23 +276,149 @@ def plot_3d_with_plane(df, y, hemis, tracts, Cs, elev, azim,
 
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        for fmt in ("png", "svg"):
+            plt.savefig(op.join(save_path, f"{savefilename}.{fmt}"), dpi=600, bbox_inches="tight")
+
     plt.show()
 
-C_left = 0.005
-C_right = 0.147
+C_left = 4.299
+C_right = 10
 plot_3d_with_plane(
-    df=df_use, y=y, hemis=["L", "R"], tracts=tracts[:3],
+    df=df_use, y=y, hemis=["L", "R"], tracts=tracts, #[tracts[i] for i in (0, 1, 3)],
     Cs=[C_left, C_right],                 # from a stated selection rule
-    elev=[15, 15], azim=[45, 45],
-    save_path=op.join(bids_path, "analysis", "plots", "pyAFQ3beta_wb_beta_weights_3d_linear_svm_EBptlocal_NSmtlocal.png"),
+    elev=[5, 0], azim=[-90, -90],
+    save_path=op.join(bids_path, "analysis", "plots"),
+    savefilename =  "pyAFQ3beta_wb_beta_weights_3d_linear_svm_EBptlocal_NSptlocal_PTR-SLF-IFOF"
 )   
+
+
 #==============================================
-### Visualize boundary line with only 2 tracts
+### Visualize boundary in only 2 dimensions (3rd dimension fixed)
+#==============================================
+
+import numpy as np
+import os
+import os.path as op
+import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotlib as mpl
+mpl.rcParams["svg.fonttype"] = "none"
+
+def plot_2d_slice_of_3d_svm(df, y, hemis, tracts, Cs, dims=(0, 1),
+                            z_value="mean", show_z_spread=True,
+                            save_path=None, savefilename=None,  pad=0.05):
+    """
+    Fit the SVM on ALL features in `tracts` (e.g. 3), then plot only the two
+    features in `dims`, with the decision boundary of the 3D model sliced at
+    a fixed value of the remaining feature(s).
+
+    z_value: "mean", "median", or a number (in raw units), or a list with one
+             value per hemisphere.
+    show_z_spread: also draw the boundary at z = mean ± 1 SD (dashed), to show
+                   how much the 3D boundary moves along the hidden dimension.
+    """
+    n_feat = len(tracts)
+    assert n_feat >= 3 and len(dims) == 2, "Fit on >=3 features, plot 2 of them"
+    hidden = [k for k in range(n_feat) if k not in dims]
+
+    fig, axes = plt.subplots(1, len(hemis), figsize=(14, 6),
+                             constrained_layout=True)
+
+    for i, hemi in enumerate(hemis):
+        ax = axes[i]
+
+        # ---- 3D model (same features, same C as your 3D analysis) ----
+        X = get_feature_matrix(df, hemi, tracts)
+        clf = fit_final_model(X, y, Cs[i])
+        w, b = get_decision_plane_raw(clf)
+
+        d0, d1 = dims
+        if abs(w[d1]) < 1e-8:
+            print(f"{hemi}: boundary is nearly vertical in this view "
+                  f"(w[{d1}] ~ 0); line not drawn.")
+
+        # ---- Value(s) at which hidden feature(s) are held ----
+        if z_value == "mean":
+            z0 = X[:, hidden].mean(axis=0)
+        elif z_value == "median":
+            z0 = np.median(X[:, hidden], axis=0)
+        else:
+            zv = z_value[i] if np.ndim(z_value) > 0 else z_value
+            z0 = np.full(len(hidden), zv, dtype=float)
+        z_sd = X[:, hidden].std(axis=0)
+
+        def boundary(x_vals, z):
+            offset = b + np.dot(w[hidden], z)
+            return (-w[d0] * x_vals - offset) / w[d1]
+
+        # ---- Points: the two plotted dimensions ----
+        ax.scatter(X[y == 1, d0], X[y == 1, d1],
+                   c="#9ecae1", marker="s", s=60, label="EB")
+        ax.scatter(X[y == 0, d0], X[y == 0, d1],
+                   c="#c45100", marker="o", s=60, label="NS")
+
+        # ---- Sliced decision boundary ----
+        lo, hi = X[:, [d0, d1]].min(0), X[:, [d0, d1]].max(0)
+        span = hi - lo
+        lo, hi = lo - pad * span, hi + pad * span
+        x_vals = np.linspace(lo[0], hi[0], 200)
+
+        if abs(w[d1]) >= 1e-8:
+            ax.plot(x_vals, boundary(x_vals, z0), color="black", linewidth=2,
+                    label=f"Boundary ({tracts[hidden[0]]} = mean)"
+                    if z_value == "mean" else "Boundary (slice)")
+            if show_z_spread:
+                for sgn in (-1, 1):
+                    ax.plot(x_vals, boundary(x_vals, z0 + sgn * z_sd),
+                            color="black", linewidth=1, linestyle="--",
+                            alpha=0.6,
+                            label="± 1 SD of hidden feature" if sgn == -1 else None)
+
+        ax.set_xlim(lo[0], hi[0])
+        ax.set_ylim(lo[1], hi[1])   # keeps steep lines from stretching axes
+
+        sns.despine(ax=ax, top=True, right=True)
+        ax.spines["left"].set_linewidth(2.5)
+        ax.spines["bottom"].set_linewidth(2.5)
+
+        ax.set_xlabel(tracts[d0], fontsize=18, fontweight="bold")
+        ax.set_ylabel(tracts[d1], fontsize=18, fontweight="bold")
+        ax.set_title(f"{hemi} Hemisphere (C = {Cs[i]:.3g})")
+        ax.legend()
+        plt.setp(ax.get_xticklabels(), fontsize=14, fontweight="bold")
+        plt.setp(ax.get_yticklabels(), fontsize=14, fontweight="bold")
+
+    plt.suptitle(f"3D linear SVM, 2D slice ({tracts[dims[0]]} vs {tracts[dims[1]]})",
+                 fontsize=16)
+
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        for fmt in ("png", "svg"):
+            plt.savefig(op.join(save_path, f"{savefilename}.{fmt}"), dpi=600, bbox_inches="tight")
+    plt.show()
+
+
+plot_2d_slice_of_3d_svm(
+    df=df_use,
+    y=y,
+    hemis=["L", "R"],
+    tracts=tracts[:3],               # the SAME 3 tracts used in the 3D analysis
+    Cs=[C_left, C_right],               # the same Cs as the 3D model
+    dims=(0,2),                     # which two features to display
+    z_value="median",
+    save_path=op.join(bids_path, "analysis", "plots"),
+    savefilename =  "pyAFQ3beta_wb_beta_weights_3d_linear_svm_2d_slice_EBptlocal_NSptlocal_ptr-ifof"
+)
+
+
+#==============================================
+### Visualize boundary line with only 2 tracts (rerunning 2D SVC)
 #==============================================
 
 import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib as mpl
+mpl.rcParams["svg.fonttype"] = "none"
 
 def fit_final_model(X, y, C):
     clf = make_pipeline(C)
@@ -315,7 +443,7 @@ def get_decision_plane_raw(clf):
     return w, b
 
 def plot_2d_with_plane(
-    df, participants, y, hemis, tracts, C
+    df, participants, y, hemis, tracts, C, save_path, savefilename
 ):
     assert len(tracts) == 2, "Decision boundary requires exactly 2 features"
 
@@ -336,11 +464,11 @@ def plot_2d_with_plane(
         # ---- Scatter points ----
         ax.scatter(
             X[y == 1, 0], X[y == 1, 1],
-            c="blue", marker="s", s=60, label="EB"
+            c="#9ecae1", marker="s", s=60, label="EB"
         )
         ax.scatter(
             X[y == 0, 0], X[y == 0, 1],
-            c="red", marker="o", s=60, label="NS"
+            c="#c45100", marker="o", s=60, label="NS"
         )
 
         # ---- Decision boundary ----
@@ -372,34 +500,29 @@ def plot_2d_with_plane(
         # ---- Formatting ----
         ax.set_xlabel(tracts[0],fontsize=18,fontweight='bold')
         ax.set_ylabel(tracts[1],fontsize=18,fontweight='bold')
-        ax.set_title(f"{hemi} Hemisphere")
+        ax.set_title(f"{hemi} Hemisphere (C = {C_val})")
         ax.legend()
         plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
 
     plt.suptitle("Linear SVM decision boundaries", fontsize=16)
 
-    saveDir = op.join(bids_path, "analysis", "plots")
-    os.makedirs(saveDir, exist_ok=True)
-    plt.savefig(
-        op.join(
-            saveDir,
-            "pyAFQ3beta_targ_beta_weights_2d_linear_svm_innercv.png"
-        ),
-        dpi=300,
-        bbox_inches="tight"
-    )
-
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        for fmt in ("png", "svg"):
+            plt.savefig(op.join(save_path, f"{savefilename}.{fmt}"), dpi=600, bbox_inches="tight")
     plt.show()
 
 C_left = 4.299
-C_right = 0.341
+C_right = 4.299
 plot_2d_with_plane(
-    df=df,
+    df=df_use,
     participants=participants,
     y=y,
     hemis=["L", "R"],
     tracts=selected_tracts,
-    C = np.array([C_left, C_right])
+    C = np.array([C_left, C_right]),
+    save_path = op.join(bids_path, "analysis", "plots"),
+    savefilename = "pyAFQ3beta_wb_beta_weights_2d_linear_svm_PTR-IFOF"
 )
 
 
