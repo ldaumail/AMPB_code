@@ -159,13 +159,13 @@ n_tract = len(tracts)
 
 # Labels
 y = np.array([1 if "EB" in p else 0 for p in participants])
-
-df_use = df[~((df["Group"] == "NS") & (df["Localizer"] == "mtlocal"))].copy()
-selected_tracts = tracts.copy() #[[0, 2]]
+tract_matches = tracts.copy() #["MTxLGNxPU", "MTxPTxSTS1"]
+df_use = df[~((df["Group"] == "NS") & (df["Localizer"] == "mtlocal"))& df["Tract"].isin(tract_matches)].copy()
+# selected_tracts = tracts.copy() #[[0, 2]]
 
 for hemi in hemis:
     print(f"\n=== Hemisphere {hemi} ===")
-    X = get_feature_matrix(df_use, hemi, selected_tracts)
+    X = get_feature_matrix(df_use, hemi, tract_matches)
 
     res = nested_cv_repeated(X, y, n_repeats=20)
     print(f"Nested CV AUC:  {res['auc_mean']:.3f} ± {res['auc_sd']:.3f}")
@@ -190,6 +190,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 from sklearn.model_selection import cross_val_predict, StratifiedKFold
+import matplotlib as mpl
+mpl.rcParams["svg.fonttype"] = "none"
 
 def fit_final_model(X, y, C):
     clf = make_pipeline(C)
@@ -227,8 +229,8 @@ def plot_3d_with_plane(df, y, hemis, tracts, Cs, elev, azim,
 
         ax = fig.add_subplot(1, 2, i + 1, projection="3d")
 
-        for lab, color, marker, name in [(1, "blue", "s", "EB"),
-                                         (0, "red", "o", "NS")]:
+        for lab, color, marker, name in [(1, "#9ecae1", "s", "EB"),
+                                         (0, "#c45100", "o", "NS")]:
             m = y == lab
             ax.scatter(X[m & ~wrong, 0], X[m & ~wrong, 1], X[m & ~wrong, 2],
                        c=color, marker=marker, s=60, label=name)
@@ -284,7 +286,7 @@ C_right = 4.299
 plot_3d_with_plane(
     df=df_use, y=y, hemis=["L", "R"], tracts=tracts[:3],
     Cs=[C_left, C_right],                 # from a stated selection rule
-    elev=[15, 15], azim=[-50, -40],
+    elev=[15, 15], azim=[-60, -40],
     save_path=op.join(bids_path, "analysis", "plots"),
     savefilename = "pyAFQ3beta_targ_beta_weights_3d_linear_svm_EBptlocal_NSptlocaltest9"
 )   
@@ -301,7 +303,22 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib as mpl
 mpl.rcParams["svg.fonttype"] = "none"
+def fit_final_model(X, y, C):
+    clf = make_pipeline(C)
+    clf.fit(X, y)
+    return clf
+def get_decision_plane_raw(clf):
+    scaler = clf.named_steps["scaler"]
+    svm = clf.named_steps["svm"]
 
+    w_scaled = svm.coef_[0]
+    b_scaled = svm.intercept_[0]
+
+    # Undo scaling
+    w = w_scaled / scaler.scale_
+    b = b_scaled - np.sum(w_scaled * scaler.mean_ / scaler.scale_)
+
+    return w, b
 def plot_2d_slice_of_3d_svm(df, y, hemis, tracts, Cs, dims=(0, 1),
                             z_value="mean", show_z_spread=True,
                             save_path=None, savefilename=None,  pad=0.05):
@@ -402,10 +419,10 @@ plot_2d_slice_of_3d_svm(
     hemis=["L", "R"],
     tracts=tracts[:3],               # the SAME 3 tracts used in the 3D analysis
     Cs=[0.794, 4.299],               # the same Cs as the 3D model
-    dims=(0, 2),                     # which two features to display
+    dims=(0, 1),                     # which two features to display
     z_value="median",
     save_path=op.join(bids_path, "analysis", "plots"),
-    savefilename =  "pyAFQ3beta_targ_beta_weights_3d_linear_svm_2d_slice_EBptlocal_NSptlocaltest9"
+    savefilename =  "pyAFQ3beta_targ_beta_weights_3d_linear_svm_2d_slice_EBptlocal_NSptlocaltest9_MTLGNPU-MTPTSTS1"
 )
 
 
@@ -415,6 +432,8 @@ plot_2d_slice_of_3d_svm(
 
 import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib as mpl
+mpl.rcParams["svg.fonttype"] = "none"
 
 def fit_final_model(X, y, C):
     clf = make_pipeline(C)
@@ -439,7 +458,7 @@ def get_decision_plane_raw(clf):
     return w, b
 
 def plot_2d_with_plane(
-    df, participants, y, hemis, tracts, C
+    df, participants, y, hemis, tracts, C, save_path, savefilename
 ):
     assert len(tracts) == 2, "Decision boundary requires exactly 2 features"
 
@@ -460,11 +479,11 @@ def plot_2d_with_plane(
         # ---- Scatter points ----
         ax.scatter(
             X[y == 1, 0], X[y == 1, 1],
-            c="blue", marker="s", s=60, label="EB"
+            c="#9ecae1", marker="s", s=60, label="EB"
         )
         ax.scatter(
             X[y == 0, 0], X[y == 0, 1],
-            c="red", marker="o", s=60, label="NS"
+            c="#c45100", marker="o", s=60, label="NS"
         )
 
         # ---- Decision boundary ----
@@ -496,35 +515,32 @@ def plot_2d_with_plane(
         # ---- Formatting ----
         ax.set_xlabel(tracts[0],fontsize=18,fontweight='bold')
         ax.set_ylabel(tracts[1],fontsize=18,fontweight='bold')
-        ax.set_title(f"{hemi} Hemisphere")
+        ax.set_title(f"{hemi} Hemisphere (C = {C_val})")
         ax.legend()
         plt.setp(ax.get_yticklabels(),fontsize=18,fontweight='bold')
 
     plt.suptitle("Linear SVM decision boundaries", fontsize=16)
 
-    saveDir = op.join(bids_path, "analysis", "plots")
-    os.makedirs(saveDir, exist_ok=True)
-    plt.savefig(
-        op.join(
-            saveDir,
-            "pyAFQ3beta_targ_beta_weights_2d_linear_svm_innercv.png"
-        ),
-        dpi=300,
-        bbox_inches="tight"
-    )
-
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        for fmt in ("png", "svg"):
+            plt.savefig(op.join(save_path, f"{savefilename}.{fmt}"), dpi=600, bbox_inches="tight")
     plt.show()
 
-C_left = 4.299
-C_right = 0.341
+C_left = 0.063
+C_right = 1.848
 plot_2d_with_plane(
-    df=df,
+    df=df_use,
     participants=participants,
     y=y,
     hemis=["L", "R"],
-    tracts=selected_tracts,
-    C = np.array([C_left, C_right])
+    tracts=tract_matches,
+    C = np.array([C_left, C_right]),
+    save_path = op.join(bids_path, "analysis", "plots"),
+    savefilename = "pyAFQ3beta_wb_beta_weights_2d_linear_svm_Thalamocort-Temporal"
 )
+
+
 
 
 # #=========================================================

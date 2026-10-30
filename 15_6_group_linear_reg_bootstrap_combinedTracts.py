@@ -32,7 +32,7 @@ fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
 tract_order = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] #'MTxLGNxPU', 'MTxPTxSTS1', 
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 hemis = ["L", "R"]
-
+projfrac = '1'
 # Initialize storage dictionary
 density_data = {hemi: [] for hemi in hemis}
 
@@ -54,7 +54,7 @@ for participant in participants:
         for tract in tract_order:
             
             # Find file matching this tract and hemisphere
-            matches = [f for f in os.listdir(subj_dir) if f"wang{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith("fsprojdensity0mm2.mgh")]
+            matches = [f for f in os.listdir(subj_dir) if f"wang{tract}" in f and f"hemi-{hemi_fs}" in f and "fsaverage" in f and f.endswith(f"fsprojdensity{projfrac}frac.mgh")]
 
             if not matches:
                 print(f"   ⚠️ Missing: {tract} ({hemi}) for {participant}")

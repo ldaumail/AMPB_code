@@ -229,8 +229,8 @@ def plot_3d_with_plane(df, y, hemis, tracts, Cs, elev, azim,
 
         ax = fig.add_subplot(1, 2, i + 1, projection="3d")
 
-        for lab, color, marker, name in [(1, "blue", "s", "EB"),
-                                         (0, "red", "o", "NS")]:
+        for lab, color, marker, name in [(1, "#9ecae1", "s", "EB"),
+                                         (0, "#c45100", "o", "NS")]:
             m = y == lab
             ax.scatter(X[m & ~wrong, 0], X[m & ~wrong, 1], X[m & ~wrong, 2],
                        c=color, marker=marker, s=60, label=name)
