@@ -293,23 +293,21 @@ trained_coefs = np.zeros((n_tracts, n_groups, n_localizers, n_hemis))  # scalar 
 n_boot = 1000
 trained_coefs_null = np.zeros((n_tracts, n_boot, n_groups, n_localizers,len(hemis)))
 
-# FIX 3: preallocate the difference arrays (they were never defined)
+# Preallocate the difference arrays
 null_dist_diff = np.zeros((n_tracts, n_boot, 1, n_localizers, n_hemis))
 sample_diff = np.zeros((n_tracts, n_localizers, n_hemis))
 
-# FIX 1: index of a localizer within C_mean for a given subject
-# EB subjects only have ptlocal (stored at index 0); NS subjects have mtlocal (0) and ptlocal (1)
-def get_loc_idx(p, localizer):
+# Index into C_mean for the null groups.
+# EB subjects only have ptlocal (stored at index 0), so in the null they
+# contribute their ptlocal map whichever localizer is requested.
+# NS subjects have mtlocal (0) and ptlocal (1).
+def get_null_idx(p, localizer):
     if "EB" in participants[p]:
-        return 0 if localizer == "ptlocal" else None
+        return 0
     return localizer_order.index(localizer)
 
 predicted_maps = {hemi: [] for hemi in hemis}
 for h, hemi in enumerate(hemis):
-        #h = 0
-        #hemi = "L"
-        #s = 0
-        #'sub-EBxGxCCx1986'
 
     # ----------------------------
     # Load MT ROI
@@ -329,9 +327,8 @@ for h, hemi in enumerate(hemis):
     
     n_target_runs = 3
     all_C = np.full((n_localizers, n_subj, n_target_runs, n_masked), np.nan)  
-    # rnd_run_idx = np.full((n_subj, n_target_runs, len(hemis)), np.nan)
     for s, participant in enumerate(participants):
-                # EB --> ptlocal only
+        # EB --> ptlocal only
         # NS --> mtlocal + ptlocal
         if "EB" in participant:
                 localizers = ["ptlocal"]
@@ -383,11 +380,11 @@ for h, hemi in enumerate(hemis):
 
             # X: density maps for this participant
             # shape: (n_vertices_masked, n_tracts)
-            X = group_norm_density.transpose(0,2,1).reshape(-1,3)#norm_density_data[hemi][s].T
+            X = group_norm_density.transpose(0,2,1).reshape(-1,3)
 
             # y: functional contrast map
             # shape: (n_vertices_masked,)
-            y = group_C_mean.reshape(-1,1) #C_mean[s, :]
+            y = group_C_mean.reshape(-1,1)
 
             # Fit regression
             linreg = LinearRegression()
@@ -395,9 +392,6 @@ for h, hemi in enumerate(hemis):
 
             # Store coefficients
             trained_coefs[:, g,l, h] = linreg.coef_.copy()
-
-        # Reliability (if needed)
-        # reliability[s, h] = vertex_bootstrap_reliability(all_C[s,:,:])
 
 
     #Null beta distributions
@@ -410,8 +404,8 @@ for h, hemi in enumerate(hemis):
         group_norm_density1 = np.stack([norm_density_data[hemi][p] for p in participants1], axis = 0)
 
         localizer_idx = 0
-        # FIX 1: null "EB" group uses each subject's ptlocal map (EB: index 0, NS: index 1)
-        group_C_mean1 = np.stack([C_mean[get_loc_idx(p, "ptlocal"), p,:] for p in participants1], axis = 0)
+        # Null "EB ptlocal" group: every subject contributes their ptlocal map
+        group_C_mean1 = np.stack([C_mean[get_null_idx(p, "ptlocal"), p,:] for p in participants1], axis = 0)
         X1 = group_norm_density1.transpose(0,2,1).reshape(-1,3)
         y1 = group_C_mean1.reshape(-1,1)
 
@@ -419,117 +413,146 @@ for h, hemi in enumerate(hemis):
         linreg1.fit(X1, y1)
         trained_coefs_null[:,n, 0, localizer_idx, h] = linreg1.coef_.copy()
 
-        #Need to generate 2 null NS groups, one for each localizer contrast
+        # Null "NS" groups, one per localizer.
+        # mtlocal null: NS subjects contribute mtlocal, EB subjects contribute ptlocal (mixed).
+        # ptlocal null: everyone contributes ptlocal.
         localizers = ["mtlocal", "ptlocal"]  
+        group_norm_density2 = np.stack([norm_density_data[hemi][p] for p in participants2], axis = 0)
+        X2 = group_norm_density2.transpose(0,2,1).reshape(-1,3)
         for l, localizer in enumerate(localizers):
-            # FIX 1/2: keep only subjects that have this localizer (EB subjects have no mtlocal)
-            participants2_loc = [p for p in participants2 if get_loc_idx(p, localizer) is not None]
-            group_norm_density2 = np.stack([norm_density_data[hemi][p] for p in participants2_loc], axis = 0)
-            group_C_mean2 = np.stack([C_mean[get_loc_idx(p, localizer), p,:] for p in participants2_loc], axis = 0)
-            X2 = group_norm_density2.transpose(0,2,1).reshape(-1,3)
+            group_C_mean2 = np.stack([C_mean[get_null_idx(p, localizer), p,:] for p in participants2], axis = 0)
             y2 = group_C_mean2.reshape(-1,1)
 
             linreg2 = LinearRegression()
             linreg2.fit(X2, y2)
 
-            
             trained_coefs_null[:,n, 1,l, h] = linreg2.coef_.copy()
 
 localizers_NS = ["mtlocal", "ptlocal"]  
 localizer_idx_EB = 0
 for l, localizer in enumerate(localizers_NS):
+    # EB ptlocal - NS {localizer}
     null_dist_diff[:,:,0,l,:] = trained_coefs_null[:,:,0,localizer_idx_EB,:] - trained_coefs_null[:,:,1,l,:]
-    # FIX 3: was sample_diff[:,:,l,:], which has one index too many for a (tracts, hemis) result
     sample_diff[:,l,:] = trained_coefs[:,0,localizer_idx_EB,:] - trained_coefs[:,1,l,:]
 
 #Plot
+
+import os
+import os.path as op
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.stats import gaussian_kde
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
 
-# null_dist_diff: (n_tracts, n_boot, 1, n_localizers, n_hemis)
-# sample_diff:    (n_tracts, n_localizers, n_hemis)
-# localizer index: 0 = mtlocal, 1 = ptlocal
-n_tracts = null_dist_diff.shape[0]
-n_hemi = 2  # Left and Right
-loc_plot = [(1, "ptlocal"), (0, "mtlocal")]   # (index, label), in plotting order
-n_cols = n_tracts * len(loc_plot)
 
-# Shared x-range across all panels
-all_values = np.concatenate([null_dist_diff.flatten(), sample_diff.flatten()])
-x_min, x_max = all_values.min(), all_values.max()
-buffer = (x_max - x_min) * 0.1
-global_xlim = (x_min - buffer, x_max + buffer)
+def plot_null_diffs(null_dist_diff, sample_diff, tract_order, bids_path,
+                    savefilename=None):
+    # null_dist_diff: (n_tracts, n_boot, 1, n_localizers, n_hemis)
+    # sample_diff:    (n_tracts, n_localizers, n_hemis)
+    # localizer index: 0 = mtlocal, 1 = ptlocal (the NS localizer in each comparison)
 
-# Grid: 2 rows (hemis), n_tracts*2 columns + 1 narrow legend column
-fig, axes = plt.subplots(
-    n_hemi, n_cols + 1,
-    figsize=(5 * (n_cols + 1), 10),
-    gridspec_kw={'width_ratios': [1] * n_cols + [0.5]}
-)
+    NULL_COLOR = "#9ecae1"   # light blue
 
-for h in range(n_hemi):
-    hemi_label = "Left" if h == 0 else "Right"
+    n_tracts = null_dist_diff.shape[0]
+    n_hemi = 2  # Left and Right
+    loc_plot = [(1, "ptlocal"), (0, "mtlocal")]   # (index, NS localizer label)
+    n_cols = n_tracts * len(loc_plot)
 
-    for t in range(n_tracts):
-        for k, (l, loc_name) in enumerate(loc_plot):
-            ax = axes[h, t * len(loc_plot) + k]
+    # Shared x-range across all panels
+    all_values = np.concatenate([null_dist_diff.flatten(), sample_diff.flatten()])
+    x_min, x_max = all_values.min(), all_values.max()
+    buffer = (x_max - x_min) * 0.1
+    global_xlim = (x_min - buffer, x_max + buffer)
 
-            null_vals = null_dist_diff[t, :, 0, l, h]
-            observed = sample_diff[t, l, h]
+    # Shared bin edges across all panels
+    bin_edges = np.linspace(x_min, x_max, 31)   # 30 bins
 
-            p_val = np.sum(null_vals >= observed) / len(null_vals)
+    fig, axes = plt.subplots(
+        n_hemi, n_cols + 1,
+        figsize=(5 * (n_cols + 1), 10),
+        gridspec_kw={'width_ratios': [1] * n_cols + [0.5]}
+    )
 
-            # 1. Histogram + KDE
-            sns.histplot(null_vals, bins=30, kde=True, stat="density",
-                         ax=ax, color="#4C72B0", alpha=0.4,
-                         label='Null Dist', edgecolor="none")
+    for h in range(n_hemi):
+        hemi_label = "Left" if h == 0 else "Right"
 
-            # 2. Observed and confidence interval
-            ax.axvline(observed, color="red", linewidth=3, label='Observed Diff')
+        for t in range(n_tracts):
+            for k, (l, loc_name) in enumerate(loc_plot):
+                ax = axes[h, t * len(loc_plot) + k]
 
-            if observed > 0:
-                lower, upper = np.percentile(null_vals, 0), np.percentile(null_vals, 95)
-            else:
-                lower, upper = np.percentile(null_vals, 5), np.percentile(null_vals, 100)
+                null_vals = null_dist_diff[t, :, 0, l, h]
+                observed = sample_diff[t, l, h]
 
-            ax.axvline(lower, color="black", linestyle="--", linewidth=2, label='95% CI')
-            ax.axvline(upper, color="black", linestyle="--", linewidth=2)
+                p_val = np.sum(null_vals >= observed) / len(null_vals)
 
-            # 3. Bold formatting
-            ax.set_title(f"{tract_order[t]}\n({hemi_label}, EB - NS {loc_name})",
-                         fontsize=18, fontweight='bold')
-            ax.set_xlabel("EB-NS Beta Diff", fontsize=18, fontweight='bold')
-            ax.set_ylabel("Density" if (t == 0 and k == 0) else "",
-                          fontsize=18, fontweight='bold')
-            for spine in ax.spines.values():
-                spine.set_linewidth(2.5)
-            ax.tick_params(labelsize=16, width=2.5)
-            ax.set_xlim(global_xlim)
-            plt.setp(ax.get_xticklabels(), fontweight='bold')
-            plt.setp(ax.get_yticklabels(), fontweight='bold')
+                # 1. Histogram (bars) + KDE, all in light blue
+                sns.histplot(null_vals, bins=bin_edges, kde=False, stat="density",
+                             ax=ax, color=NULL_COLOR, alpha=0.35, edgecolor="none")
 
-            # p-value: x in data units, y in axes fraction (no hardcoded height)
-            ax.text(observed, 0.92, f"p = {p_val:.3f}",
-                    transform=ax.get_xaxis_transform(),
-                    fontsize=16, fontweight='bold', color='red', ha='center')
+                kde = gaussian_kde(null_vals)
+                xs = np.linspace(null_vals.min() - 3 * null_vals.std(),
+                                 null_vals.max() + 3 * null_vals.std(), 500)
+                ys = kde(xs)
+                ax.plot(xs, ys, color=NULL_COLOR, linewidth=3)
+                ax.fill_between(xs, ys, color=NULL_COLOR, alpha=0.25)
 
-    # 4. Legend column
-    legend_ax = axes[h, -1]
-    legend_ax.axis('off')
-    handles, labels = axes[h, 0].get_legend_handles_labels()
-    leg = legend_ax.legend(handles, labels, loc='center', fontsize=20,
-                           frameon=False, title=f"{hemi_label} Hemi")
-    plt.setp(leg.get_texts(), fontweight='bold')
-    plt.setp(leg.get_title(), fontweight='bold', fontsize=22)
+                # 2. Observed and confidence interval
+                ax.axvline(observed, color="red", linewidth=3)
 
-sns.despine()
-plt.tight_layout()
-saveDir = op.join(bids_path, 'analysis', 'plots')
-os.makedirs(saveDir, exist_ok=True)
-# plt.savefig(op.join(saveDir, "permutation_group_diff_betas_linreg_combined_tracts.png"),
-#             dpi=300, bbox_inches='tight')
-plt.show()
+                if observed > 0:
+                    lower, upper = np.percentile(null_vals, 0), np.percentile(null_vals, 95)
+                else:
+                    lower, upper = np.percentile(null_vals, 5), np.percentile(null_vals, 100)
+
+                ax.axvline(lower, color="black", linestyle="--", linewidth=2)
+                ax.axvline(upper, color="black", linestyle="--", linewidth=2)
+
+                # 3. Bold formatting
+                ax.set_title(f"{tract_order[t]} ({hemi_label})\nEB ptlocal - NS {loc_name}",
+                             fontsize=18, fontweight='bold')
+                ax.set_xlabel("Beta Diff", fontsize=18, fontweight='bold')
+                ax.set_ylabel("Density" if (t == 0 and k == 0) else "",
+                              fontsize=18, fontweight='bold')
+                for spine in ax.spines.values():
+                    spine.set_linewidth(2.5)
+                ax.tick_params(labelsize=16, width=2.5)
+                ax.set_xlim(global_xlim)
+                plt.setp(ax.get_xticklabels(), fontweight='bold')
+                plt.setp(ax.get_yticklabels(), fontweight='bold')
+
+                # p-value: x in data units, y in axes fraction
+                ax.text(observed, 0.92, f"p = {p_val:.3f}",
+                        transform=ax.get_xaxis_transform(),
+                        fontsize=16, fontweight='bold', color='red', ha='center')
+
+        # 4. Legend column
+        legend_ax = axes[h, -1]
+        legend_ax.axis('off')
+        handles = [
+            Patch(facecolor=NULL_COLOR, alpha=0.8, label="Null Dist"),
+            Line2D([0], [0], color="red", linewidth=3, label="Observed Diff"),
+            Line2D([0], [0], color="black", linestyle="--", linewidth=2, label="95% CI"),
+        ]
+        leg = legend_ax.legend(handles=handles, loc='center', fontsize=20,
+                               frameon=False, title=f"{hemi_label} Hemi")
+        plt.setp(leg.get_texts(), fontweight='bold')
+        plt.setp(leg.get_title(), fontweight='bold', fontsize=22)
+
+    sns.despine()
+    plt.tight_layout()
+
+    if savefilename:
+        saveDir = op.join(bids_path, 'analysis', 'plots')
+        os.makedirs(saveDir, exist_ok=True)
+        plt.savefig(op.join(saveDir, savefilename), dpi=300, bbox_inches='tight')
+    plt.show()
+
+
+plot_null_diffs(null_dist_diff, sample_diff, tract_order, bids_path)
+# To save: plot_null_diffs(..., savefilename="permutation_group_diff_betas_linreg_combined_tracts.png")
+
 # import numpy as np
 # import matplotlib.pyplot as plt
 # import seaborn as sns
