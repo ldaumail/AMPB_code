@@ -266,7 +266,9 @@ def vertex_bootstrap_reliability(C, n_boot=1000, frac=1):
 
     return np.mean(rs)
 
+#---------------------------------------
 ## Fit Regression Models to each group
+#---------------------------------------
 verbose = True
 
 hemis = ["L", "R"]
@@ -282,14 +284,6 @@ n_hemis = len(hemis)
 n_target_runs = 3
 
 n_groups = len(groups)
-# rs   = np.full((n_subj, len(hemis)), np.nan)
-# rsquared = np.full(( n_subj, len(hemis)), np.nan) #goodness of fit
-# reliability = np.full((n_subj, len(hemis)), np.nan)
-# r_all = np.full((n_subj, len(hemis)), np.nan)
-# rnd_run_idx = np.full((n_subj, 3, len(hemis)), np.nan)
-# trained_coefs = np.zeros((n_tracts, n_groups, len(hemis)))  # scalar summary per tract/run
-
-
 rs   = np.full((n_subj, n_localizers, n_hemis), np.nan)
 rsquared = np.full((n_subj, n_localizers, n_hemis), np.nan) #goodness of fit
 reliability = np.full((n_subj, n_localizers, n_hemis), np.nan)
@@ -298,6 +292,17 @@ trained_coefs = np.zeros((n_tracts, n_groups, n_localizers, n_hemis))  # scalar 
 
 n_boot = 1000
 trained_coefs_null = np.zeros((n_tracts, n_boot, n_groups, n_localizers,len(hemis)))
+
+# FIX 3: preallocate the difference arrays (they were never defined)
+null_dist_diff = np.zeros((n_tracts, n_boot, 1, n_localizers, n_hemis))
+sample_diff = np.zeros((n_tracts, n_localizers, n_hemis))
+
+# FIX 1: index of a localizer within C_mean for a given subject
+# EB subjects only have ptlocal (stored at index 0); NS subjects have mtlocal (0) and ptlocal (1)
+def get_loc_idx(p, localizer):
+    if "EB" in participants[p]:
+        return 0 if localizer == "ptlocal" else None
+    return localizer_order.index(localizer)
 
 predicted_maps = {hemi: [] for hemi in hemis}
 for h, hemi in enumerate(hemis):
@@ -323,28 +328,34 @@ for h, hemi in enumerate(hemis):
     _, _, n_vertices  = density_data[hemi].shape #get total number of vertices within fsaverage hemisphere
     
     n_target_runs = 3
-    all_C = []              # will store (n_subj, 3, n_vertices)
-    rnd_run_idx = np.full((n_subj, n_target_runs, len(hemis)), np.nan)
+    all_C = np.full((n_localizers, n_subj, n_target_runs, n_masked), np.nan)  
+    # rnd_run_idx = np.full((n_subj, n_target_runs, len(hemis)), np.nan)
     for s, participant in enumerate(participants):
+                # EB --> ptlocal only
+        # NS --> mtlocal + ptlocal
+        if "EB" in participant:
+                localizers = ["ptlocal"]
+        elif "NS" in participant:
+                localizers = ["mtlocal", "ptlocal"]
+        for l, localizer in enumerate(localizers):
 
-        C_full = norm_contrast_data[hemi][s][contrast]   # (n_runs_available, n_vertices)
-        n_runs_available = C_full.shape[0]
+            C_full = norm_contrast_data[hemi][s][localizer][contrast]   # (n_runs_available, n_vertices)
+            n_runs_available = C_full.shape[0]
 
-        # ---- choose runs ----
-        if "NS" in participant:
-            run_idx = np.arange(3)
-        elif "EB" in participant:
-            run_idx = np.random.choice(
-                n_runs_available, size=3, replace=False
-            )
+            # ---- choose runs ----
+            if "NS" in participant:
+                run_idx = np.arange(3)
+            elif "EB" in participant:
+                run_idx = np.random.choice(
+                    n_runs_available, size=3, replace=False
+                )
 
-        rnd_run_idx[s, :, h] = run_idx
+            rnd_run_idx[s, :, l, h] = run_idx #store runs indices of runs used for this analysis
 
-        # ---- extract runs ----
-        C_sel = C_full[run_idx, :]     # (3, n_vertices)
-        all_C.append(C_sel)
-    all_C = np.stack(all_C, axis=0)
-    C_mean = all_C.mean(axis=1)
+            # ---- extract runs ----
+            C_sel = C_full[run_idx, :]     # (3, n_vertices)
+            all_C[l,s,] = C_sel
+    C_mean = all_C.mean(axis=2)
 
 
     # -------------------------
@@ -352,34 +363,38 @@ for h, hemi in enumerate(hemis):
     # -------------------------
 
     for g, group in enumerate(groups):
+        # EB --> ptlocal only
+        # NS --> mtlocal + ptlocal
+        if group == "EB":
+                localizers = ["ptlocal"]
+        elif group == "NS":
+                localizers = ["mtlocal", "ptlocal"]
         
         participants_group = [p for p in participants if group in p]
         n_g_subj = len(participants_group)
         #Define X and Y of the given group
         group_norm_density = np.stack([norm_density_data[hemi][p] for p in range(n_subj) if participants[p] in participants_group], axis = 0)
-        group_C_mean = np.stack([C_mean[p,:] for p in range(n_subj) if participants[p] in participants_group], axis = 0)
 
-        if verbose:
-            print(f"Fitting group {group}")
+        for l, localizer in enumerate(localizers):
+            group_C_mean = np.stack([C_mean[l, p,:] for p in range(n_subj) if participants[p] in participants_group], axis = 0)
 
-        # X: density maps for this participant
-        # shape: (n_vertices_masked, n_tracts)
-        X = group_norm_density.transpose(0,2,1).reshape(-1,3)#norm_density_data[hemi][s].T
+            if verbose:
+                print(f"Fitting group {group}")
 
-        # y: functional contrast map
-        # shape: (n_vertices_masked,)
-        y = group_C_mean.reshape(-1,1) #C_mean[s, :]
+            # X: density maps for this participant
+            # shape: (n_vertices_masked, n_tracts)
+            X = group_norm_density.transpose(0,2,1).reshape(-1,3)#norm_density_data[hemi][s].T
 
-        # Fit regression
-        linreg = LinearRegression()
-        linreg.fit(X, y)
+            # y: functional contrast map
+            # shape: (n_vertices_masked,)
+            y = group_C_mean.reshape(-1,1) #C_mean[s, :]
 
-        # Store coefficients
-        trained_coefs[:, g, h] = linreg.coef_.copy()
+            # Fit regression
+            linreg = LinearRegression()
+            linreg.fit(X, y)
 
-        # # Predict (optional)
-        # y_pred = ridge.predict(X)
-        # predicted[s, :] = y_pred
+            # Store coefficients
+            trained_coefs[:, g,l, h] = linreg.coef_.copy()
 
         # Reliability (if needed)
         # reliability[s, h] = vertex_bootstrap_reliability(all_C[s,:,:])
@@ -387,112 +402,124 @@ for h, hemi in enumerate(hemis):
 
     #Null beta distributions
     for n in range(n_boot):
-        participants1 = np.random.choice(n_subj, 7, replace=False)
-        participants2 = [p for p in range(n_subj) if p not in participants1]
+        participants_EB = [p for p in participants if "EB" in p]
+        n_EB_subj = len(participants_EB)
+        participants1 = np.random.choice(n_subj,  n_EB_subj, replace=False) #simulates a null group of same size as EB group
+        participants2 = [p for p in range(n_subj) if p not in participants1] #Simulates a null group of same size as NS group
 
         group_norm_density1 = np.stack([norm_density_data[hemi][p] for p in participants1], axis = 0)
-        group_C_mean1 = np.stack([C_mean[p,:] for p in participants1], axis = 0)
+
+        localizer_idx = 0
+        # FIX 1: null "EB" group uses each subject's ptlocal map (EB: index 0, NS: index 1)
+        group_C_mean1 = np.stack([C_mean[get_loc_idx(p, "ptlocal"), p,:] for p in participants1], axis = 0)
         X1 = group_norm_density1.transpose(0,2,1).reshape(-1,3)
         y1 = group_C_mean1.reshape(-1,1)
 
         linreg1 = LinearRegression()
         linreg1.fit(X1, y1)
+        trained_coefs_null[:,n, 0, localizer_idx, h] = linreg1.coef_.copy()
 
-        group_norm_density2 = np.stack([norm_density_data[hemi][p] for p in participants2], axis = 0)
-        group_C_mean2 = np.stack([C_mean[p,:] for p in participants2], axis = 0)
-        X2 = group_norm_density2.transpose(0,2,1).reshape(-1,3)
-        y2 = group_C_mean2.reshape(-1,1)
+        #Need to generate 2 null NS groups, one for each localizer contrast
+        localizers = ["mtlocal", "ptlocal"]  
+        for l, localizer in enumerate(localizers):
+            # FIX 1/2: keep only subjects that have this localizer (EB subjects have no mtlocal)
+            participants2_loc = [p for p in participants2 if get_loc_idx(p, localizer) is not None]
+            group_norm_density2 = np.stack([norm_density_data[hemi][p] for p in participants2_loc], axis = 0)
+            group_C_mean2 = np.stack([C_mean[get_loc_idx(p, localizer), p,:] for p in participants2_loc], axis = 0)
+            X2 = group_norm_density2.transpose(0,2,1).reshape(-1,3)
+            y2 = group_C_mean2.reshape(-1,1)
 
-        linreg2 = LinearRegression()
-        linreg2.fit(X2, y2)
+            linreg2 = LinearRegression()
+            linreg2.fit(X2, y2)
 
-        trained_coefs_null[:,n, 0, h] = linreg1.coef_.copy()
-        trained_coefs_null[:,n, 1, h] = linreg2.coef_.copy()
+            
+            trained_coefs_null[:,n, 1,l, h] = linreg2.coef_.copy()
 
-
-null_dist_diff = trained_coefs_null[:,:,0,:] - trained_coefs_null[:,:,1,:]
-sample_diff = trained_coefs[:,0,:] - trained_coefs[:,1,:]
+localizers_NS = ["mtlocal", "ptlocal"]  
+localizer_idx_EB = 0
+for l, localizer in enumerate(localizers_NS):
+    null_dist_diff[:,:,0,l,:] = trained_coefs_null[:,:,0,localizer_idx_EB,:] - trained_coefs_null[:,:,1,l,:]
+    # FIX 3: was sample_diff[:,:,l,:], which has one index too many for a (tracts, hemis) result
+    sample_diff[:,l,:] = trained_coefs[:,0,localizer_idx_EB,:] - trained_coefs[:,1,l,:]
 
 #Plot
-
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# null_dist_diff: (n_tracts, n_boot, 1, n_localizers, n_hemis)
+# sample_diff:    (n_tracts, n_localizers, n_hemis)
+# localizer index: 0 = mtlocal, 1 = ptlocal
 n_tracts = null_dist_diff.shape[0]
-n_hemi = 2 # Left and Right
-# Flatten the null distribution and observed values to find the absolute range
+n_hemi = 2  # Left and Right
+loc_plot = [(1, "ptlocal"), (0, "mtlocal")]   # (index, label), in plotting order
+n_cols = n_tracts * len(loc_plot)
+
+# Shared x-range across all panels
 all_values = np.concatenate([null_dist_diff.flatten(), sample_diff.flatten()])
 x_min, x_max = all_values.min(), all_values.max()
-
-# Add a 10% buffer so the bars don't touch the edges
 buffer = (x_max - x_min) * 0.1
 global_xlim = (x_min - buffer, x_max + buffer)
-# Create a grid: 2 rows (Hemis), n_tracts + 1 columns (Tracts + Legend Space)
-# The width_ratios makes the legend column narrower
-fig, axes = plt.subplots(2, n_tracts + 1, 
-                         figsize=(6 * (n_tracts + 1), 10), 
-                         gridspec_kw={'width_ratios': [1]*n_tracts + [0.4]})
+
+# Grid: 2 rows (hemis), n_tracts*2 columns + 1 narrow legend column
+fig, axes = plt.subplots(
+    n_hemi, n_cols + 1,
+    figsize=(5 * (n_cols + 1), 10),
+    gridspec_kw={'width_ratios': [1] * n_cols + [0.5]}
+)
 
 for h in range(n_hemi):
     hemi_label = "Left" if h == 0 else "Right"
-    
+
     for t in range(n_tracts):
-        ax = axes[h, t]
-        null_vals = null_dist_diff[t, :, h]
-        observed = sample_diff[t, h]
+        for k, (l, loc_name) in enumerate(loc_plot):
+            ax = axes[h, t * len(loc_plot) + k]
 
-        p_val = np.sum(null_vals >= observed) / len(null_vals)
+            null_vals = null_dist_diff[t, :, 0, l, h]
+            observed = sample_diff[t, l, h]
 
-        # 1. Plot Histogram + KDE
-        sns.histplot(null_vals, bins=30, kde=True, stat="density", 
-                     ax=ax, color="#4C72B0", alpha=0.4, label='Null Dist',edgecolor="none")
+            p_val = np.sum(null_vals >= observed) / len(null_vals)
 
-        # 2. Observed and Confidence Intervals
-        ax.axvline(observed, color="red", linewidth=3, label='Observed Diff')
-        
-        if observed > 0:
-            lower, upper = np.percentile(null_vals, 0), np.percentile(null_vals, 95)
-        else:
-            lower, upper = np.percentile(null_vals, 5), np.percentile(null_vals, 100)
+            # 1. Histogram + KDE
+            sns.histplot(null_vals, bins=30, kde=True, stat="density",
+                         ax=ax, color="#4C72B0", alpha=0.4,
+                         label='Null Dist', edgecolor="none")
 
-        ax.axvline(lower, color="black", linestyle="--", linewidth=2, label='95% CI')
-        ax.axvline(upper, color="black", linestyle="--", linewidth=2)
+            # 2. Observed and confidence interval
+            ax.axvline(observed, color="red", linewidth=3, label='Observed Diff')
 
-        # 3. Bold Formatting (Min size 18)
-        ax.set_title(f"{tract_order[t]} ({hemi_label})", fontsize=20, fontweight='bold')
-        ax.set_xlabel("EB-NS Beta Diff", fontsize=18, fontweight='bold')
-        ax.set_ylabel("Density", fontsize=18, fontweight='bold')
-        # Axis spine thickness
-        for spine in ax.spines.values():
-            spine.set_linewidth(2.5)
-            
-        # Bold Ticks
-        ax.tick_params(labelsize=18, width=2.5)
-        ax.set_xlim(global_xlim)
-        plt.setp(ax.get_xticklabels(), fontweight='bold')
-        plt.setp(ax.get_yticklabels(), fontweight='bold')
+            if observed > 0:
+                lower, upper = np.percentile(null_vals, 0), np.percentile(null_vals, 95)
+            else:
+                lower, upper = np.percentile(null_vals, 5), np.percentile(null_vals, 100)
 
-        # --- DISPLAY P-VALUE ON PLOT ---
-        # Position it at the top of the KDE/Histogram
-        ax.text(
-            x=observed + 0.05,                     # Horizontal position (check your x-scale)
-            y=8,      # Just above the red line
-            s=f"p = {p_val:.3f}",
-            fontsize=16,
-            fontweight='bold',
-            color='red',
-            ha='center'
-        )
+            ax.axvline(lower, color="black", linestyle="--", linewidth=2, label='95% CI')
+            ax.axvline(upper, color="black", linestyle="--", linewidth=2)
 
+            # 3. Bold formatting
+            ax.set_title(f"{tract_order[t]}\n({hemi_label}, EB - NS {loc_name})",
+                         fontsize=18, fontweight='bold')
+            ax.set_xlabel("EB-NS Beta Diff", fontsize=18, fontweight='bold')
+            ax.set_ylabel("Density" if (t == 0 and k == 0) else "",
+                          fontsize=18, fontweight='bold')
+            for spine in ax.spines.values():
+                spine.set_linewidth(2.5)
+            ax.tick_params(labelsize=16, width=2.5)
+            ax.set_xlim(global_xlim)
+            plt.setp(ax.get_xticklabels(), fontweight='bold')
+            plt.setp(ax.get_yticklabels(), fontweight='bold')
 
-    # 4. Handle the Legend Subplot (Last column of each row)
+            # p-value: x in data units, y in axes fraction (no hardcoded height)
+            ax.text(observed, 0.92, f"p = {p_val:.3f}",
+                    transform=ax.get_xaxis_transform(),
+                    fontsize=16, fontweight='bold', color='red', ha='center')
+
+    # 4. Legend column
     legend_ax = axes[h, -1]
-    legend_ax.axis('off') # Hide the plot lines/axes
-    
-    # Grab handles from the last tract plot in this row
+    legend_ax.axis('off')
     handles, labels = axes[h, 0].get_legend_handles_labels()
-    leg = legend_ax.legend(handles, labels, loc='center', fontsize=20, frameon=False, title=f"{hemi_label} Hemi")
+    leg = legend_ax.legend(handles, labels, loc='center', fontsize=20,
+                           frameon=False, title=f"{hemi_label} Hemi")
     plt.setp(leg.get_texts(), fontweight='bold')
     plt.setp(leg.get_title(), fontweight='bold', fontsize=22)
 
@@ -503,6 +530,94 @@ os.makedirs(saveDir, exist_ok=True)
 # plt.savefig(op.join(saveDir, "permutation_group_diff_betas_linreg_combined_tracts.png"),
 #             dpi=300, bbox_inches='tight')
 plt.show()
+# import numpy as np
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+
+# n_tracts = null_dist_diff.shape[0]
+# n_hemi = 2 # Left and Right
+# # Flatten the null distribution and observed values to find the absolute range
+# all_values = np.concatenate([null_dist_diff.flatten(), sample_diff.flatten()])
+# x_min, x_max = all_values.min(), all_values.max()
+
+# # Add a 10% buffer so the bars don't touch the edges
+# buffer = (x_max - x_min) * 0.1
+# global_xlim = (x_min - buffer, x_max + buffer)
+# # Create a grid: 2 rows (Hemis), n_tracts + 1 columns (Tracts + Legend Space)
+# # The width_ratios makes the legend column narrower
+# fig, axes = plt.subplots(2, n_tracts + 1, 
+#                          figsize=(6 * (n_tracts + 1), 10), 
+#                          gridspec_kw={'width_ratios': [1]*n_tracts + [0.4]})
+
+# for h in range(n_hemi):
+#     hemi_label = "Left" if h == 0 else "Right"
+    
+#     for t in range(n_tracts):
+#         ax = axes[h, t]
+#         null_vals = null_dist_diff[t, :, h]
+#         observed = sample_diff[t, h]
+
+#         p_val = np.sum(null_vals >= observed) / len(null_vals)
+
+#         # 1. Plot Histogram + KDE
+#         sns.histplot(null_vals, bins=30, kde=True, stat="density", 
+#                      ax=ax, color="#4C72B0", alpha=0.4, label='Null Dist',edgecolor="none")
+
+#         # 2. Observed and Confidence Intervals
+#         ax.axvline(observed, color="red", linewidth=3, label='Observed Diff')
+        
+#         if observed > 0:
+#             lower, upper = np.percentile(null_vals, 0), np.percentile(null_vals, 95)
+#         else:
+#             lower, upper = np.percentile(null_vals, 5), np.percentile(null_vals, 100)
+
+#         ax.axvline(lower, color="black", linestyle="--", linewidth=2, label='95% CI')
+#         ax.axvline(upper, color="black", linestyle="--", linewidth=2)
+
+#         # 3. Bold Formatting (Min size 18)
+#         ax.set_title(f"{tract_order[t]} ({hemi_label})", fontsize=20, fontweight='bold')
+#         ax.set_xlabel("EB-NS Beta Diff", fontsize=18, fontweight='bold')
+#         ax.set_ylabel("Density", fontsize=18, fontweight='bold')
+#         # Axis spine thickness
+#         for spine in ax.spines.values():
+#             spine.set_linewidth(2.5)
+            
+#         # Bold Ticks
+#         ax.tick_params(labelsize=18, width=2.5)
+#         ax.set_xlim(global_xlim)
+#         plt.setp(ax.get_xticklabels(), fontweight='bold')
+#         plt.setp(ax.get_yticklabels(), fontweight='bold')
+
+#         # --- DISPLAY P-VALUE ON PLOT ---
+#         # Position it at the top of the KDE/Histogram
+#         ax.text(
+#             x=observed + 0.05,                     # Horizontal position (check your x-scale)
+#             y=8,      # Just above the red line
+#             s=f"p = {p_val:.3f}",
+#             fontsize=16,
+#             fontweight='bold',
+#             color='red',
+#             ha='center'
+#         )
+
+
+#     # 4. Handle the Legend Subplot (Last column of each row)
+#     legend_ax = axes[h, -1]
+#     legend_ax.axis('off') # Hide the plot lines/axes
+    
+#     # Grab handles from the last tract plot in this row
+#     handles, labels = axes[h, 0].get_legend_handles_labels()
+#     leg = legend_ax.legend(handles, labels, loc='center', fontsize=20, frameon=False, title=f"{hemi_label} Hemi")
+#     plt.setp(leg.get_texts(), fontweight='bold')
+#     plt.setp(leg.get_title(), fontweight='bold', fontsize=22)
+
+# sns.despine()
+# plt.tight_layout()
+# saveDir = op.join(bids_path, 'analysis', 'plots')
+# os.makedirs(saveDir, exist_ok=True)
+# # plt.savefig(op.join(saveDir, "permutation_group_diff_betas_linreg_combined_tracts.png"),
+# #             dpi=300, bbox_inches='tight')
+# plt.show()
 
 
 ## Check visually the group level regressions beta values
