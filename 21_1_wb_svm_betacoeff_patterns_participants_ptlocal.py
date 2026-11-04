@@ -153,7 +153,8 @@ df = pd.read_csv(op.join(bids_path, 'analysis','diff2func_model_fits', 'pyAFQ3be
 participants = df["Participant"].unique()
 hemis = ["L", "R"]
 #tracts = ["PTR", "SuperiorLongitudinal", "VerticalOccipital"] #df["Tract"].unique()
-tracts = ["PTR", "SuperiorLongitudinal", "InferiorFrontooccipital"]
+tracts = ["InferiorFrontooccipital", "VerticalOccipital"]
+#tracts = ["PTR", "SuperiorLongitudinal"]
 n_subj = len(participants)
 n_tract = len(tracts)
 
@@ -161,7 +162,7 @@ n_tract = len(tracts)
 y = np.array([1 if "EB" in p else 0 for p in participants])
 
 tract_matches = tracts.copy() #["PTR", "SuperiorLongitudinal","InferiorFrontooccipital", "VerticalOccipital"]
-df_use = df[~((df["Group"] == "NS") & (df["Localizer"] == "mtlocal")) & df["Tract"].isin(tract_matches)].copy()
+df_use = df[~((df["Group"] == "NS") & (df["Localizer"] == "ptlocal")) & df["Tract"].isin(tract_matches)].copy()
 selected_tracts = tracts.copy() #[[0, 2]]
 
 for hemi in hemis:
@@ -281,8 +282,8 @@ def plot_3d_with_plane(df, y, hemis, tracts, Cs, elev, azim,
 
     plt.show()
 
-C_left = 4.299
-C_right = 10
+C_left = 1.848
+C_right = 0.012
 plot_3d_with_plane(
     df=df_use, y=y, hemis=["L", "R"], tracts=tracts, #[tracts[i] for i in (0, 1, 3)],
     Cs=[C_left, C_right],                 # from a stated selection rule
@@ -512,8 +513,8 @@ def plot_2d_with_plane(
             plt.savefig(op.join(save_path, f"{savefilename}.{fmt}"), dpi=600, bbox_inches="tight")
     plt.show()
 
-C_left = 4.299
-C_right = 4.299
+C_left = 0.005
+C_right = 0.794
 plot_2d_with_plane(
     df=df_use,
     participants=participants,
@@ -522,7 +523,7 @@ plot_2d_with_plane(
     tracts=selected_tracts,
     C = np.array([C_left, C_right]),
     save_path = op.join(bids_path, "analysis", "plots"),
-    savefilename = "pyAFQ3beta_wb_beta_weights_2d_linear_svm_PTR-IFOF"
+    savefilename = "pyAFQ3beta_wb_beta_weights_2d_linear_svm_EBptlocal_NSmtlocal_IFOF-VOF"
 )
 
 

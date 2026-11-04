@@ -428,14 +428,25 @@ for h, hemi in enumerate(hemis):
 
 #
 import sys
+import os.path as op
+import pandas as pd
 current_dir = op.dirname(op.abspath(__file__))
 sys.path.append(current_dir)
 from plots_utils_15_4 import pearsonr_combined_plot, beta_plot, avg_density_plot, avg_func_plot
 
 #Performance plots
+bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
+density_dir = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps')
+participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
+projfrac = '1'
+tract_order = ['PTR', 'InferiorLongitudinal','InferiorFrontooccipital','SuperiorLongitudinal','VerticalOccipital','Arcuate','PosteriorArcuate' ] 
 savefilename = f"wb_pearson_linearreg_combined_tracts_{projfrac}frac"
 ylim = [-0.2, 1]
-pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path, savefilename,ylim)
+rs_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'diff2func_model_fits', 'pyAFQ3beta_wb_participants_linearreg_ptlocal', 'pearsonr_contrast-motionXstationary_combined_1frac.csv')
+rs = pd.read_csv(rs_file) 
+nc_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'diff2func_model_fits', 'pyAFQ3beta_wb_participants_linearreg_ptlocal', 'noiseceiling_contrast-motionXstationary_combined_1frac.csv')
+reliability = pd.read_csv(nc_file) 
+pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path, savefilename,ylim, figsize=(7, 12))
 
 savefilename = f"wb_beta_barplot_linearreg_combined_tracts_{projfrac}frac"
 ylim = [-0.4, 0.4]

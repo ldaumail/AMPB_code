@@ -577,7 +577,8 @@ def beta_plot(betas, participants, tract_order, bids_path, savefilename, ylim):
 
     plt.show()
 
-def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path, savefilename, ylim):
+def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path,
+                           savefilename, ylim, figsize=(7, 12), bar_width=0.25):
     #First compute noise ceiling 95% CI
     hemi_labels = ["L", "R"]
     if isinstance(reliability, np.ndarray):
@@ -716,13 +717,9 @@ def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path
     # Create 2 subplots — one per hemisphere
     # ------------------------------------------------
 
-    # ------------------------------------------------
-    # Create 2 subplots — one per hemisphere
-    # ------------------------------------------------
-
     fig, axes = plt.subplots(
         2, 1,
-        figsize=(12, 16),
+        figsize=figsize,
         sharey=True
     )
 
@@ -745,6 +742,8 @@ def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path
         nc_sem_df["Group"] + "_" + nc_sem_df["Localizer"]
     )
 
+    rng = np.random.default_rng(0)   # reproducible dot jitter
+
     for ax, hemi in zip(axes, hemi_labels):
 
         # Groups that actually exist at each localizer
@@ -752,15 +751,14 @@ def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path
             "mtlocal": ["NS_mtlocal"],
             "ptlocal": ["EB_ptlocal", "NS_ptlocal"],
         }
-        bar_width = 0.4   # same width for every bar
+
+        df_h = df[df["Hemisphere"] == hemi].copy()
+        nc_h = nc_sem_df[nc_sem_df["Hemisphere"] == hemi].copy()
 
         # ------------------------------------------------
         # Bars + dots, one localizer at a time
         # ------------------------------------------------
         for loc, groups in groups_per_loc.items():
-            df_h = df[df["Hemisphere"] == hemi].copy()
-            nc_h = nc_sem_df[nc_sem_df["Hemisphere"] == hemi].copy()
-
             d = df_h[df_h["Localizer"] == loc]
             if d.empty:
                 continue
@@ -783,23 +781,16 @@ def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path
                 ax=ax
             )
 
-            sns.stripplot(
-                data=d,
-                x="Localizer",
-                y="Correlation",
-                order=localizer_order,
-                hue="GroupLocalizer",
-                hue_order=groups,
-                palette=combined_palette,
-                dodge=True,
-                jitter=0.08,
-                size=5,
-                edgecolor="black",
-                linewidth=0.6,
-                alpha=0.85,
-                legend=False,
-                ax=ax
-            )
+            # Participant dots, drawn manually so they stay centered on the
+            # (now thinner) bars. seaborn's stripplot dodges over a fixed
+            # width of 0.8 and would no longer line up with the bars.
+            loc_idx = localizer_order.index(loc)
+            for gi, key in enumerate(groups):
+                vals = d.loc[d["GroupLocalizer"] == key, "Correlation"].to_numpy()
+                xc = loc_idx + (gi - (len(groups) - 1) / 2) * bar_width
+                xs = xc + rng.uniform(-bar_width * 0.25, bar_width * 0.25, len(vals))
+                ax.scatter(xs, vals, s=25, color=combined_palette[key],
+                           edgecolor="black", linewidth=0.6, alpha=0.85, zorder=3)
 
         # ------------------------------------------------
         # Noise ceiling: aligned with the new bar positions
@@ -827,6 +818,7 @@ def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path
         # ------------------------------------------------
 
         ax.set_ylim(ylim)
+        ax.set_xlim(-0.5, 1.5)          # shorter x axis around the two groups of bars
 
         ax.set_title(
             f"{hemi}-Hemisphere",
@@ -836,6 +828,7 @@ def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path
         )
 
         ax.set_xlabel("Localizer", fontsize=18, fontweight="bold")
+        ax.set_xticks([0, 1])
         ax.set_xticklabels(
             ["MT localizer", "PT localizer"],
             fontsize=16,
@@ -916,6 +909,345 @@ def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path
         plt.savefig(op.join(saveDir, f"{savefilename}.{fmt}"), dpi=600, bbox_inches="tight")
 
     plt.show()
+# def pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path, savefilename, ylim):
+#     #First compute noise ceiling 95% CI
+#     hemi_labels = ["L", "R"]
+#     if isinstance(reliability, np.ndarray):
+#         nc_rows = []
+
+#         for h in range(2):     # left/right hemispheres
+#             for s, participant in enumerate(participants):
+#                 gp = "EB" if "EB" in participant else "NS"
+#                 # EB --> ptlocal only
+#                 # NS --> mtlocal + ptlocal
+#                 if "EB" in participant:
+#                         localizers = ["ptlocal"]
+#                 elif "NS" in participant:
+#                         localizers = ["mtlocal", "ptlocal"]
+#                 for l, localizer in enumerate(localizers):
+
+#                     nc_rows.append({
+#                         "Localizer": localizer,
+#                         "Subject": s,
+#                         "Hemisphere": hemi_labels[h],
+#                         "Group": gp,
+#                         "Correlation": reliability[s,l,h] #r_all[s, h] #
+#                     })
+#         nc_df = pd.DataFrame(nc_rows)
+#         nc_sem_df = (
+#         nc_df.groupby(["Group", "Localizer", "Hemisphere"])["Correlation"]
+#         .agg(["mean", sem])
+#         .reset_index()
+#         .rename(columns={"mean": "Mean", "sem": "SEM"})
+#     )
+#     else:
+#         nc_df = reliability.copy()
+
+#         nc_sem_df = (
+#             nc_df.groupby(["Group", "Localizer", "Hemisphere"])["NC"]
+#             .agg(["mean", sem])
+#             .reset_index()
+#             .rename(columns={"mean": "Mean", "sem": "SEM"})
+#         )
+
+#     tract_labels = [
+#         t.replace("InferiorLongitudinal", "ILF")
+#         .replace("InferiorFrontooccipital", "IFOF")
+#         .replace("AnteriorVerticalOccipital", "aVOF")
+#         .replace("VerticalOccipital", "VOF")
+#         .replace("PosteriorVerticalOccipital", "pVOF")
+#         .replace("PosteriorArcuate", "pArc")
+#         .replace("Arcuate", "AF")
+#         .replace("SuperiorLongitudinal", "SLF")
+#         .replace("SuperiorLongitudinalI", "SLFI")
+#         .replace("SuperiorLongitudinalII", "SLFII")
+#         .replace("SuperiorLongitudinalI", "SLFIII")
+#         .replace("OpticRadiation", "OR")
+#         .replace("AnteriorThalamic", "ATR")
+#         .replace("CingulumCingulate", "CC")
+#         .replace("Corticospinal", "CST")
+#         .replace("MTxLGNxPU", "Thalamocortical")
+#         .replace("MTxPTxSTS1", "Temporal")
+#         .replace("MTxFEF", "Frontal")
+#         for t in tract_order
+#     ]
+
+#     nc_sem_df["CI95_upper"] = nc_sem_df["Mean"] + 1.96 * nc_sem_df["SEM"]
+#     nc_sem_df["CI95_lower"] = nc_sem_df["Mean"] - 1.96 * nc_sem_df["SEM"]
+
+#     # --------------------------------------
+#     # Organize Pearson's r in table
+#     # --------------------------------------
+
+#     hemi_labels = ["L", "R"]
+#     if isinstance(rs, np.ndarray):
+#         rows = []
+
+#         for h in range(2):     # left/right hemispheres
+#             for s, participant in enumerate(participants):
+#                 gp = "EB" if "EB" in participant else "NS"
+#                 # EB --> ptlocal only
+#                 # NS --> mtlocal + ptlocal
+#                 if "EB" in participant:
+#                         localizers = ["ptlocal"]
+#                 elif "NS" in participant:
+#                         localizers = ["mtlocal", "ptlocal"]
+#                 for l, localizer in enumerate(localizers):
+#                 # pearson = rs[:, s, h]
+
+#                     rows.append({
+#                         "Subject": s,
+#                         "Localizer": localizer,
+#                         "Hemisphere": hemi_labels[h],
+#                         "Group": gp,
+#                         "Correlation": rs[s,l,h] #r_all[s, h] #
+#                     })
+
+#         df = pd.DataFrame(rows)
+#     else:
+#          df = rs.copy()
+
+#     # ------------------------------------------------
+#     # Compute SEM per Group × Hemisphere
+#     # ------------------------------------------------
+#     sem_df = (
+#         df.groupby(["Group", "Localizer","Hemisphere"])["Correlation"]
+#         .agg(["mean", sem])
+#         .reset_index()
+#         .rename(columns={"mean": "Mean", "sem": "SEM"})
+#     )
+#     # ------------------------------------------------
+#     # Color palette: Group = color family,
+#     # Localizer = shade within the family
+#     # ------------------------------------------------
+
+#     palette = {
+#         ("EB", "ptlocal"): "#9ecae1",  # light blue 
+#         ("NS", "mtlocal"): "#c45100",  # dark orange 
+#         ("NS", "ptlocal"): "#fdae6b",  # light orange
+#     } #        ("EB", "mtlocal"): "#1f4e79",  # dark blue
+
+#     # Create a combined categorical variable for hue
+#     for data_df in [df, nc_df]:
+#         data_df["GroupLocalizer"] = (
+#             data_df["Group"] + "_" + data_df["Localizer"]
+#         )
+
+#     hue_order = [
+#         "EB_ptlocal",
+#         "NS_mtlocal",
+#         "NS_ptlocal",
+#     ] #        "EB_mtlocal",
+
+#     combined_palette = {
+#         f"{group}_{localizer}": color
+#         for (group, localizer), color in palette.items()
+#     }
+
+#     # ------------------------------------------------
+#     # Create 2 subplots — one per hemisphere
+#     # ------------------------------------------------
+
+#     # ------------------------------------------------
+#     # Create 2 subplots — one per hemisphere
+#     # ------------------------------------------------
+
+#     fig, axes = plt.subplots(
+#         2, 1,
+#         figsize=(12, 16),
+#         sharey=True
+#     )
+
+#     localizer_order = ["mtlocal", "ptlocal"]
+#     hue_order = ["NS_mtlocal", "EB_ptlocal", "NS_ptlocal"]
+
+#     # Only combinations that actually exist
+#     combined_palette = {
+#         "EB_ptlocal": "#9ecae1",  # light blue
+#         "NS_mtlocal": "#c45100",  # dark orange
+#         "NS_ptlocal": "#fdae6b",  # light orange
+#     }
+
+#     # Add combined hue variable
+#     df = df.copy()
+#     df["GroupLocalizer"] = df["Group"] + "_" + df["Localizer"]
+
+#     nc_sem_df = nc_sem_df.copy()
+#     nc_sem_df["GroupLocalizer"] = (
+#         nc_sem_df["Group"] + "_" + nc_sem_df["Localizer"]
+#     )
+
+#     for ax, hemi in zip(axes, hemi_labels):
+
+#         # Groups that actually exist at each localizer
+#         groups_per_loc = {
+#             "mtlocal": ["NS_mtlocal"],
+#             "ptlocal": ["EB_ptlocal", "NS_ptlocal"],
+#         }
+#         bar_width = 0.4   # same width for every bar
+
+#         # ------------------------------------------------
+#         # Bars + dots, one localizer at a time
+#         # ------------------------------------------------
+#         for loc, groups in groups_per_loc.items():
+#             df_h = df[df["Hemisphere"] == hemi].copy()
+#             nc_h = nc_sem_df[nc_sem_df["Hemisphere"] == hemi].copy()
+
+#             d = df_h[df_h["Localizer"] == loc]
+#             if d.empty:
+#                 continue
+
+#             sns.barplot(
+#                 data=d,
+#                 x="Localizer",
+#                 y="Correlation",
+#                 order=localizer_order,        # keeps x positions 0 and 1
+#                 hue="GroupLocalizer",
+#                 hue_order=groups,
+#                 palette=combined_palette,
+#                 errorbar="se",
+#                 capsize=0.06,
+#                 alpha=0.75,
+#                 edgecolor="black",
+#                 linewidth=1.5,
+#                 width=bar_width * len(groups),  # per-bar width = bar_width
+#                 legend=False,
+#                 ax=ax
+#             )
+
+#             sns.stripplot(
+#                 data=d,
+#                 x="Localizer",
+#                 y="Correlation",
+#                 order=localizer_order,
+#                 hue="GroupLocalizer",
+#                 hue_order=groups,
+#                 palette=combined_palette,
+#                 dodge=True,
+#                 jitter=0.08,
+#                 size=5,
+#                 edgecolor="black",
+#                 linewidth=0.6,
+#                 alpha=0.85,
+#                 legend=False,
+#                 ax=ax
+#             )
+
+#         # ------------------------------------------------
+#         # Noise ceiling: aligned with the new bar positions
+#         # ------------------------------------------------
+#         for _, row in nc_h.iterrows():
+#             key = row["GroupLocalizer"]
+#             loc = row["Localizer"]
+#             if key not in groups_per_loc.get(loc, []):
+#                 continue
+
+#             groups = groups_per_loc[loc]
+#             loc_idx = localizer_order.index(loc)
+#             x_center = loc_idx + (groups.index(key) - (len(groups) - 1) / 2) * bar_width
+#             x0, x1 = x_center - bar_width / 2, x_center + bar_width / 2
+
+#             ax.fill_between([x0, x1], row["CI95_lower"], row["CI95_upper"],
+#                             color=combined_palette[key], alpha=0.12, zorder=0)
+#             ax.hlines([row["CI95_lower"], row["CI95_upper"]], xmin=x0, xmax=x1,
+#                       colors=combined_palette[key], linestyles="--", linewidth=1.5)
+#             ax.hlines(row["Mean"], xmin=x0, xmax=x1,
+#                       colors=combined_palette[key], linestyles=":", linewidth=2)
+
+#         # ------------------------------------------------
+#         # Formatting
+#         # ------------------------------------------------
+
+#         ax.set_ylim(ylim)
+
+#         ax.set_title(
+#             f"{hemi}-Hemisphere",
+#             fontsize=22,
+#             fontweight="bold",
+#             pad=15
+#         )
+
+#         ax.set_xlabel("Localizer", fontsize=18, fontweight="bold")
+#         ax.set_xticklabels(
+#             ["MT localizer", "PT localizer"],
+#             fontsize=16,
+#             fontweight="bold"
+#         )
+
+#         ax.axhline(
+#             0,
+#             color="gray",
+#             linestyle="--",
+#             linewidth=1.5
+#         )
+
+#         ax.spines["left"].set_linewidth(2.5)
+#         ax.spines["bottom"].set_linewidth(2.5)
+
+#         ax.tick_params(
+#             axis="both",
+#             which="major",
+#             labelsize=16,
+#             width=2.5
+#         )
+
+#         for label in ax.get_yticklabels():
+#             label.set_fontweight("bold")
+
+#         # ------------------------------------------------
+#         # Manual legend
+#         # ------------------------------------------------
+
+#         legend_labels = {
+#             "EB_ptlocal": "EB — ptlocal",
+#             "NS_mtlocal": "NS — mtlocal",
+#             "NS_ptlocal": "NS — ptlocal",
+#         }
+
+#         legend_handles = [
+#             Patch(
+#                 facecolor=combined_palette[key],
+#                 edgecolor="black",
+#                 alpha=0.75,
+#                 label=legend_labels[key]
+#             )
+#             for key in hue_order
+#         ]
+
+#         legend_handles.append(
+#             Patch(
+#                 facecolor="lightgray",
+#                 alpha=0.35,
+#                 label="95% noise ceiling CI"
+#             )
+#         )
+
+#         leg = ax.legend(
+#             handles=legend_handles,
+#             title="Group — Localizer",
+#             loc="upper right",
+#             frameon=False,
+#             fontsize=12
+#         )
+
+#         plt.setp(leg.get_texts(), fontweight="bold")
+#         plt.setp(leg.get_title(), fontweight="bold")
+
+
+#     axes[0].set_ylabel("Pearson's r", fontsize=18, fontweight="bold")
+#     axes[1].set_ylabel("Pearson's r", fontsize=18, fontweight="bold")
+
+#     sns.despine()
+#     plt.tight_layout()
+
+#     saveDir = op.join(bids_path, "analysis", "plots")
+#     os.makedirs(saveDir, exist_ok=True)
+
+#     # ---- save + close ----
+#     for fmt in ("eps", "svg"):
+#         plt.savefig(op.join(saveDir, f"{savefilename}.{fmt}"), dpi=600, bbox_inches="tight")
+
+#     plt.show()
 
 #========================================
 #Save plot of maps for each group
@@ -1148,7 +1480,6 @@ def avg_func_plot(func_maps, participants, bids_path, img_out_dir):
                 # display.savefig(out_png, dpi=300)
                 plt.close(display.figure)
 
-
 def participant_density_plot(density_maps, participant, pidx, tract_order, bids_path, img_out_dir, ylim, projfrac):
     fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
     hemis = ["L", "R"]
@@ -1226,7 +1557,7 @@ def participant_density_plot(density_maps, participant, pidx, tract_order, bids_
                 stat_map=surf_map,
                 hemi="left" if hemi == "L" else "right",
                 view="lateral",
-                cmap="plasma",
+                cmap="jet",
                 colorbar=True,
                 vmin=vmin,
                 vmax=vmax,

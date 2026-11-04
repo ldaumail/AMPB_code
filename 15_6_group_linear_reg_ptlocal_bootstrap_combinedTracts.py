@@ -415,11 +415,10 @@ for h, hemi in enumerate(hemis):
 
         # Null "NS" groups, one per localizer.
         # mtlocal null: NS subjects contribute mtlocal, EB subjects contribute ptlocal (mixed).
-        # ptlocal null: everyone contributes ptlocal.
-        localizers = ["mtlocal", "ptlocal"]  
+        # ptlocal null: everyone contributes ptlocal. 
         group_norm_density2 = np.stack([norm_density_data[hemi][p] for p in participants2], axis = 0)
         X2 = group_norm_density2.transpose(0,2,1).reshape(-1,3)
-        for l, localizer in enumerate(localizers):
+        for l, localizer in enumerate(localizer_order):
             group_C_mean2 = np.stack([C_mean[get_null_idx(p, localizer), p,:] for p in participants2], axis = 0)
             y2 = group_C_mean2.reshape(-1,1)
 
@@ -445,9 +444,10 @@ import seaborn as sns
 from scipy.stats import gaussian_kde
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
+import matplotlib as mpl
+mpl.rcParams["svg.fonttype"] = "none"
 
-
-def plot_null_diffs(null_dist_diff, sample_diff, tract_order, bids_path,
+def plot_null_diffs(null_dist_diff, sample_diff, tract_order, save_path,
                     savefilename=None):
     # null_dist_diff: (n_tracts, n_boot, 1, n_localizers, n_hemis)
     # sample_diff:    (n_tracts, n_localizers, n_hemis)
@@ -544,13 +544,16 @@ def plot_null_diffs(null_dist_diff, sample_diff, tract_order, bids_path,
     plt.tight_layout()
 
     if savefilename:
-        saveDir = op.join(bids_path, 'analysis', 'plots')
-        os.makedirs(saveDir, exist_ok=True)
-        plt.savefig(op.join(saveDir, savefilename), dpi=300, bbox_inches='tight')
+            out_base = op.join(
+            save_path, savefilename)
+            # ---- save + close ----
+            for fmt in ("png", "svg"):
+                plt.savefig(f"{out_base}.{fmt}", dpi=600)
     plt.show()
 
-
-plot_null_diffs(null_dist_diff, sample_diff, tract_order, bids_path)
+save_path = op.join(bids_path, 'analysis', 'plots')
+savefilename = "targ_permutation_group_diff_betas_linreg_combined_tracts"
+plot_null_diffs(null_dist_diff, sample_diff, tract_order, save_path,savefilename)
 # To save: plot_null_diffs(..., savefilename="permutation_group_diff_betas_linreg_combined_tracts.png")
 
 # import numpy as np
