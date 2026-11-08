@@ -419,13 +419,12 @@ import os.path as op
 import sys
 current_dir = op.dirname(op.abspath(__file__))
 sys.path.append(current_dir)
-from plots_utils_15_4 import pearsonr_combined_plot, beta_plot, avg_density_plot, participant_density_plot, participant_pred_plot
+from plots_utils_15_4 import pearsonr_combined_plot, beta_plot, avg_density_cropped_plot, avg_func_cropped_plot, participant_density_cropped_plot, participant_pred_cropped_plot
 
 #Performance plots
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
 density_dir = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps')
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
-tract_order = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF']
 projfrac = '1'
 savefilename = f"targ_pearson_linearreg_combined_tracts_{projfrac}frac_test9"
 ylim = [-0.2, 1]
@@ -433,7 +432,7 @@ rs_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tract
 rs = pd.read_csv(rs_file) 
 nc_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'diff2func_model_fits', 'pyAFQ3beta_targ_participants_linearreg_ptlocal', 'noiseceiling_contrast-motionXstationary_combined_1frac_test9.csv')
 reliability = pd.read_csv(nc_file) 
-pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path, savefilename, ylim,figsize=(7, 12))
+pearsonr_combined_plot(rs, reliability, participants, bids_path, savefilename, ylim,figsize=(5, 12))
 
 savefilename = f"targ_beta_barplot_linearreg_combined_tracts_{projfrac}frac_test9"
 ylim = [-0.4, 0.4]
@@ -446,21 +445,38 @@ beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename, yli
 
 #Average plots
 img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "mean_density")
-# tract_order2 = ['MTxLGNxPU', 'MTxPTxSTS1', 'MTxFEF'] 
-avg_density_plot(norm_density_data, participants, tract_order, bids_path, img_out_dir, projfrac)
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import numpy as np
+jet = plt.cm.get_cmap('jet')
+cmap = mcolors.LinearSegmentedColormap.from_list(
+    'jet_green_red', jet(np.linspace(0.5, 1, 256))
+)
+ylim = [-1, 2]
+avg_density_cropped_plot(norm_density_data, participants, tract_order, bids_path, img_out_dir, projfrac, ylim, crop_radius=45, cmap = cmap)
+
+img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "mean_contrast")
+avg_func_cropped_plot(norm_contrast_data, participants, bids_path, img_out_dir, crop_radius=45)
 
 #Participant density plot
-img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "participant_density")
+img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg_ptlocal",  "surface_pngs", "participant_density")
 participant = "sub-NSxLxATx1954"
 pidx = [i for i, p in enumerate(participants) if participant in p]
-ylim = [-3, 3]
-participant_density_plot(norm_density_data, participant, pidx, tract_order, bids_path, img_out_dir, ylim, projfrac)
+ylim = [-1, 3]
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import numpy as np
+jet = plt.cm.get_cmap('jet')
+cmap = mcolors.LinearSegmentedColormap.from_list(
+    'jet_green_red', jet(np.linspace(0.5, 1, 256))
+)
+participant_density_cropped_plot(norm_density_data, participant, pidx, tract_order, bids_path, img_out_dir, ylim, projfrac, cmap = cmap, crop_radius=45)
 
 img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "participant_functional_pred")
 participant = "sub-NSxLxATx1954"
 pidx = [i for i, p in enumerate(participants) if participant in p]
 ylim = [-1, 1]
-participant_pred_plot(predicted_maps, participant, pidx, bids_path, img_out_dir, ylim)
+participant_pred_cropped_plot(predicted_maps, participant, pidx, bids_path, img_out_dir, ylim, crop_radius=45)
 
 
 #-------------

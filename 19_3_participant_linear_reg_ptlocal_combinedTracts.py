@@ -432,33 +432,52 @@ import os.path as op
 import pandas as pd
 current_dir = op.dirname(op.abspath(__file__))
 sys.path.append(current_dir)
-from plots_utils_15_4 import pearsonr_combined_plot, beta_plot, avg_density_plot, avg_func_plot
+from plots_utils_15_4 import pearsonr_combined_plot, beta_plot, avg_density_cropped_plot, avg_func_cropped_plot
 
 #Performance plots
 bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
 density_dir = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps')
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 projfrac = '1'
-tract_order = ['PTR', 'InferiorLongitudinal','InferiorFrontooccipital','SuperiorLongitudinal','VerticalOccipital','Arcuate','PosteriorArcuate' ] 
 savefilename = f"wb_pearson_linearreg_combined_tracts_{projfrac}frac"
 ylim = [-0.2, 1]
 rs_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'diff2func_model_fits', 'pyAFQ3beta_wb_participants_linearreg_ptlocal', 'pearsonr_contrast-motionXstationary_combined_1frac.csv')
 rs = pd.read_csv(rs_file) 
 nc_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'diff2func_model_fits', 'pyAFQ3beta_wb_participants_linearreg_ptlocal', 'noiseceiling_contrast-motionXstationary_combined_1frac.csv')
 reliability = pd.read_csv(nc_file) 
-pearsonr_combined_plot(rs, reliability, participants, tract_order, bids_path, savefilename,ylim, figsize=(7, 12))
+pearsonr_combined_plot(rs, reliability, participants, bids_path, savefilename,ylim, figsize=(5, 12))
 
+bids_path = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb')
+density_dir = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps')
+participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
+projfrac = '1'
 savefilename = f"wb_beta_barplot_linearreg_combined_tracts_{projfrac}frac"
-ylim = [-0.4, 0.4]
+tract_order = ['PTR', 'InferiorLongitudinal','InferiorFrontooccipital','SuperiorLongitudinal','VerticalOccipital','Arcuate','PosteriorArcuate'] 
+rs_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'diff2func_model_fits', 'pyAFQ3beta_wb_participants_linearreg_ptlocal', 'beta_contrast-motionXstationary_combined_1frac.csv')
+trained_coefs = pd.read_csv(rs_file) 
+ylim = [-0.2, 0.3]
 beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename, ylim)
 
 
 #Data plots
+#Average plots
+img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_wb_participants_linearreg",  "surface_pngs", "mean_density")
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import numpy as np
+jet = plt.cm.get_cmap('jet')
+cmap = mcolors.LinearSegmentedColormap.from_list(
+    'jet_green_red', jet(np.linspace(0.5, 1, 256))
+)
+ylim = [-1, 2]
+avg_density_cropped_plot(norm_density_data, participants, tract_order, bids_path, img_out_dir, projfrac, ylim, crop_radius=45, cmap = cmap)
+
+
 img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_wb_participants_linearreg_ptlocal",  "surface_pngs", "mean_density")
 avg_density_plot(norm_density_data, participants, tract_order, bids_path, img_out_dir, projfrac)
 
 img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg_ptlocal",  "surface_pngs", "mean_contrast")
-avg_func_plot(norm_contrast_data, participants, bids_path, img_out_dir)
+avg_func_cropped_plot(norm_contrast_data, participants, bids_path, img_out_dir, crop_radius=45)
 
 #------------------------------------------------------------
 # Save tables for statistical analyses

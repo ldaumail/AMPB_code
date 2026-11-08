@@ -160,9 +160,9 @@ n_tract = len(tracts)
 # Labels
 y = np.array([1 if "EB" in p else 0 for p in participants])
 tract_matches = tracts.copy() #["MTxLGNxPU", "MTxPTxSTS1"]
-df_use = df[~((df["Group"] == "NS") & (df["Localizer"] == "mtlocal"))& df["Tract"].isin(tract_matches)].copy()
+df_use = df[~((df["Group"] == "NS") & (df["Localizer"] == "ptlocal"))& df["Tract"].isin(tract_matches)].copy()
 # selected_tracts = tracts.copy() #[[0, 2]]
-
+summary_rows = []
 for hemi in hemis:
     print(f"\n=== Hemisphere {hemi} ===")
     X = get_feature_matrix(df_use, hemi, tract_matches)
@@ -180,6 +180,29 @@ for hemi in hemis:
     best_C, mean_curve, sd_curve = final_C_curve(X, y)
     print(f"Final-model C: {best_C:.3f}")
     print("AUC by C:", np.round(mean_curve, 3))
+
+    summary_rows.append({
+    "hemisphere": hemi,
+    "tracts": "+".join(map(str, tract_matches)),
+    "n_subjects": len(y),
+    "nested_auc_mean": res["auc_mean"],
+    "nested_auc_sd": res["auc_sd"],
+    "nested_bacc_mean": res["bacc_mean"],
+    "nested_bacc_sd": res["bacc_sd"],
+    "median_C": res["median_C"],
+    "geomean_C": res["geomean_C"],
+    "perm_obs_auc": perm["obs_auc"],
+    "perm_obs_bacc": perm["obs_bacc"],
+    "perm_p_auc": perm["p_auc"],
+    "perm_p_bacc": perm["p_bacc"],
+    "final_C": best_C,
+    **{f"cv_auc_C{i}": v for i, v in enumerate(mean_curve)},
+    **{f"cv_auc_sd_C{i}": v for i, v in enumerate(sd_curve)},
+    })
+
+import pandas as pd
+summary_df = pd.DataFrame(summary_rows)
+summary_df.to_csv(op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg_ptlocal", "svm_results_summary_EB-ptlocal_NS-mtlocal.csv"), index=False)
 
 #--------------------------------------------------------------------------------
 # Visualize 3 D Results
@@ -281,14 +304,14 @@ def plot_3d_with_plane(df, y, hemis, tracts, Cs, elev, azim,
 
     plt.show()
 
-C_left = 0.794
+C_left = 0.012
 C_right = 4.299
 plot_3d_with_plane(
     df=df_use, y=y, hemis=["L", "R"], tracts=tracts[:3],
     Cs=[C_left, C_right],                 # from a stated selection rule
-    elev=[15, 15], azim=[-60, -40],
+    elev=[15, 15], azim=[-60, -80],
     save_path=op.join(bids_path, "analysis", "plots"),
-    savefilename = "pyAFQ3beta_targ_beta_weights_3d_linear_svm_EBptlocal_NSptlocaltest9"
+    savefilename = "pyAFQ3beta_targ_beta_weights_3d_linear_svm_EBptlocal_NSmtlocaltest9"
 )   
 
 
