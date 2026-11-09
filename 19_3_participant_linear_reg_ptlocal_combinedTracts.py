@@ -466,9 +466,10 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
 jet = plt.cm.get_cmap('jet')
-cmap = mcolors.LinearSegmentedColormap.from_list(
-    'jet_green_red', jet(np.linspace(0.5, 1, 256))
-)
+# cmap = mcolors.LinearSegmentedColormap.from_list(
+#     'jet_green_red', jet(np.linspace(0.5, 1, 256))
+# )
+cmap = 'plasma'
 ylim = [-1, 2]
 avg_density_cropped_plot(norm_density_data, participants, tract_order, bids_path, img_out_dir, projfrac, ylim, crop_radius=45, cmap = cmap)
 

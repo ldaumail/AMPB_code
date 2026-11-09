@@ -1232,11 +1232,12 @@ def avg_density_plot(density_maps, participants, tract_order, bids_path, img_out
                     display.savefig(f"{out_base}.{fmt}", dpi=600)
                 plt.close(display.figure)
 
-
 def avg_density_cropped_plot(
     density_maps, participants, tract_order, bids_path,
     img_out_dir, projfrac, ylim, crop_radius=None, margin=15,
-    cmap="plasma", figsize=(11, 5.5)
+    cmap="plasma", figsize=(11, 5.5),
+    gyri_dark=0.35, sulci_dark=0.95,
+    nilearn_darkness=0.6, data_bg_strength=0.25
 ):
     """
     One figure per group and tract: left + right hemispheres side by side.
@@ -1251,6 +1252,11 @@ def avg_density_cropped_plot(
     crop_radius=<float>:
         Use the specified radius (mm) for both hemispheres. In this case,
         margin is ignored.
+
+    gyri_dark / sulci_dark: background darkness (0 = white, 1 = black) of the
+    gyri (lowest curvature) and sulci (highest curvature).
+    nilearn_darkness: the `darkness` passed to nilearn; must match what is
+    used for the rescaling below.
     """
 
     fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
@@ -1394,15 +1400,23 @@ def avg_density_cropped_plot(
         new_index[idx] = np.arange(len(idx))
 
         face_mask = keep[faces].all(axis=1)
+        faces_crop = new_index[faces[face_mask]]
 
         info["idx"] = idx
 
-        info["mesh_crop"] = (
-            coords[idx],
-            new_index[faces[face_mask]]
-        )
+        info["mesh_crop"] = (coords[idx], faces_crop)
 
         info["curv_crop"] = info["curv_norm"][idx]
+
+        # Per-face background value, normalized to 0-1 the same way nilearn does
+        bg_faces = info["curv_crop"][faces_crop].mean(axis=1)
+        bg_faces = (bg_faces - bg_faces.min()) / (bg_faces.max() - bg_faces.min() + 1e-12)
+        # gray level nilearn used (gray_r: 1 = white) and the one we want
+        old_gray = 1.0 - bg_faces * nilearn_darkness
+        new_gray = 1.0 - (gyri_dark + (sulci_dark - gyri_dark) * bg_faces)
+        info["old_gray"] = old_gray
+        info["new_gray"] = new_gray
+        info["bg_ratio"] = new_gray / old_gray
 
     # ------------------------------------------------
     # Print crop diagnostics
@@ -1480,10 +1494,39 @@ def avg_density_cropped_plot(
                     threshold=None,
                     bg_map=info["curv_crop"],
                     bg_on_data=True,
-                    darkness=0.6,
+                    darkness=nilearn_darkness,
                     axes=ax,
                     figure=fig,
                 )
+
+                # ---- darker curvature background, brighter data ----
+                surf_coll = ax.collections[0]
+                fc = np.array(surf_coll._facecolor3d)
+                if len(fc) == len(info["bg_ratio"]):
+                    # faces that carry functional data
+                    vals = surf_map[info["idx"]]
+                    faces_crop = info["mesh_crop"][1]
+                    has_data = ~np.isnan(vals[faces_crop]).all(axis=1)
+
+                    # no data: darkened curvature as before
+                    factor = info["bg_ratio"].copy()
+                    # data: undo nilearn's curvature multiplication, then re-apply
+                    # only a fraction (data_bg_strength) of the new curvature shading
+                    s = data_bg_strength
+                    factor[has_data] = (
+                        (1 - s * (1 - info["new_gray"][has_data]))
+                        / info["old_gray"][has_data]
+                    )
+
+                    fc[:, :3] = np.clip(fc[:, :3] * factor[:, None], 0, 1)
+                    fc[has_data, 3] = 1.0          # fully opaque data faces
+                    surf_coll.set_facecolor(fc)
+                    surf_coll.set_edgecolor(fc)
+                    surf_coll.set_linewidth(0.3)
+                    surf_coll.set_antialiased(False)
+                else:
+                    print(f"Warning: {len(fc)} face colors vs "
+                          f"{len(info['bg_ratio'])} faces; background not darkened.")
 
                 # ------------------------------------
                 # Overlay functional MT boundary
@@ -1609,6 +1652,382 @@ def avg_density_cropped_plot(
                 )
 
             plt.close(fig)
+# def avg_density_cropped_plot(
+#     density_maps, participants, tract_order, bids_path,
+#     img_out_dir, projfrac, ylim, crop_radius=None, margin=15,
+#     cmap="plasma", figsize=(11, 5.5)
+# ):
+#     """
+#     One figure per group and tract: left + right hemispheres side by side.
+
+#     Both hemispheres use the SAME crop radius and are drawn at the SAME scale.
+
+#     crop_radius=None:
+#         Automatically calculate the radius from the largest extent of the
+#         Wang hMT+ ROI and both groups' functional MT ROIs across hemispheres,
+#         then add margin (mm).
+
+#     crop_radius=<float>:
+#         Use the specified radius (mm) for both hemispheres. In this case,
+#         margin is ignored.
+#     """
+
+#     fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
+#     hemis = ["L", "R"]
+#     groups = ["EB", "NS"]
+
+#     vmin, vmax = ylim
+
+#     os.makedirs(img_out_dir, exist_ok=True)
+#     plt.rcParams["svg.fonttype"] = "none"
+
+#     # ------------------------------------------------
+#     # Per-hemisphere setup: ROI, curvature, geometry,
+#     # centroid, extent, and density maps
+#     # ------------------------------------------------
+#     hemi_info = {}
+
+#     for hemi in hemis:
+
+#         hemi_fs = "lh" if hemi == "L" else "rh"
+
+#         # --------------------------------------------
+#         # Load Wang hMT+ ROI
+#         # --------------------------------------------
+#         wang_hmt_path = op.join(
+#             '/Users', 'ldaumail3', 'Documents', 'research',
+#             'brain_atlases', 'Wang_2015', 'hmtplus',
+#             f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+#         )
+
+#         surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+#         n_vertices = len(surf_roi)
+#         wang_hmt_vertices = np.where(surf_roi > 0)[0]
+
+#         print(f"{len(wang_hmt_vertices)} Wang hMT+ vertices ({hemi})")
+
+#         # --------------------------------------------
+#         # Load curvature background
+#         # --------------------------------------------
+#         curv_file = op.join(
+#             fs_path, "fsaverage", "surf", f"{hemi_fs}.curv"
+#         )
+
+#         curv = nib.freesurfer.read_morph_data(curv_file)
+
+#         curv_norm = (curv - np.percentile(curv, 5)) / (
+#             np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
+#         )
+#         curv_norm = np.clip(curv_norm, 0, 1)
+
+#         # --------------------------------------------
+#         # Load inflated geometry
+#         # --------------------------------------------
+#         infl_surf = op.join(
+#             fs_path, "fsaverage", "surf", f"{hemi_fs}.inflated"
+#         )
+
+#         coords, faces = nib.freesurfer.read_geometry(infl_surf)
+
+#         # Wang hMT+ centroid
+#         center = coords[wang_hmt_vertices].mean(axis=0)
+
+#         # --------------------------------------------
+#         # Calculate ROI extent
+#         # Include Wang hMT+ and both groups' functional MT ROIs
+#         # --------------------------------------------
+#         roi_vertices = [wang_hmt_vertices]
+
+#         for group in groups:
+
+#             label_file = op.join(
+#                 bids_path, 'analysis', 'ROIs', 'func_roi',
+#                 'functional_surf_roi', 'group_averages',
+#                 f"group-{group}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
+#             )
+
+#             if op.exists(label_file):
+#                 roi_vertices.append(
+#                     np.asarray(read_label(label_file))
+#                 )
+
+#         roi_vertices = np.unique(np.concatenate(roi_vertices))
+
+#         extent = np.linalg.norm(
+#             coords[roi_vertices] - center, axis=1
+#         ).max()
+
+#         # --------------------------------------------
+#         # Prepare density maps
+#         # Shape per tract: (n_participants, n_masked_vertices)
+#         # --------------------------------------------
+#         hemi_maps = {
+#             t: np.array([
+#                 density_maps[hemi][sub][t]
+#                 for sub in density_maps[hemi]
+#             ])
+#             for t in range(len(tract_order))
+#         }
+
+#         # Store hemisphere information
+#         hemi_info[hemi] = dict(
+#             n_vertices=n_vertices,
+#             wang_hmt_vertices=wang_hmt_vertices,
+#             curv_norm=curv_norm,
+#             coords=coords,
+#             faces=faces,
+#             center=center,
+#             extent=extent,
+#             hemi_maps=hemi_maps,
+#         )
+
+#     # ------------------------------------------------
+#     # Determine common crop radius
+#     # ------------------------------------------------
+#     if crop_radius is None:
+
+#         crop_radius = max(
+#             info["extent"] for info in hemi_info.values()
+#         ) + margin
+
+#     print(
+#         f"\nCrop radius used for both hemispheres: "
+#         f"{crop_radius:.2f} mm"
+#     )
+
+#     # ------------------------------------------------
+#     # Crop meshes
+#     # ------------------------------------------------
+#     for hemi, info in hemi_info.items():
+
+#         coords = info["coords"]
+#         faces = info["faces"]
+
+#         keep = np.linalg.norm(
+#             coords - info["center"], axis=1
+#         ) <= crop_radius
+
+#         idx = np.where(keep)[0]
+
+#         new_index = -np.ones(info["n_vertices"], dtype=int)
+#         new_index[idx] = np.arange(len(idx))
+
+#         face_mask = keep[faces].all(axis=1)
+
+#         info["idx"] = idx
+
+#         info["mesh_crop"] = (
+#             coords[idx],
+#             new_index[faces[face_mask]]
+#         )
+
+#         info["curv_crop"] = info["curv_norm"][idx]
+
+#     # ------------------------------------------------
+#     # Print crop diagnostics
+#     # ------------------------------------------------
+#     for hemi, info in hemi_info.items():
+
+#         print(
+#             f"{hemi}: "
+#             f"extent={info['extent']:.2f} mm | "
+#             f"radius={crop_radius:.2f} mm | "
+#             f"vertices retained={len(info['idx'])}/"
+#             f"{info['n_vertices']} "
+#             f"({100 * len(info['idx']) / info['n_vertices']:.1f}%)"
+#         )
+
+#     # ------------------------------------------------
+#     # One figure per group and tract
+#     # ------------------------------------------------
+#     for group in groups:
+
+#         # Select participants belonging to this group
+#         group_mask = np.array([
+#             group in participants[sub]
+#             for sub in density_maps["L"]
+#         ])
+
+#         print(
+#             f"\n{group}: "
+#             f"{group_mask.sum()} participants"
+#         )
+
+#         for t, tract in enumerate(tract_order):
+
+#             fig = plt.figure(figsize=figsize)
+
+#             # ----------------------------------------
+#             # Plot both hemispheres
+#             # ----------------------------------------
+#             for h, hemi in enumerate(hemis):
+
+#                 info = hemi_info[hemi]
+
+#                 ax = fig.add_subplot(
+#                     1, 2, h + 1,
+#                     projection="3d"
+#                 )
+
+#                 # Average density across group participants
+#                 mean_vals = np.nanmean(
+#                     info["hemi_maps"][t][group_mask, :],
+#                     axis=0
+#                 )
+
+#                 # Build full-surface vector
+#                 surf_map = np.full(
+#                     (info["n_vertices"],),
+#                     np.nan,
+#                     dtype=np.float32
+#                 )
+
+#                 surf_map[info["wang_hmt_vertices"]] = mean_vals
+
+#                 # ------------------------------------
+#                 # Plot cropped density map
+#                 # ------------------------------------
+#                 plotting.plot_surf_stat_map(
+#                     surf_mesh=info["mesh_crop"],
+#                     stat_map=surf_map[info["idx"]],
+#                     hemi="left" if hemi == "L" else "right",
+#                     view="lateral",
+#                     cmap=cmap,
+#                     colorbar=False,
+#                     vmin=vmin,
+#                     vmax=vmax,
+#                     threshold=None,
+#                     bg_map=info["curv_crop"],
+#                     bg_on_data=True,
+#                     darkness=0.6,
+#                     axes=ax,
+#                     figure=fig,
+#                 )
+
+#                 # ------------------------------------
+#                 # Overlay functional MT boundary
+#                 # for the current group
+#                 # ------------------------------------
+#                 # label_file = op.join(
+#                 #     bids_path, 'analysis', 'ROIs', 'func_roi',
+#                 #     'functional_surf_roi', 'group_averages',
+#                 #     f"group-{group}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
+#                 # )
+
+#                 # if op.exists(label_file):
+
+#                 #     func_mt_vertices = np.asarray(
+#                 #         read_label(label_file)
+#                 #     )
+
+#                 #     func_mt_roi = np.zeros(
+#                 #         info["n_vertices"],
+#                 #         dtype=np.float32
+#                 #     )
+
+#                 #     func_mt_roi[func_mt_vertices] = 1
+
+#                 #     # Restrict contour map to cropped vertices
+#                 #     func_mt_crop = func_mt_roi[info["idx"]]
+
+#                 #     plotting.plot_surf_contours(
+#                 #         surf_mesh=info["mesh_crop"],
+#                 #         roi_map=func_mt_crop,
+#                 #         levels=[1],
+#                 #         colors=["lightgray"],
+#                 #         linewidths=2.0,
+#                 #         figure=fig,
+#                 #         axes=ax,
+#                 #     )
+
+#                 # ------------------------------------
+#                 # Identical scale for both hemispheres
+#                 # ------------------------------------
+#                 cx, cy, cz = info["center"]
+
+#                 ax.set_xlim(
+#                     cx - crop_radius,
+#                     cx + crop_radius
+#                 )
+#                 ax.set_ylim(
+#                     cy - crop_radius,
+#                     cy + crop_radius
+#                 )
+#                 ax.set_zlim(
+#                     cz - crop_radius,
+#                     cz + crop_radius
+#                 )
+
+#                 ax.set_box_aspect((1, 1, 1))
+
+#                 ax.set_title(
+#                     f"{hemi} hemisphere",
+#                     fontsize=18,
+#                     fontweight="bold"
+#                 )
+
+#                 # Rasterize surface only
+#                 for coll in ax.collections:
+#                     coll.set_rasterized(True)
+
+#             # ----------------------------------------
+#             # Shared colorbar in a dedicated right margin
+#             # ----------------------------------------
+#             sm = ScalarMappable(
+#                 norm=Normalize(vmin=vmin, vmax=vmax),
+#                 cmap=cmap
+#             )
+
+#             # Reserve space on the right for the colorbar
+#             fig.subplots_adjust(
+#                 left=0.02,
+#                 right=0.86,
+#                 bottom=0.05,
+#                 top=0.88,
+#                 wspace=0.08
+#             )
+
+#             # Dedicated colorbar axis
+#             cbar_ax = fig.add_axes([0.89, 0.20, 0.018, 0.60])
+
+#             cbar = fig.colorbar(sm, cax=cbar_ax)
+
+#             cbar.ax.tick_params(labelsize=14)
+
+#             for lab in cbar.ax.get_yticklabels():
+#                 lab.set_fontweight("bold")
+
+#             # ----------------------------------------
+#             # Figure title
+#             # ----------------------------------------
+#             fig.suptitle(
+#                 f"{group} mean - {tract} (density)",
+#                 fontsize=20,
+#                 fontweight="bold"
+#             )
+
+#             cbar.ax.tick_params(labelsize=14)
+
+#             for lab in cbar.ax.get_yticklabels():
+#                 lab.set_fontweight("bold")
+
+#             # ----------------------------------------
+#             # Save
+#             # ----------------------------------------
+#             out_base = op.join(
+#                 img_out_dir,
+#                 f"{group}_hemi-LR_label-{tract}_desc-density_"
+#                 f"inflated_{projfrac}frac_cropped"
+#             )
+
+#             for fmt in ("png", "svg"):
+#                 fig.savefig(
+#                     f"{out_base}.{fmt}",
+#                     dpi=600,
+#                     bbox_inches="tight"
+#                 )
+
+#             plt.close(fig)
 
 def avg_func_plot(func_maps, participants, bids_path, img_out_dir):
     fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
@@ -1725,13 +2144,18 @@ def avg_func_plot(func_maps, participants, bids_path, img_out_dir):
                 # display.savefig(out_png, dpi=300)
                 plt.close(display.figure)
 
-
 def avg_func_cropped_plot(func_maps, participants, bids_path, img_out_dir,
-                  crop_radius=None, margin=15, vmin=-2, vmax=2, cmap="plasma",
-                  figsize=(11, 5.5)):
+                          crop_radius=None, margin=15, vmin=-2, vmax=2, cmap="plasma",
+                          figsize=(11, 5.5), gyri_dark=0.35, sulci_dark=0.95,
+                          nilearn_darkness=0.6, data_bg_strength=0.25):
     """One figure per (group, localizer), left + right hemisphere side by side.
     Both hemispheres are cropped with the SAME radius and drawn at the SAME scale.
-    crop_radius=None -> radius = largest hMT+ extent over both hemispheres + margin (mm)."""
+    crop_radius=None -> radius = largest hMT+ extent over both hemispheres + margin (mm).
+
+    gyri_dark / sulci_dark: background darkness (0 = white, 1 = black) of the
+    gyri (lowest curvature) and sulci (highest curvature).
+    nilearn_darkness: the `darkness` passed to nilearn; must match what is
+    used for the rescaling below."""
     fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
     hemis = ["L", "R"]
     groups = ["EB", "NS"]
@@ -1739,7 +2163,7 @@ def avg_func_cropped_plot(func_maps, participants, bids_path, img_out_dir,
     plt.rcParams["svg.fonttype"] = "none"   # keep text editable
 
     # ------------------------------------------------
-    # Per-hemisphere setup (done once): ROI, curvature, geometry, centroid, extent
+    # Per-hemisphere setup (done once)
     # ------------------------------------------------
     hemi_info = {}
     for hemi in hemis:
@@ -1786,7 +2210,7 @@ def avg_func_cropped_plot(func_maps, participants, bids_path, img_out_dir,
         )
 
     # ------------------------------------------------
-    # Common radius: the less-cropped (larger) hemisphere sets it for both
+    # Common radius
     # ------------------------------------------------
     if crop_radius is None:
         crop_radius = max(info["extent"] for info in hemi_info.values()) + margin
@@ -1800,9 +2224,21 @@ def avg_func_cropped_plot(func_maps, participants, bids_path, img_out_dir,
         new_index = -np.ones(info["n_vertices"], dtype=int)
         new_index[idx] = np.arange(len(idx))
         face_mask = keep[faces].all(axis=1)
+        faces_crop = new_index[faces[face_mask]]
         info["idx"] = idx
-        info["mesh_crop"] = (coords[idx], new_index[faces[face_mask]])
+        info["mesh_crop"] = (coords[idx], faces_crop)
         info["curv_crop"] = info["curv_norm"][idx]
+
+        # Per-face background value, normalized to 0-1 the same way nilearn does
+        bg_faces = info["curv_crop"][faces_crop].mean(axis=1)
+        bg_faces = (bg_faces - bg_faces.min()) / (bg_faces.max() - bg_faces.min() + 1e-12)
+        # gray level nilearn used (gray_r: 1 = white) and the one we want
+        old_gray = 1.0 - bg_faces * nilearn_darkness
+        new_gray = 1.0 - (gyri_dark + (sulci_dark - gyri_dark) * bg_faces)
+        info["old_gray"] = old_gray
+        info["new_gray"] = new_gray
+        info["bg_ratio"] = new_gray / old_gray
+
     for hemi, info in hemi_info.items():
         print(
             f"{hemi}: "
@@ -1811,6 +2247,7 @@ def avg_func_cropped_plot(func_maps, participants, bids_path, img_out_dir,
             f"vertices retained={len(info['idx'])}/{info['n_vertices']} "
             f"({100 * len(info['idx']) / info['n_vertices']:.1f}%)"
         )
+
     # ------------------------------------------------
     # One figure per group x localizer
     # ------------------------------------------------
@@ -1823,15 +2260,6 @@ def avg_func_cropped_plot(func_maps, participants, bids_path, img_out_dir,
             for h, hemi in enumerate(hemis):
                 info = hemi_info[hemi]
                 ax = fig.add_subplot(1, 2, h + 1, projection="3d")
-
-                # Functional MT ROI (group average label) for the contour
-                label_file = op.join(
-                    bids_path, 'analysis', 'ROIs', 'func_roi',
-                    'functional_surf_roi', 'group_averages',
-                    f"group-{group}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
-                )
-                func_mt_roi = np.zeros(info["n_vertices"], dtype=np.float32)
-                func_mt_roi[read_label(label_file)] = 1
 
                 # Group-average functional map on the full surface, then crop
                 hemi_maps = np.array([
@@ -1853,23 +2281,39 @@ def avg_func_cropped_plot(func_maps, participants, bids_path, img_out_dir,
                     threshold=None,
                     bg_map=info["curv_crop"],
                     bg_on_data=True,
-                    darkness=0.6,
+                    darkness=nilearn_darkness,
                     axes=ax, figure=fig,
                 )
 
-                # ---- functional MT boundary overlay ----
-                plotting.plot_surf_contours(
-                    surf_mesh=info["mesh_crop"],
-                    roi_map=func_mt_roi[info["idx"]],
-                    levels=[1],
-                    colors=["lightgray"],
-                    linewidths=2.0,
-                    figure=fig, axes=ax,
-                )
+                # ---- darker curvature background, brighter data ----
+                surf_coll = ax.collections[0]
+                fc = np.array(surf_coll._facecolor3d)
+                if len(fc) == len(info["bg_ratio"]):
+                    # faces that carry functional data
+                    vals = surf_map[info["idx"]]
+                    faces_crop = info["mesh_crop"][1]
+                    has_data = ~np.isnan(vals[faces_crop]).all(axis=1)
 
+                    # no data: darkened curvature as before
+                    factor = info["bg_ratio"].copy()
+                    # data: undo nilearn's curvature multiplication, then re-apply
+                    # only a fraction (data_bg_strength) of the new curvature shading
+                    s = data_bg_strength
+                    factor[has_data] = (
+                        (1 - s * (1 - info["new_gray"][has_data]))
+                        / info["old_gray"][has_data]
+                    )
+
+                    fc[:, :3] = np.clip(fc[:, :3] * factor[:, None], 0, 1)
+                    fc[has_data, 3] = 1.0          # fully opaque data faces
+                    surf_coll.set_facecolor(fc)
+                    surf_coll.set_edgecolor(fc)
+                    surf_coll.set_linewidth(0.3)
+                    surf_coll.set_antialiased(False)
+                else:
+                    print(f"Warning: {len(fc)} face colors vs "
+                          f"{len(info['bg_ratio'])} faces; background not darkened.")
                 # ---- identical scale for both hemispheres ----
-                # nilearn autoscales each axis to its own mesh; override with the
-                # same span, centered on each hemisphere's hMT+ centroid
                 cx, cy, cz = info["center"]
                 ax.set_xlim(cx - crop_radius, cx + crop_radius)
                 ax.set_ylim(cy - crop_radius, cy + crop_radius)
@@ -1900,6 +2344,181 @@ def avg_func_cropped_plot(func_maps, participants, bids_path, img_out_dir,
             for fmt in ("png", "svg"):
                 fig.savefig(f"{out_base}.{fmt}", dpi=600, bbox_inches="tight")
             plt.close(fig)
+# def avg_func_cropped_plot(func_maps, participants, bids_path, img_out_dir,
+#                   crop_radius=None, margin=15, vmin=-2, vmax=2, cmap="plasma",
+#                   figsize=(11, 5.5)):
+#     """One figure per (group, localizer), left + right hemisphere side by side.
+#     Both hemispheres are cropped with the SAME radius and drawn at the SAME scale.
+#     crop_radius=None -> radius = largest hMT+ extent over both hemispheres + margin (mm)."""
+#     fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
+#     hemis = ["L", "R"]
+#     groups = ["EB", "NS"]
+#     os.makedirs(img_out_dir, exist_ok=True)
+#     plt.rcParams["svg.fonttype"] = "none"   # keep text editable
+
+#     # ------------------------------------------------
+#     # Per-hemisphere setup (done once): ROI, curvature, geometry, centroid, extent
+#     # ------------------------------------------------
+#     hemi_info = {}
+#     for hemi in hemis:
+#         hemi_fs = "lh" if hemi == "L" else "rh"
+
+#         wang_hmt_path = op.join(
+#             '/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases',
+#             'Wang_2015', 'hmtplus',
+#             f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+#         )
+#         surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+#         n_vertices = len(surf_roi)
+#         wang_hmt_vertices = np.where(surf_roi > 0)[0]
+#         print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
+
+#         # Curvature background
+#         curv = nib.freesurfer.read_morph_data(
+#             op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv"))
+#         curv_norm = (curv - np.percentile(curv, 5)) / (
+#             np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8)
+#         curv_norm = np.clip(curv_norm, 0, 0.7)
+#         # curv_norm = 1 / (1 + np.exp(-10 * (curv_norm - 0.5))) 
+
+#         # Inflated geometry and hMT+ centroid
+#         coords, faces = nib.freesurfer.read_geometry(
+#             op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.inflated"))
+#         center = coords[wang_hmt_vertices].mean(axis=0)
+
+#         # Extent of hMT+ (Wang ROI + functional MT labels of both groups)
+#         roi_vertices = [wang_hmt_vertices]
+#         for group in groups:
+#             lf = op.join(
+#                 bids_path, 'analysis', 'ROIs', 'func_roi', 'functional_surf_roi',
+#                 'group_averages',
+#                 f"group-{group}_hemi-{hemi}_space-fsaverage_label-MT_mask.label")
+#             if op.exists(lf):
+#                 roi_vertices.append(np.asarray(read_label(lf)))
+#         roi_vertices = np.unique(np.concatenate(roi_vertices))
+#         extent = np.linalg.norm(coords[roi_vertices] - center, axis=1).max()
+
+#         hemi_info[hemi] = dict(
+#             n_vertices=n_vertices, wang_hmt_vertices=wang_hmt_vertices,
+#             curv_norm=curv_norm, coords=coords, faces=faces,
+#             center=center, extent=extent,
+#         )
+
+#     # ------------------------------------------------
+#     # Common radius: the less-cropped (larger) hemisphere sets it for both
+#     # ------------------------------------------------
+#     if crop_radius is None:
+#         crop_radius = max(info["extent"] for info in hemi_info.values()) + margin
+#     print(f"Crop radius used for both hemispheres: {crop_radius:.1f} mm")
+
+#     # Cropped meshes with the common radius
+#     for hemi, info in hemi_info.items():
+#         coords, faces = info["coords"], info["faces"]
+#         keep = np.linalg.norm(coords - info["center"], axis=1) <= crop_radius
+#         idx = np.where(keep)[0]
+#         new_index = -np.ones(info["n_vertices"], dtype=int)
+#         new_index[idx] = np.arange(len(idx))
+#         face_mask = keep[faces].all(axis=1)
+#         info["idx"] = idx
+#         info["mesh_crop"] = (coords[idx], new_index[faces[face_mask]])
+#         info["curv_crop"] = info["curv_norm"][idx]
+#     for hemi, info in hemi_info.items():
+#         print(
+#             f"{hemi}: "
+#             f"extent={info['extent']:.2f} mm | "
+#             f"radius={crop_radius:.2f} mm | "
+#             f"vertices retained={len(info['idx'])}/{info['n_vertices']} "
+#             f"({100 * len(info['idx']) / info['n_vertices']:.1f}%)"
+#         )
+#     # ------------------------------------------------
+#     # One figure per group x localizer
+#     # ------------------------------------------------
+#     for group in groups:
+#         localizers = ["ptlocal"] if "EB" in group else ["mtlocal", "ptlocal"]
+
+#         for cont in localizers:
+#             fig = plt.figure(figsize=figsize)
+
+#             for h, hemi in enumerate(hemis):
+#                 info = hemi_info[hemi]
+#                 ax = fig.add_subplot(1, 2, h + 1, projection="3d")
+
+#                 # Functional MT ROI (group average label) for the contour
+#                 label_file = op.join(
+#                     bids_path, 'analysis', 'ROIs', 'func_roi',
+#                     'functional_surf_roi', 'group_averages',
+#                     f"group-{group}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
+#                 )
+#                 func_mt_roi = np.zeros(info["n_vertices"], dtype=np.float32)
+#                 func_mt_roi[read_label(label_file)] = 1
+
+#                 # Group-average functional map on the full surface, then crop
+#                 hemi_maps = np.array([
+#                     np.nanmean(func_maps[hemi][sub][cont]["motionXstationary"], axis=0)
+#                     for sub in func_maps[hemi] if group in participants[sub]
+#                 ])
+#                 mean_vals = np.nanmean(hemi_maps, axis=0)
+#                 surf_map = np.full((info["n_vertices"],), np.nan, dtype=np.float32)
+#                 surf_map[info["wang_hmt_vertices"]] = mean_vals
+
+#                 plotting.plot_surf_stat_map(
+#                     surf_mesh=info["mesh_crop"],
+#                     stat_map=surf_map[info["idx"]],
+#                     hemi="left" if hemi == "L" else "right",
+#                     view="lateral",
+#                     cmap=cmap,
+#                     colorbar=False,                 # one shared colorbar below
+#                     vmin=vmin, vmax=vmax,
+#                     threshold=None,
+#                     bg_map=info["curv_crop"],
+#                     bg_on_data=True,
+#                     darkness=0.6,
+#                     axes=ax, figure=fig,
+#                 )
+
+#                 # ---- functional MT boundary overlay ----
+#                 # plotting.plot_surf_contours(
+#                 #     surf_mesh=info["mesh_crop"],
+#                 #     roi_map=func_mt_roi[info["idx"]],
+#                 #     levels=[1],
+#                 #     colors=["lightgray"],
+#                 #     linewidths=2.0,
+#                 #     figure=fig, axes=ax,
+#                 # )
+
+#                 # ---- identical scale for both hemispheres ----
+#                 # nilearn autoscales each axis to its own mesh; override with the
+#                 # same span, centered on each hemisphere's hMT+ centroid
+#                 cx, cy, cz = info["center"]
+#                 ax.set_xlim(cx - crop_radius, cx + crop_radius)
+#                 ax.set_ylim(cy - crop_radius, cy + crop_radius)
+#                 ax.set_zlim(cz - crop_radius, cz + crop_radius)
+#                 ax.set_box_aspect((1, 1, 1))
+
+#                 ax.set_title(f"{hemi} hemisphere", fontsize=18, fontweight="bold")
+
+#                 # Rasterize the 3D surface only (keeps the SVG small)
+#                 for coll in ax.collections:
+#                     coll.set_rasterized(True)
+
+#             # ---- one shared colorbar ----
+#             sm = ScalarMappable(norm=Normalize(vmin=vmin, vmax=vmax), cmap=cmap)
+#             cbar = fig.colorbar(sm, ax=fig.axes, shrink=0.6, pad=0.02)
+#             cbar.ax.tick_params(labelsize=14)
+#             for lab in cbar.ax.get_yticklabels():
+#                 lab.set_fontweight("bold")
+
+#             fig.suptitle(f"{group} - {cont} (motion > stationary)",
+#                          fontsize=20, fontweight="bold")
+
+#             # ---- save + close ----
+#             out_base = op.join(
+#                 img_out_dir,
+#                 f"{group}-mean_hemi-LR_label-{cont}_desc-motionXstationary_mean_inflated_cropped"
+#             )
+#             for fmt in ("png", "svg"):
+#                 fig.savefig(f"{out_base}.{fmt}", dpi=600, bbox_inches="tight")
+#             plt.close(fig)
 
 
 def participant_density_plot(density_maps, participant, pidx, tract_order, bids_path, img_out_dir, ylim, projfrac):
@@ -2014,10 +2633,16 @@ def participant_density_plot(density_maps, participant, pidx, tract_order, bids_
 def participant_density_cropped_plot(density_maps, participant, pidx, tract_order, bids_path,
                              img_out_dir, ylim, projfrac,
                              crop_radius=None, margin=15, cmap="RdYlGn_r",
-                             figsize=(11, 5.5)):
+                             figsize=(11, 5.5), gyri_dark=0.35, sulci_dark=0.95,
+                             nilearn_darkness=0.6, data_bg_strength=0.25):
     """One figure per tract: left + right hemisphere side by side for one participant.
     Both hemispheres use the SAME crop radius and are drawn at the SAME scale.
-    crop_radius=None -> radius = largest hMT+ (Wang ROI) extent over both hemispheres + margin (mm)."""
+    crop_radius=None -> radius = largest hMT+ (Wang ROI) extent over both hemispheres + margin (mm).
+
+    gyri_dark / sulci_dark: background darkness (0 = white, 1 = black) of the
+    gyri (lowest curvature) and sulci (highest curvature).
+    nilearn_darkness: the `darkness` passed to nilearn; must match what is
+    used for the rescaling below."""
     fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
     hemis = ["L", "R"]
     groups = ["EB", "NS"]
@@ -2112,14 +2737,23 @@ def participant_density_cropped_plot(density_maps, participant, pidx, tract_orde
         new_index[idx] = np.arange(len(idx))
 
         face_mask = keep[faces].all(axis=1)
+        faces_crop = new_index[faces[face_mask]]
 
         info["idx"] = idx
-        info["mesh_crop"] = (
-            coords[idx],
-            new_index[faces[face_mask]]
-        )
+        info["mesh_crop"] = (coords[idx], faces_crop)
 
         info["curv_crop"] = info["curv_norm"][idx]
+
+        # Per-face background value, normalized to 0-1 the same way nilearn does
+        bg_faces = info["curv_crop"][faces_crop].mean(axis=1)
+        bg_faces = (bg_faces - bg_faces.min()) / (bg_faces.max() - bg_faces.min() + 1e-12)
+        # gray level nilearn used (gray_r: 1 = white) and the one we want
+        old_gray = 1.0 - bg_faces * nilearn_darkness
+        new_gray = 1.0 - (gyri_dark + (sulci_dark - gyri_dark) * bg_faces)
+        info["old_gray"] = old_gray
+        info["new_gray"] = new_gray
+        info["bg_ratio"] = new_gray / old_gray
+
     for hemi, info in hemi_info.items():
         print(
             f"{hemi}: "
@@ -2154,9 +2788,38 @@ def participant_density_cropped_plot(density_maps, participant, pidx, tract_orde
                 threshold=None,
                 bg_map=info["curv_crop"],
                 bg_on_data=True,
-                darkness=0.6,
+                darkness=nilearn_darkness,
                 axes=ax, figure=fig,
             )
+
+            # ---- darker curvature background, brighter data ----
+            surf_coll = ax.collections[0]
+            fc = np.array(surf_coll._facecolor3d)
+            if len(fc) == len(info["bg_ratio"]):
+                # faces that carry functional data
+                vals = surf_map[info["idx"]]
+                faces_crop = info["mesh_crop"][1]
+                has_data = ~np.isnan(vals[faces_crop]).all(axis=1)
+
+                # no data: darkened curvature as before
+                factor = info["bg_ratio"].copy()
+                # data: undo nilearn's curvature multiplication, then re-apply
+                # only a fraction (data_bg_strength) of the new curvature shading
+                s = data_bg_strength
+                factor[has_data] = (
+                    (1 - s * (1 - info["new_gray"][has_data]))
+                    / info["old_gray"][has_data]
+                )
+
+                fc[:, :3] = np.clip(fc[:, :3] * factor[:, None], 0, 1)
+                fc[has_data, 3] = 1.0          # fully opaque data faces
+                surf_coll.set_facecolor(fc)
+                surf_coll.set_edgecolor(fc)
+                surf_coll.set_linewidth(0.3)
+                surf_coll.set_antialiased(False)
+            else:
+                print(f"Warning: {len(fc)} face colors vs "
+                      f"{len(info['bg_ratio'])} faces; background not darkened.")
 
             # ---- identical scale for both hemispheres ----
             cx, cy, cz = info["center"]
@@ -2189,6 +2852,186 @@ def participant_density_cropped_plot(density_maps, participant, pidx, tract_orde
         for fmt in ("png", "svg"):
             fig.savefig(f"{out_base}.{fmt}", dpi=600, bbox_inches="tight")
         plt.close(fig)
+
+
+# def participant_density_cropped_plot(density_maps, participant, pidx, tract_order, bids_path,
+#                              img_out_dir, ylim, projfrac,
+#                              crop_radius=None, margin=15, cmap="RdYlGn_r",
+#                              figsize=(11, 5.5)):
+#     """One figure per tract: left + right hemisphere side by side for one participant.
+#     Both hemispheres use the SAME crop radius and are drawn at the SAME scale.
+#     crop_radius=None -> radius = largest hMT+ (Wang ROI) extent over both hemispheres + margin (mm)."""
+#     fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
+#     hemis = ["L", "R"]
+#     groups = ["EB", "NS"]
+#     vmin, vmax = ylim
+#     os.makedirs(img_out_dir, exist_ok=True)
+#     plt.rcParams["svg.fonttype"] = "none"   # keep text editable
+
+#     # ------------------------------------------------
+#     # Per-hemisphere setup (done once): ROI, curvature, geometry, centroid, extent
+#     # ------------------------------------------------
+#     hemi_info = {}
+#     for hemi in hemis:
+#         hemi_fs = "lh" if hemi == "L" else "rh"
+
+#         wang_hmt_path = op.join(
+#             '/Users', 'ldaumail3', 'Documents', 'research', 'brain_atlases',
+#             'Wang_2015', 'hmtplus',
+#             f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+#         )
+#         surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+#         n_vertices = len(surf_roi)
+#         wang_hmt_vertices = np.where(surf_roi > 0)[0]
+#         print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
+
+#         # Curvature background
+#         curv = nib.freesurfer.read_morph_data(
+#             op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv"))
+#         curv_norm = (curv - np.percentile(curv, 5)) / (
+#             np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8)
+#         curv_norm = np.clip(curv_norm, 0, 1)
+
+#         # Inflated geometry and hMT+ centroid
+#         coords, faces = nib.freesurfer.read_geometry(
+#             op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.inflated")
+#         )
+
+#         center = coords[wang_hmt_vertices].mean(axis=0)
+
+#         # Extent of hMT+ (Wang ROI + functional MT labels of both groups)
+#         roi_vertices = [wang_hmt_vertices]
+
+#         for group in groups:
+#             lf = op.join(
+#                 bids_path, 'analysis', 'ROIs', 'func_roi',
+#                 'functional_surf_roi', 'group_averages',
+#                 f"group-{group}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
+#             )
+
+#             if op.exists(lf):
+#                 roi_vertices.append(np.asarray(read_label(lf)))
+
+#         roi_vertices = np.unique(np.concatenate(roi_vertices))
+
+#         extent = np.linalg.norm(
+#             coords[roi_vertices] - center, axis=1
+#         ).max()
+#         hemi_info[hemi] = dict(
+#             n_vertices=n_vertices, wang_hmt_vertices=wang_hmt_vertices,
+#             curv_norm=curv_norm, coords=coords, faces=faces,
+#             center=center, extent=extent,
+#         )
+#         # Participant density maps for this hemisphere: (n_participants, n_tracts, n_masked)
+#         hemi_maps = {t: np.array([density_maps[hemi][sub][t] for sub in density_maps[hemi]])
+#                      for t in range(len(tract_order))}
+
+#         hemi_info[hemi] = dict(
+#             n_vertices=n_vertices, wang_hmt_vertices=wang_hmt_vertices,
+#             curv_norm=curv_norm, coords=coords, faces=faces,
+#             center=center, extent=extent, hemi_maps=hemi_maps,
+#         )
+
+#     # Common radius
+#     if crop_radius is None:
+#         crop_radius = max(
+#             info["extent"] for info in hemi_info.values()
+#         ) + margin
+
+#     print(f"Crop radius used for both hemispheres: {crop_radius:.1f} mm")
+
+#     # Crop meshes
+#     for hemi, info in hemi_info.items():
+
+#         coords, faces = info["coords"], info["faces"]
+
+#         keep = np.linalg.norm(
+#             coords - info["center"], axis=1
+#         ) <= crop_radius
+
+#         idx = np.where(keep)[0]
+
+#         new_index = -np.ones(info["n_vertices"], dtype=int)
+#         new_index[idx] = np.arange(len(idx))
+
+#         face_mask = keep[faces].all(axis=1)
+
+#         info["idx"] = idx
+#         info["mesh_crop"] = (
+#             coords[idx],
+#             new_index[faces[face_mask]]
+#         )
+
+#         info["curv_crop"] = info["curv_norm"][idx]
+#     for hemi, info in hemi_info.items():
+#         print(
+#             f"{hemi}: "
+#             f"extent={info['extent']:.2f} mm | "
+#             f"radius={crop_radius:.2f} mm | "
+#             f"vertices retained={len(info['idx'])}/{info['n_vertices']} "
+#             f"({100 * len(info['idx']) / info['n_vertices']:.1f}%)"
+#         )
+#     # ------------------------------------------------
+#     # One figure per tract, both hemispheres side by side
+#     # ------------------------------------------------
+#     for t, tract in enumerate(tract_order):
+#         fig = plt.figure(figsize=figsize)
+
+#         for h, hemi in enumerate(hemis):
+#             info = hemi_info[hemi]
+#             ax = fig.add_subplot(1, 2, h + 1, projection="3d")
+
+#             # Participant density on the full surface, then crop
+#             density_vals = info["hemi_maps"][t][pidx, :]
+#             surf_map = np.full((info["n_vertices"],), np.nan, dtype=np.float32)
+#             surf_map[info["wang_hmt_vertices"]] = density_vals
+
+#             plotting.plot_surf_stat_map(
+#                 surf_mesh=info["mesh_crop"],
+#                 stat_map=surf_map[info["idx"]],
+#                 hemi="left" if hemi == "L" else "right",
+#                 view="lateral",
+#                 cmap=cmap,
+#                 colorbar=False,                 # one shared colorbar below
+#                 vmin=vmin, vmax=vmax,
+#                 threshold=None,
+#                 bg_map=info["curv_crop"],
+#                 bg_on_data=True,
+#                 darkness=0.6,
+#                 axes=ax, figure=fig,
+#             )
+
+#             # ---- identical scale for both hemispheres ----
+#             cx, cy, cz = info["center"]
+#             ax.set_xlim(cx - crop_radius, cx + crop_radius)
+#             ax.set_ylim(cy - crop_radius, cy + crop_radius)
+#             ax.set_zlim(cz - crop_radius, cz + crop_radius)
+#             ax.set_box_aspect((1, 1, 1))
+
+#             ax.set_title(f"{hemi} hemisphere", fontsize=18, fontweight="bold")
+
+#             # Rasterize the 3D surface only (keeps the SVG small)
+#             for coll in ax.collections:
+#                 coll.set_rasterized(True)
+
+#         # ---- one shared colorbar ----
+#         sm = ScalarMappable(norm=Normalize(vmin=vmin, vmax=vmax), cmap=cmap)
+#         cbar = fig.colorbar(sm, ax=fig.axes, shrink=0.6, pad=0.02)
+#         cbar.ax.tick_params(labelsize=14)
+#         for lab in cbar.ax.get_yticklabels():
+#             lab.set_fontweight("bold")
+
+#         fig.suptitle(f"{participant} - {tract} (density)",
+#                      fontsize=20, fontweight="bold")
+
+#         # ---- save + close ----
+#         out_base = op.join(
+#             img_out_dir,
+#             f"{participant}_hemi-LR_label-{tract}_desc-density_inflated_{projfrac}frac_cropped"
+#         )
+#         for fmt in ("png", "svg"):
+#             fig.savefig(f"{out_base}.{fmt}", dpi=600, bbox_inches="tight")
+#         plt.close(fig)
 
 def participant_pred_plot(func_maps, participant, pidx, bids_path, img_out_dir, ylim):
     fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
@@ -2304,9 +3147,310 @@ def participant_pred_plot(func_maps, participant, pidx, bids_path, img_out_dir, 
             plt.close(display.figure)
 
 
+# def participant_pred_cropped_plot(func_maps, participant, pidx, bids_path, img_out_dir, ylim,
+#                           crop_radius=None, margin=15, cmap="plasma",
+#                           figsize=(11, 5.5), show_func_mt_boundary=False):
+
+#     fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
+#     hemis = ["L", "R"]
+#     vmin, vmax = ylim
+
+#     os.makedirs(img_out_dir, exist_ok=True)
+#     plt.rcParams["svg.fonttype"] = "none"
+
+#     # EB --> ptlocal only
+#     # NS --> mtlocal + ptlocal
+#     if "EB" in participant:
+#         localizers = ["ptlocal"]
+#     elif "NS" in participant:
+#         localizers = ["mtlocal", "ptlocal"]
+#     else:
+#         raise ValueError(f"Cannot determine localizers for {participant}")
+
+#     # ------------------------------------------------
+#     # Per-hemisphere setup: ROI, curvature, geometry,
+#     # centroid, extent, and participant functional maps
+#     # ------------------------------------------------
+#     hemi_info = {}
+
+#     for hemi in hemis:
+
+#         hemi_fs = "lh" if hemi == "L" else "rh"
+
+#         # ----------------------------
+#         # Load Wang hMT+ ROI
+#         # ----------------------------
+#         wang_hmt_path = op.join(
+#             '/Users', 'ldaumail3', 'Documents', 'research',
+#             'brain_atlases', 'Wang_2015', 'hmtplus',
+#             f"hemi-{hemi}_space-fsaverage_label-hMT_desc-wang_dilated.mgh"
+#         )
+
+#         surf_roi = nib.load(wang_hmt_path).get_fdata().squeeze()
+#         n_vertices = len(surf_roi)
+
+#         wang_hmt_vertices = np.where(surf_roi > 0)[0]
+#         print(f"{len(wang_hmt_vertices)} vertices in ROI ({hemi})")
+
+#         # ----------------------------
+#         # Load functional MT ROI
+#         # ----------------------------
+#         label_file = op.join(
+#             bids_path, 'analysis', 'ROIs', 'func_roi',
+#             'functional_surf_roi', participant,
+#             f"{participant}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
+#         )
+
+#         func_mt_vertices = read_label(label_file)
+
+#         func_mt_roi = np.zeros(n_vertices, dtype=np.float32)
+#         func_mt_roi[func_mt_vertices] = 1
+
+#         # ----------------------------
+#         # Curvature background
+#         # ----------------------------
+#         curv = nib.freesurfer.read_morph_data(
+#             op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.curv")
+#         )
+
+#         curv_norm = (curv - np.percentile(curv, 5)) / (
+#             np.percentile(curv, 95) - np.percentile(curv, 5) + 1e-8
+#         )
+#         curv_norm = np.clip(curv_norm, 0, 1)
+
+#         # ----------------------------
+#         # Inflated surface geometry
+#         # ----------------------------
+#         coords, faces = nib.freesurfer.read_geometry(
+#             op.join(fs_path, "fsaverage", "surf", f"{hemi_fs}.inflated")
+#         )
+
+#         center = coords[wang_hmt_vertices].mean(axis=0)
+
+#         # Extent of hMT+ (Wang ROI + functional MT labels of both groups)
+#         groups = ["EB", "NS"]
+#         roi_vertices = [wang_hmt_vertices]
+
+#         for group in groups:
+#             lf = op.join(
+#                 bids_path, 'analysis', 'ROIs', 'func_roi',
+#                 'functional_surf_roi', 'group_averages',
+#                 f"group-{group}_hemi-{hemi}_space-fsaverage_label-MT_mask.label"
+#             )
+
+#             if op.exists(lf):
+#                 roi_vertices.append(np.asarray(read_label(lf)))
+
+#         roi_vertices = np.unique(np.concatenate(roi_vertices))
+
+#         extent = np.linalg.norm(
+#             coords[roi_vertices] - center, axis=1
+#         ).max()
+
+#         # ----------------------------
+#         # Participant functional maps
+#         # One map per localizer
+#         # ----------------------------
+#         hemi_maps = {}
+
+#         for c, cont in enumerate(localizers):
+
+#             hemi_maps[cont] = np.nanmean(
+#                 np.squeeze(func_maps[hemi][c][pidx]),
+#                 axis=0
+#             )
+
+#         hemi_info[hemi] = dict(
+#             n_vertices=n_vertices,
+#             wang_hmt_vertices=wang_hmt_vertices,
+#             func_mt_roi=func_mt_roi,
+#             curv_norm=curv_norm,
+#             coords=coords,
+#             faces=faces,
+#             center=center,
+#             extent=extent,
+#             hemi_maps=hemi_maps
+#         )
+
+#     # ------------------------------------------------
+#     # Common crop radius: largest hMT+ extent sets
+#     # the radius for BOTH hemispheres
+#     # ------------------------------------------------
+#     if crop_radius is None:
+#         crop_radius = max(
+#             info["extent"] for info in hemi_info.values()
+#         ) + margin
+
+#     print(f"Crop radius used for both hemispheres: {crop_radius:.1f} mm")
+
+#     # ------------------------------------------------
+#     # Crop both meshes using the same radius
+#     # ------------------------------------------------
+#     for hemi, info in hemi_info.items():
+
+#         coords = info["coords"]
+#         faces = info["faces"]
+
+#         keep = np.linalg.norm(
+#             coords - info["center"], axis=1
+#         ) <= crop_radius
+
+#         idx = np.where(keep)[0]
+
+#         new_index = -np.ones(info["n_vertices"], dtype=int)
+#         new_index[idx] = np.arange(len(idx))
+
+#         face_mask = keep[faces].all(axis=1)
+
+#         info["idx"] = idx
+#         info["mesh_crop"] = (
+#             coords[idx],
+#             new_index[faces[face_mask]]
+#         )
+
+#         info["curv_crop"] = info["curv_norm"][idx]
+
+#         # Cropped functional MT ROI for optional boundary overlay
+#         info["func_mt_roi_crop"] = info["func_mt_roi"][idx]
+
+#     # ------------------------------------------------
+#     # One figure per localizer:
+#     # left + right hemispheres side by side
+#     # ------------------------------------------------
+#     for cont in localizers:
+
+#         fig = plt.figure(figsize=figsize)
+
+#         for h, hemi in enumerate(hemis):
+
+#             info = hemi_info[hemi]
+
+#             ax = fig.add_subplot(
+#                 1, 2, h + 1, projection="3d"
+#             )
+
+#             # ----------------------------
+#             # Functional map on full surface
+#             # then crop
+#             # ----------------------------
+#             func_vals = info["hemi_maps"][cont]
+
+#             surf_map = np.full(
+#                 (info["n_vertices"],),
+#                 np.nan,
+#                 dtype=np.float32
+#             )
+
+#             surf_map[info["wang_hmt_vertices"]] = func_vals
+
+#             # ----------------------------
+#             # Plot cropped surface
+#             # ----------------------------
+#             plotting.plot_surf_stat_map(
+#                 surf_mesh=info["mesh_crop"],
+#                 stat_map=surf_map[info["idx"]],
+#                 hemi="left" if hemi == "L" else "right",
+#                 view="lateral",
+#                 cmap=cmap,
+#                 colorbar=False,
+#                 vmin=vmin,
+#                 vmax=vmax,
+#                 threshold=None,
+#                 bg_map=info["curv_crop"],
+#                 bg_on_data=True,
+#                 darkness=0.6,
+#                 axes=ax,
+#                 figure=fig
+#             )
+
+#             # ----------------------------
+#             # Optional functional MT boundary
+#             # ----------------------------
+#             if show_func_mt_boundary:
+
+#                 plotting.plot_surf_contours(
+#                     surf_mesh=info["mesh_crop"],
+#                     roi_map=info["func_mt_roi_crop"],
+#                     levels=[0.5],
+#                     colors=["lightgray"],
+#                     linewidths=2.0,
+#                     figure=fig,
+#                     axes=ax
+#                 )
+
+#             # ----------------------------
+#             # Identical scale for both hemispheres
+#             # ----------------------------
+#             cx, cy, cz = info["center"]
+
+#             ax.set_xlim(cx - crop_radius, cx + crop_radius)
+#             ax.set_ylim(cy - crop_radius, cy + crop_radius)
+#             ax.set_zlim(cz - crop_radius, cz + crop_radius)
+
+#             ax.set_box_aspect((1, 1, 1))
+
+#             ax.set_title(
+#                 f"{hemi} hemisphere",
+#                 fontsize=18,
+#                 fontweight="bold"
+#             )
+
+#             # Rasterize surface only
+#             for coll in ax.collections:
+#                 coll.set_rasterized(True)
+
+#         # ------------------------------------------------
+#         # Shared colorbar
+#         # ------------------------------------------------
+#         sm = ScalarMappable(
+#             norm=Normalize(vmin=vmin, vmax=vmax),
+#             cmap=cmap
+#         )
+
+#         cbar = fig.colorbar(
+#             sm,
+#             ax=fig.axes,
+#             shrink=0.6,
+#             pad=0.02
+#         )
+
+#         cbar.ax.tick_params(labelsize=14)
+
+#         for lab in cbar.ax.get_yticklabels():
+#             lab.set_fontweight("bold")
+
+#         # ------------------------------------------------
+#         # Figure title
+#         # ------------------------------------------------
+#         fig.suptitle(
+#             f"{participant} - {cont} (motionXstationary)",
+#             fontsize=20,
+#             fontweight="bold"
+#         )
+
+#         # ------------------------------------------------
+#         # Save PNG + SVG
+#         # ------------------------------------------------
+#         out_base = op.join(
+#             img_out_dir,
+#             f"{participant}_hemi-LR_label-{cont}_"
+#             f"desc-motionXstationary_inflated_cropped"
+#         )
+
+#         for fmt in ("png", "svg"):
+#             fig.savefig(
+#                 f"{out_base}.{fmt}",
+#                 dpi=600,
+#                 bbox_inches="tight"
+#             )
+
+#         plt.close(fig)
+
 def participant_pred_cropped_plot(func_maps, participant, pidx, bids_path, img_out_dir, ylim,
                           crop_radius=None, margin=15, cmap="plasma",
-                          figsize=(11, 5.5), show_func_mt_boundary=False):
+                          figsize=(11, 5.5), show_func_mt_boundary=False,
+                          gyri_dark=0.35, sulci_dark=0.95,
+                          nilearn_darkness=0.6, data_bg_strength=0.25):
 
     fs_path = op.join(bids_path, 'derivatives', 'freesurfer')
     hemis = ["L", "R"]
@@ -2458,14 +3602,22 @@ def participant_pred_cropped_plot(func_maps, participant, pidx, bids_path, img_o
         new_index[idx] = np.arange(len(idx))
 
         face_mask = keep[faces].all(axis=1)
+        faces_crop = new_index[faces[face_mask]]
 
         info["idx"] = idx
-        info["mesh_crop"] = (
-            coords[idx],
-            new_index[faces[face_mask]]
-        )
+        info["mesh_crop"] = (coords[idx], faces_crop)
 
         info["curv_crop"] = info["curv_norm"][idx]
+
+        # Per-face background value, normalized to 0-1 the same way nilearn does
+        bg_faces = info["curv_crop"][faces_crop].mean(axis=1)
+        bg_faces = (bg_faces - bg_faces.min()) / (bg_faces.max() - bg_faces.min() + 1e-12)
+        # gray level nilearn used (gray_r: 1 = white) and the one we want
+        old_gray = 1.0 - bg_faces * nilearn_darkness
+        new_gray = 1.0 - (gyri_dark + (sulci_dark - gyri_dark) * bg_faces)
+        info["old_gray"] = old_gray
+        info["new_gray"] = new_gray
+        info["bg_ratio"] = new_gray / old_gray
 
         # Cropped functional MT ROI for optional boundary overlay
         info["func_mt_roi_crop"] = info["func_mt_roi"][idx]
@@ -2515,10 +3667,39 @@ def participant_pred_cropped_plot(func_maps, participant, pidx, bids_path, img_o
                 threshold=None,
                 bg_map=info["curv_crop"],
                 bg_on_data=True,
-                darkness=0.6,
+                darkness=nilearn_darkness,
                 axes=ax,
                 figure=fig
             )
+
+            # ---- darker curvature background, brighter data ----
+            surf_coll = ax.collections[0]
+            fc = np.array(surf_coll._facecolor3d)
+            if len(fc) == len(info["bg_ratio"]):
+                # faces that carry functional data
+                vals = surf_map[info["idx"]]
+                faces_crop = info["mesh_crop"][1]
+                has_data = ~np.isnan(vals[faces_crop]).all(axis=1)
+
+                # no data: darkened curvature as before
+                factor = info["bg_ratio"].copy()
+                # data: undo nilearn's curvature multiplication, then re-apply
+                # only a fraction (data_bg_strength) of the new curvature shading
+                s = data_bg_strength
+                factor[has_data] = (
+                    (1 - s * (1 - info["new_gray"][has_data]))
+                    / info["old_gray"][has_data]
+                )
+
+                fc[:, :3] = np.clip(fc[:, :3] * factor[:, None], 0, 1)
+                fc[has_data, 3] = 1.0          # fully opaque data faces
+                surf_coll.set_facecolor(fc)
+                surf_coll.set_edgecolor(fc)
+                surf_coll.set_linewidth(0.3)
+                surf_coll.set_antialiased(False)
+            else:
+                print(f"Warning: {len(fc)} face colors vs "
+                      f"{len(info['bg_ratio'])} faces; background not darkened.")
 
             # ----------------------------
             # Optional functional MT boundary
@@ -2602,3 +3783,6 @@ def participant_pred_cropped_plot(func_maps, participant, pidx, bids_path, img_o
             )
 
         plt.close(fig)
+
+
+

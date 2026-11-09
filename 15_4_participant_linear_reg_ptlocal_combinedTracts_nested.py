@@ -445,31 +445,20 @@ beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename, yli
 
 #Average plots
 img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "mean_density")
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
-jet = plt.cm.get_cmap('jet')
-cmap = mcolors.LinearSegmentedColormap.from_list(
-    'jet_green_red', jet(np.linspace(0.5, 1, 256))
-)
+cmap = 'plasma'
 ylim = [-1, 2]
 avg_density_cropped_plot(norm_density_data, participants, tract_order, bids_path, img_out_dir, projfrac, ylim, crop_radius=45, cmap = cmap)
 
+cmap = 'RdBu_r'
 img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "mean_contrast")
-avg_func_cropped_plot(norm_contrast_data, participants, bids_path, img_out_dir, crop_radius=45)
+avg_func_cropped_plot(norm_contrast_data, participants, bids_path, img_out_dir, crop_radius=45, cmap = cmap, sulci_dark=0.75, data_bg_strength=0.5)
 
 #Participant density plot
 img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg_ptlocal",  "surface_pngs", "participant_density")
 participant = "sub-NSxLxATx1954"
 pidx = [i for i, p in enumerate(participants) if participant in p]
 ylim = [-1, 3]
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
-jet = plt.cm.get_cmap('jet')
-cmap = mcolors.LinearSegmentedColormap.from_list(
-    'jet_green_red', jet(np.linspace(0.5, 1, 256))
-)
+cmap = 'plasma'
 participant_density_cropped_plot(norm_density_data, participant, pidx, tract_order, bids_path, img_out_dir, ylim, projfrac, cmap = cmap, crop_radius=45)
 
 img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_targ_participants_linearreg",  "surface_pngs", "participant_functional_pred")
