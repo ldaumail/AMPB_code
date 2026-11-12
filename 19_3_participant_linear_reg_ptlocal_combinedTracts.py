@@ -175,6 +175,7 @@ localizer_order = ["mtlocal", "ptlocal"]
 n_subj = len(participants)
 n_tracts = len(tract_order)
 norm_density_data = {hemi: {} for hemi in hemis}
+density_data_raw = {hemi: {} for hemi in hemis}
 norm_contrast_data = {hemi: {} for hemi in hemis}
 for h, hemi in enumerate(hemis):
     densities = density_data[hemi]        # X; (subj, tract, vertices)
@@ -225,6 +226,7 @@ for h, hemi in enumerate(hemis):
             
         #Prepare subject's X = zscored density maps for each tract
         zscored_densities = np.full((n_tracts, n_masked), np.nan)
+        subj_raw_densities = np.full((n_tracts, n_masked), np.nan)
         for tract_idx in range(n_tracts):
 
             print(f" Tract {tract_idx+1}/{n_tracts} z-scored")
@@ -235,17 +237,23 @@ for h, hemi in enumerate(hemis):
             if n_tracts == 1:
                 if np.std(densities_masked[s, :]) == 0:
                     zscored_densities[tract_idx,:] = 0
+                    subj_raw_densities[tract_idx,:] = 0
                 else:
                     zscored_densities[tract_idx,:] = (densities_masked[s, :] - np.mean(densities_masked[s, :]))/np.std(densities_masked[s, :])
+                    subj_raw_densities[tract_idx,:] = (densities_masked[s, :])/np.sum(densities_masked[s, :])
             else:
                 if np.std(densities_masked[s, tract_idx, :]) == 0:
                     zscored_densities[tract_idx,:] = 0
+                    subj_raw_densities[tract_idx,:] = 0
                 else:
                     zscored_densities[tract_idx,:] = (densities_masked[s, tract_idx, :] - np.mean(densities_masked[s, tract_idx, :]))/np.std(densities_masked[s, tract_idx, :])
+                    subj_raw_densities[tract_idx,:] = (densities_masked[s, tract_idx, :])/np.sum(densities_masked[s, tract_idx, :])
 
 
         norm_density_data[hemi].setdefault(s, {})
         norm_density_data[hemi][s] = zscored_densities
+        density_data_raw[hemi].setdefault(s, {})
+        density_data_raw[hemi][s] = subj_raw_densities
 
 #================Useful functions ============
 #Define a goodness of fit function
@@ -440,7 +448,7 @@ density_dir = op.join(bids_path, 'analysis', 'tdi_maps', 'dipy_wmgmi_tdi_maps')
 participants = sorted([p for p in os.listdir(density_dir) if p.startswith("sub-")])
 projfrac = '1'
 savefilename = f"wb_pearson_linearreg_combined_tracts_{projfrac}frac"
-ylim = [-0.2, 1]
+ylim = [0, 1]
 rs_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'diff2func_model_fits', 'pyAFQ3beta_wb_participants_linearreg_ptlocal', 'pearsonr_contrast-motionXstationary_combined_1frac.csv')
 rs = pd.read_csv(rs_file) 
 nc_file = op.join('/Users', 'ldaumail3', 'Documents', 'research', 'ampb_mt_tractometry_analysis', 'ampb', 'analysis', 'diff2func_model_fits', 'pyAFQ3beta_wb_participants_linearreg_ptlocal', 'noiseceiling_contrast-motionXstationary_combined_1frac.csv')
@@ -462,17 +470,9 @@ beta_plot(trained_coefs, participants, tract_order, bids_path, savefilename, yli
 #Data plots
 #Average plots
 img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_wb_participants_linearreg",  "surface_pngs", "mean_density")
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
-jet = plt.cm.get_cmap('jet')
-# cmap = mcolors.LinearSegmentedColormap.from_list(
-#     'jet_green_red', jet(np.linspace(0.5, 1, 256))
-# )
 cmap = 'plasma'
-ylim = [-1, 2]
-avg_density_cropped_plot(norm_density_data, participants, tract_order, bids_path, img_out_dir, projfrac, ylim, crop_radius=45, cmap = cmap)
-
+ylim = [0, 0.001]
+avg_density_cropped_plot(density_data_raw, participants, tract_order, bids_path, img_out_dir, projfrac, ylim, crop_radius=45, cmap = cmap, sulci_dark=0.75)
 
 img_out_dir = op.join(bids_path, "analysis", "diff2func_model_fits", "pyAFQ3beta_wb_participants_linearreg_ptlocal",  "surface_pngs", "mean_density")
 avg_density_plot(norm_density_data, participants, tract_order, bids_path, img_out_dir, projfrac)
